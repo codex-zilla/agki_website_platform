@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking Confirmed - MediBook</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-green: #2d5a2d;
+            --light-green: #4a7c59;
+            --gradient-green: linear-gradient(135deg, #2d5a2d 0%, #4a7c59 100%);
+            --accent-green: #7cc576;
+            --light-bg: #f8f9fa;
+            --dark-text: #333;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--dark-text);
+            line-height: 1.6;
+            background: var(--light-bg);
+        }
+
+        /* Navigation */
+        .navbar {
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 1rem 0;
+        }
+
+        .navbar-brand {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: var(--primary-green) !important;
+        }
+
+        /* Success Container */
+        .success-container {
+            min-height: calc(100vh - 200px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem 15px;
+        }
+
+        .success-card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            max-width: 700px;
+            width: 100%;
+            overflow: hidden;
+            animation: slideUp 0.6s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .success-header {
+            background: var(--gradient-green);
+            padding: 3rem 2rem;
+            text-align: center;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .success-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            animation: pulse 3s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+
+        .success-icon {
+            width: 100px;
+            height: 100px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            animation: checkmarkPop 0.6s ease-out 0.3s both;
+            position: relative;
+            z-index: 1;
+        }
+
+        @keyframes checkmarkPop {
+            0% {
+                transform: scale(0);
+                opacity: 0;
+            }
+            50% {
+                transform: scale(1.1);
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .success-icon i {
+            font-size: 3.5rem;
+            color: var(--primary-green);
+            animation: checkmarkDraw 0.4s ease-out 0.6s both;
+        }
+
+        @keyframes checkmarkDraw {
+            from { transform: scale(0); }
+            to { transform: scale(1); }
+        }
+
+        .success-title {
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .success-subtitle {
+            font-size: 1.1rem;
+            opacity: 0.95;
+            position: relative;
+            z-index: 1;
+        }
+
+        .success-body {
+            padding: 2.5rem;
+        }
+
+        /* Booking ID Section */
+        .booking-id-section {
+            background: linear-gradient(135deg, #f0f8f0 0%, #e8f5e8 100%);
+            border: 2px dashed var(--primary-green);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .booking-id-label {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .booking-id {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary-green);
+            font-family: 'Courier New', monospace;
+            letter-spacing: 2px;
+            margin-bottom: 0.5rem;
+        }
+
+        .booking-id-info {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 0.5rem;
+        }
+
+        .copy-button {
+            background: var(--primary-green);
+            color: white;
+            border: none;
+            padding: 0.5rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+        }
+
+        .copy-button:hover {
+            background: var(--light-green);
+            transform: translateY(-2px);
+        }
+
+        .copy-button.copied {
+            background: var(--accent-green);
+        }
+
+        /* Appointment Details */
+        .appointment-details {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .details-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--primary-green);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .detail-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .detail-row:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .detail-icon {
+            width: 45px;
+            height: 45px;
+            background: var(--gradient-green);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.2rem;
+            margin-right: 1rem;
+            flex-shrink: 0;
+        }
+
+        .detail-content {
+            flex: 1;
+        }
+
+        .detail-label {
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 0.15rem;
+            font-weight: 500;
+        }
+
+        .detail-value {
+            font-weight: 600;
+            color: var(--dark-text);
+            font-size: 1rem;
+        }
+
+        /* Next Steps */
+        .next-steps {
+            background: #fff9e6;
+            border-left: 4px solid #ffc107;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .next-steps-title {
+            font-weight: 700;
+            color: var(--dark-text);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .next-steps-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .next-steps-list li {
+            padding: 0.5rem 0;
+            padding-left: 2rem;
+            position: relative;
+            color: #666;
+        }
+
+        .next-steps-list li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: var(--accent-green);
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .action-button {
+            padding: 1rem;
+            border-radius: 10px;
+            text-decoration: none;
+            text-align: center;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            border: 2px solid;
+        }
+
+        .action-button.primary {
+            background: var(--gradient-green);
+            color: white;
+            border-color: var(--primary-green);
+        }
+
+        .action-button.primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(45, 90, 45, 0.3);
+        }
+
+        .action-button.secondary {
+            background: white;
+            color: var(--primary-green);
+            border-color: var(--primary-green);
+        }
+
+        .action-button.secondary:hover {
+            background: #f0f8f0;
+            transform: translateY(-3px);
+        }
+
+        /* Calendar/Reminder Buttons */
+        .reminder-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .reminder-button {
+            flex: 1;
+            min-width: 150px;
+            padding: 0.75rem 1rem;
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            color: var(--dark-text);
+            text-decoration: none;
+            font-weight: 600;
+            text-align: center;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .reminder-button:hover {
+            border-color: var(--primary-green);
+            background: #f8fff8;
+            color: var(--primary-green);
+        }
+
+        /* Help Section */
+        .help-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .help-section h4 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--dark-text);
+            margin-bottom: 0.5rem;
+        }
+
+        .help-section p {
+            color: #666;
+            margin-bottom: 1rem;
+            font-size: 0.95rem;
+        }
+
+        .help-links {
+            display: flex;
+            gap: 1.5rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .help-link {
+            color: var(--primary-green);
+            text-decoration: none;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s;
+        }
+
+        .help-link:hover {
+            color: var(--light-green);
+            transform: translateX(3px);
+        }
+
+        /* Footer */
+        .footer {
+            background: #1a1a1a;
+            color: white;
+            padding: 2rem 0 1rem;
+            margin-top: 3rem;
+        }
+
+        .footer-content {
+            text-align: center;
+            color: #999;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .success-title {
+                font-size: 1.8rem;
+            }
+
+            .success-subtitle {
+                font-size: 1rem;
+            }
+
+            .booking-id {
+                font-size: 1.5rem;
+            }
+
+            .success-body {
+                padding: 1.5rem;
+            }
+
+            .action-buttons {
+                grid-template-columns: 1fr;
+            }
+
+            .reminder-buttons {
+                flex-direction: column;
+            }
+
+            .reminder-button {
+                min-width: 100%;
+            }
+        }
+
+        /* Confetti Animation */
+        .confetti {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        .confetti-piece {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: var(--accent-green);
+            animation: confettiFall 3s linear forwards;
+        }
+
+        @keyframes confettiFall {
+            to {
+                transform: translateY(100vh) rotate(360deg);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg sticky-top">
+        <div class="container">
+            <a class="navbar-brand" href="{% url 'appointment_home' %}">
+                <i class="fas fa-heartbeat"></i> MediBook
+            </a>
+        </div>
+    </nav>
+
+    <!-- Success Container -->
+    <div class="success-container">
+        <div class="success-card">
+            <!-- Success Header -->
+            <div class="success-header">
+                <div class="success-icon">
+                    <i class="fas fa-check"></i>
+                </div>
+                <h1 class="success-title">Appointment Confirmed!</h1>
+                <p class="success-subtitle">Your appointment has been successfully booked</p>
+            </div>
+
+            <!-- Success Body -->
+            <div class="success-body">
+                <!-- Booking ID -->
+                <div class="booking-id-section">
+                    <div class="booking-id-label">Your Booking ID</div>
+                    <div class="booking-id" id="bookingId">{{appointment.bookingID}}</div>
+                    <div class="booking-id-info">
+                        <i class="fas fa-info-circle"></i> Save this ID for future reference
+                    </div>
+                    <button class="copy-button" id="copyBtn">
+                        <i class="fas fa-copy"></i> Copy Booking ID
+                    </button>
+                </div>
+
+                <!-- Appointment Details -->
+                <div class="appointment-details">
+                    <div class="details-title">
+                        <i class="fas fa-calendar-check"></i>
+                        Appointment Details
+                    </div>
+
+                    <div class="detail-row">
+                        <div class="detail-icon">
+                            <i class="fas fa-user-md"></i>
+                        </div>
+                        <div class="detail-content">
+                            <div class="detail-label">Doctor</div>
+                            <div class="detail-value">{{appointment.slot.user.get_full_name}}</div>
+                            <small style="color: #666;">{{appointment.slot.user.role}}</small>
+                        </div>
+                    </div>
+
+                    <div class="detail-row">
+                        <div class="detail-icon">
+                            <i class="fas fa-calendar-alt"></i>
+                        </div>
+                        <div class="detail-content">
+                            <div class="detail-label">Date & Time</div>
+                            <div class="detail-value">{{appointment.slot.date}}</div>
+                            <small style="color: #666;">{{appointment.slot.time}}</small>
+                        </div>
+                    </div>
+
+                    <div class="detail-row">
+                        <div class="detail-icon">
+                            <i class="fas fa-map-marker-alt"></i>
+                        </div>
+                        <div class="detail-content">
+                            <div class="detail-label">Location</div>
+                            <div class="detail-value">{{profile.region}}</div>
+                            <small style="color: #666;">{{profile.location}}</small>
+                        </div>
+                    </div>
+
+                    <div class="detail-row">
+                        <div class="detail-icon">
+                            <i class="fas fa-envelope"></i>
+                        </div>
+                        <div class="detail-content">
+                            <div class="detail-label">Confirmation Sent To</div>
+                            <div class="detail-value">{{appointment.slot.user.email}}</div>
+                            <small style="color: #666;">Check your email for details</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Next Steps -->
+                <div class="next-steps">
+                    <div class="next-steps-title">
+                        <i class="fas fa-list-check"></i>
+                        What Happens Next?
+                    </div>
+                    <ul class="next-steps-list">
+                        <li>You'll receive a confirmation email with all appointment details</li>
+                        <li>We'll send you reminders 24 hours and 1 hour before your appointment</li>
+                        <li>Please arrive 15 minutes early for check-in</li>
+                        <li>Bring your insurance card and a valid ID</li>
+                    </ul>
+                </div>
+
+                <!-- Add to Calendar -->
+                <div class="reminder-buttons">
+                    <a href="#" class="reminder-button" id="addToGoogle">
+                        <i class="fab fa-google"></i> Google Calendar
+                    </a>
+                    <a href="#" class="reminder-button" id="addToApple">
+                        <i class="fab fa-apple"></i> Apple Calendar
+                    </a>
+                    <a href="#" class="reminder-button" id="addToOutlook">
+                        <i class="fab fa-microsoft"></i> Outlook
+                    </a>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="action-buttons">
+                    <a href="{% url 'appointment_detail' appointment.id %}" class="action-button primary">
+                        <i class="fas fa-calendar"></i> View My Appointments
+                    </a>
+                    <a href="{% url 'appointment_home' %}" class="action-button secondary">
+                        <i class="fas fa-home"></i> Back to Home
+                    </a>
+                </div>
+
+                <!-- Help Section -->
+                <div class="help-section">
+                    <h4>Need Help?</h4>
+                    <p>If you have any questions or need to make changes</p>
+                    <div class="help-links">
+                        <a href="#" class="help-link">
+                            <i class="fas fa-phone"></i> Call Support
+                        </a>
+                        <a href="#" class="help-link">
+                            <i class="fas fa-comment"></i> Live Chat
+                        </a>
+                        <a href="#" class="help-link">
+                            <i class="fas fa-envelope"></i> Email Us
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <p>&copy; 2025 MediBook. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Copy Booking ID functionality
+        const copyBtn = document.getElementById('copyBtn');
+        const bookingId = document.getElementById('bookingId').textContent;
+
+        copyBtn.addEventListener('click', async function() {
+            try {
+                await navigator.clipboard.writeText(bookingId);
+                
+                // Change button text and style
+                const originalHTML = this.innerHTML;
+                this.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                this.classList.add('copied');
+
+                // Reset after 2 seconds
+                setTimeout(() => {
+                    this.innerHTML = originalHTML;
+                    this.classList.remove('copied');
+                }, 2000);
+            } catch (err) {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = bookingId;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                this.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                this.classList.add('copied');
+                setTimeout(() => {
+                    this.innerHTML = '<i class="fas fa-copy"></i> Copy Booking ID';
+                    this.classList.remove('copied');
+                }, 2000);
+            }
+        });
+
+        // Add to Calendar functionality
+        const appointmentDetails = {
+            title: 'Appointment with Dr. Sarah Johnson',
+            description: 'Cardiologist consultation at Manhattan Heart Center',
+            location: 'Manhattan Heart Center, 123 Park Ave, New York, NY 10016',
+            start: '2025-10-11T09:00:00',
+            end: '2025-10-11T09:30:00'
+        };
+
+        // Google Calendar
+        document.getElementById('addToGoogle').addEventListener('click', function(e) {
+            e.preventDefault();
+            const googleUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(appointmentDetails.title)}&details=${encodeURIComponent(appointmentDetails.description)}&location=${encodeURIComponent(appointmentDetails.location)}&dates=${appointmentDetails.start.replace(/[-:]/g, '')}/${appointmentDetails.end.replace(/[-:]/g, '')}`;
+            window.open(googleUrl, '_blank');
+        });
+
+        // Apple Calendar (ICS file)
+        document.getElementById('addToApple').addEventListener('click', function(e) {
+            e.preventDefault();
+            const icsContent = `BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+DTSTART:${appointmentDetails.start.replace(/[-:]/g, '')}
+DTEND:${appointmentDetails.end.replace(/[-:]/g, '')}
+SUMMARY:${appointmentDetails.title}
+DESCRIPTION:${appointmentDetails.description}
+LOCATION:${appointmentDetails.location}
+END:VEVENT
+END:VCALENDAR`;
+            
+            const blob = new Blob([icsContent], { type: 'text/calendar' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'appointment.ics';
+            a.click();
+            window.URL.revokeObjectURL(url);
+        });
+
+        // Outlook Calendar
+        document.getElementById('addToOutlook').addEventListener('click', function(e) {
+            e.preventDefault();
+            const outlookUrl = `https://outlook.live.com/calendar/0/deeplink/compose?subject=${encodeURIComponent(appointmentDetails.title)}&body=${encodeURIComponent(appointmentDetails.description)}&location=${encodeURIComponent(appointmentDetails.location)}&startdt=${appointmentDetails.start}&enddt=${appointmentDetails.end}`;
+            window.open(outlookUrl, '_blank');
+        });
+
+        // View Appointments button - redirects to appointments page
+        document.getElementById('viewAppointmentsBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            // Redirect to appointments/follow-up page
+            window.location.href = 'my-appointments.html';
+        });
+
+        // Confetti effect on page load
+        function createConfetti() {
+            const confettiContainer = document.createElement('div');
+            confettiContainer.className = 'confetti';
+            document.body.appendChild(confettiContainer);
+
+            const colors = ['#2d5a2d', '#4a7c59', '#7cc576', '#ffc107', '#17a2b8'];
+            const confettiCount = 50;
+
+            for (let i = 0; i < confettiCount; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti-piece';
+                confetti.style.left = Math.random() * 100 + '%';
+                confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.animationDelay = Math.random() * 0.5 + 's';
+                confetti.style.animationDuration = (Math.random() * 2 + 2) + 's';
+                confettiContainer.appendChild(confetti);
+            }
+
+            // Remove confetti after animation
+            setTimeout(() => {
+                confettiContainer.remove();
+            }, 3000);
+        }
+
+        // Trigger confetti on page load
+        window.addEventListener('load', createConfetti);
+
+        // Print functionality (optional)
+        function printConfirmation() {
+            window.print();
+        }
+
+        // Store booking ID in localStorage for future reference
+        localStorage.setItem('lastBookingId', bookingId);
+        localStorage.setItem('lastBookingDate', new Date().toISOString());
+    </script>
+</body>
+</html>

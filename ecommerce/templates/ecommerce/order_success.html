@@ -1,0 +1,706 @@
+{% extends 'ecommerce/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block container %}
+<style>
+    /* Invoice Container */
+    .invoice-container {
+        max-width: 800px;
+        margin: 40px auto;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 5px 30px rgba(0, 0, 0, 0.1);
+        padding: 40px;
+        position: relative;
+    }
+
+    /* Print-only styles - hidden on screen */
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        .invoice-print-area,
+        .invoice-print-area * {
+            visibility: visible;
+        }
+        .invoice-print-area {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            padding: 0;
+            margin: 0;
+            box-shadow: none;
+        }
+        .no-print {
+            display: none !important;
+        }
+        .page-break {
+            page-break-after: always;
+        }
+        .invoice-print-area {
+            font-size: 12px;
+        }
+    }
+
+    /* Invoice Header */
+    .invoice-header {
+        text-align: center;
+        margin-bottom: 40px;
+        padding-bottom: 20px;
+        border-bottom: 2px solid #4CAF50;
+    }
+
+    .invoice-header h1 {
+        color: #2E7D32;
+        margin-bottom: 10px;
+        font-size: 32px;
+    }
+
+    .invoice-meta {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 20px;
+        color: #666;
+        font-size: 14px;
+    }
+
+    /* Company Logo & Info */
+    .company-info {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    .company-logo {
+        font-size: 24px;
+        font-weight: bold;
+        color: #2E7D32;
+        margin-bottom: 10px;
+    }
+
+    .company-contact {
+        color: #666;
+        font-size: 14px;
+        margin-bottom: 5px;
+    }
+
+    /* Customer & Shipping Info */
+    .info-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 40px;
+        margin: 30px 0;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
+
+    .info-section h4 {
+        color: #2E7D32;
+        margin-bottom: 10px;
+        border-bottom: 1px solid #ddd;
+        padding-bottom: 5px;
+    }
+
+    .info-section p {
+        margin: 5px 0;
+        line-height: 1.4;
+    }
+
+    /* Items Table */
+    .items-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 30px 0;
+    }
+
+    .items-table th {
+        background: #4CAF50;
+        color: white;
+        padding: 12px 15px;
+        text-align: left;
+        font-weight: 600;
+    }
+
+    .items-table td {
+        padding: 12px 15px;
+        border-bottom: 1px solid #eee;
+    }
+
+    .items-table tr:nth-child(even) {
+        background: #f9f9f9;
+    }
+
+    .items-table tr:hover {
+        background: #f5f5f5;
+    }
+
+    .text-right {
+        text-align: right;
+    }
+
+    .text-center {
+        text-align: center;
+    }
+
+    /* Totals Section */
+    .totals-section {
+        margin-top: 30px;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
+
+    .total-row {
+        display: flex;
+        justify-content: space-between;
+        margin: 10px 0;
+        padding: 5px 0;
+        border-bottom: 1px solid #eee;
+    }
+
+    .total-row:last-child {
+        border-bottom: none;
+    }
+
+    .grand-total {
+        font-size: 20px;
+        font-weight: bold;
+        color: #2E7D32;
+        border-top: 2px solid #4CAF50;
+        padding-top: 15px;
+        margin-top: 15px;
+    }
+
+    /* Payment & Status */
+    .payment-info {
+        margin-top: 30px;
+        padding: 20px;
+        background: #e8f5e9;
+        border-radius: 8px;
+        border-left: 4px solid #4CAF50;
+    }
+
+    .payment-info h4 {
+        color: #2E7D32;
+        margin-bottom: 10px;
+    }
+
+    .status-badge {
+        display: inline-block;
+        padding: 5px 15px;
+        background: #4CAF50;
+        color: white;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: 600;
+        margin-left: 10px;
+    }
+
+    /* Thank You & Footer */
+    .thank-you {
+        text-align: center;
+        margin-top: 40px;
+        padding-top: 20px;
+        border-top: 1px solid #eee;
+        color: #666;
+    }
+
+    .footer-note {
+        font-size: 12px;
+        color: #999;
+        text-align: center;
+        margin-top: 20px;
+    }
+
+    /* Action Buttons */
+    .action-buttons {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+        margin-top: 40px;
+        padding-top: 30px;
+        border-top: 1px solid #eee;
+    }
+
+    .btn {
+        padding: 12px 30px;
+        border-radius: 5px;
+        font-size: 16px;
+        font-weight: 600;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        transition: all 0.3s ease;
+        border: none;
+        cursor: pointer;
+        min-width: 160px;
+    }
+
+    .btn-primary {
+        background: #4CAF50;
+        color: white;
+        box-shadow: 0 3px 10px rgba(76, 175, 80, 0.3);
+    }
+
+    .btn-primary:hover {
+        background: #45a049;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+    }
+
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+        box-shadow: 0 3px 10px rgba(108, 117, 125, 0.3);
+    }
+
+    .btn-secondary:hover {
+        background: #5a6268;
+        transform: translateY(-2px);
+    }
+
+    .btn-outline {
+        background: white;
+        color: #4CAF50;
+        border: 2px solid #4CAF50;
+    }
+
+    .btn-outline:hover {
+        background: #4CAF50;
+        color: white;
+    }
+
+    /* Success Message */
+    .success-message {
+        text-align: center;
+        padding: 20px;
+        background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
+        color: white;
+        border-radius: 10px;
+        margin-bottom: 30px;
+    }
+
+    .success-message h2 {
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+    }
+
+    .success-icon {
+        font-size: 24px;
+        animation: checkmark 0.6s ease-out;
+    }
+
+    @keyframes checkmark {
+        0% { transform: scale(0); }
+        50% { transform: scale(1.2); }
+        100% { transform: scale(1); }
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .invoice-container {
+            padding: 20px;
+            margin: 20px;
+        }
+        
+        .info-grid {
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+        
+        .action-buttons {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        
+        .btn {
+            width: 100%;
+        }
+        
+        .items-table {
+            display: block;
+            overflow-x: auto;
+        }
+        
+        .invoice-header h1 {
+            font-size: 24px;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .invoice-container {
+            padding: 15px;
+            margin: 10px;
+        }
+        
+        .company-logo {
+            font-size: 20px;
+        }
+        
+        .items-table th,
+        .items-table td {
+            padding: 8px 10px;
+            font-size: 14px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            font-size: 14px;
+        }
+    }
+</style>
+
+<!-- Success Order Message -->
+<div class="success-message no-print">
+    <h2>
+        <span class="success-icon">✓</span>
+        Order Confirmed Successfully!
+    </h2>
+    <p>Thank you for your purchase. Your order has been processed successfully.</p>
+</div>
+
+<!-- Main Invoice Container -->
+<div class="invoice-container">
+    <!-- Invoice Print Area -->
+    <div class="invoice-print-area">
+        <!-- Header with Order Info -->
+        <div class="invoice-header">
+            <div class="company-info">
+                <div class="company-logo">
+                    <i class="fas fa-store"></i> SHOPMART
+                </div>
+                <div class="company-contact">
+                    123 Market Street, Dar es Salaam, Tanzania
+                </div>
+                <div class="company-contact">
+                    Phone: +255 123 456 789 | Email: info@shopmart.co.tz
+                </div>
+            </div>
+            
+            <h1>INVOICE</h1>
+            
+            <div class="invoice-meta">
+                <div class="meta-left">
+                    <p><strong>Invoice No:</strong> {{ order.invoice_number }}</p>
+                    <p><strong>Order ID:</strong> {{ order.order_id }}</p>
+                </div>
+                <div class="meta-right">
+                    <p><strong>Date:</strong> {{ order.created_at|date:"F d, Y" }}</p>
+                    <p><strong>Due Date:</strong> {{ order.due_date|date:"F d, Y" }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Customer & Shipping Info -->
+        <div class="info-grid">
+            <div class="info-section">
+                <h4>Bill To:</h4>
+                <p><strong>{{ order.customer_name }}</strong></p>
+                <p>{{ order.customer_email }}</p>
+                <p>{{ order.customer_phone }}</p>
+            </div>
+            
+            <div class="info-section">
+                <h4>Ship To:</h4>
+                <p>{{ order.shipping_address.street }}</p>
+                <p>{{ order.shipping_address.city }}, {{ order.shipping_address.state }}</p>
+                <p>{{ order.shipping_address.country }} - {{ order.shipping_address.zip_code }}</p>
+            </div>
+        </div>
+
+        <!-- Order Items Table -->
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Item Description</th>
+                    <th class="text-center">Qty</th>
+                    <th class="text-right">Unit Price (Tsh)</th>
+                    <th class="text-right">Total (Tsh)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in order.items.all %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ item.product_name }}</td>
+                    <td class="text-center">{{ item.quantity }}</td>
+                    <td class="text-right">{{ item.unit_price|floatformat:2|intcomma }}</td>
+                    <td class="text-right">{{ item.total_price|floatformat:2|intcomma }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Totals Section -->
+        <div class="totals-section">
+            <div class="total-row">
+                <span>Subtotal:</span>
+                <span>Tsh {{ order.subtotal|floatformat:2|intcomma }}</span>
+            </div>
+            <div class="total-row">
+                <span>Shipping:</span>
+                <span>Tsh {{ order.shipping_cost|floatformat:2|intcomma }}</span>
+            </div>
+            <div class="total-row">
+                <span>Tax ({{ order.tax_rate }}%):</span>
+                <span>Tsh {{ order.tax_amount|floatformat:2|intcomma }}</span>
+            </div>
+            <div class="total-row">
+                <span>Discount:</span>
+                <span>- Tsh {{ order.discount|floatformat:2|intcomma }}</span>
+            </div>
+            <div class="total-row grand-total">
+                <span><strong>Grand Total:</strong></span>
+                <span><strong>Tsh {{ order.grand_total|floatformat:2|intcomma }}</strong></span>
+            </div>
+        </div>
+
+        <!-- Payment Information -->
+        <div class="payment-info">
+            <h4>Payment Information</h4>
+            <p>
+                <strong>Payment Method:</strong> {{ order.payment_method }}
+                <span class="status-badge">{{ order.payment_status }}</span>
+            </p>
+            <p><strong>Paid On:</strong> {{ order.paid_at|date:"F d, Y H:i" }}</p>
+            <p><strong>Transaction ID:</strong> {{ order.transaction_id }}</p>
+        </div>
+
+        <!-- Shipping Information -->
+        <div class="payment-info" style="background: #e3f2fd; border-left-color: #2196F3;">
+            <h4>Shipping Information</h4>
+            <p><strong>Shipping Method:</strong> {{ order.shipping_method }}</p>
+            <p><strong>Estimated Delivery:</strong> {{ order.estimated_delivery|date:"F d, Y" }}</p>
+            <p><strong>Tracking Number:</strong> {{ order.tracking_number }}</p>
+        </div>
+
+        <!-- Thank You & Notes -->
+        <div class="thank-you">
+            <h3>Thank You For Your Business!</h3>
+            <p>If you have any questions about this invoice, please contact:</p>
+            <p>Email: support@shopmart.co.tz | Phone: +255 123 456 789</p>
+        </div>
+
+        <!-- Footer Notes -->
+        <div class="footer-note">
+            <p>This is a computer-generated invoice. No signature is required.</p>
+            <p>Invoice generated on: {% now "F d, Y H:i:s" %}</p>
+        </div>
+    </div> <!-- End of invoice-print-area -->
+
+    <!-- Action Buttons (Non-printable) -->
+    <div class="action-buttons no-print">
+        <button onclick="printInvoice()" class="btn btn-primary">
+            <i class="fas fa-print"></i> Print / Save as PDF
+        </button>
+        <a href="{% url 'ourproduct' %}" class="btn btn-secondary">
+            <i class="fas fa-shopping-bag"></i> Continue Shopping
+        </a>
+        <a href="{% url 'order_tracking' order.order_id %}" class="btn btn-outline">
+            <i class="fas fa-truck"></i> Track Order
+        </a>
+    </div>
+</div>
+
+<!-- Hidden JavaScript - only activates when print button is clicked -->
+<script>
+// Function to handle invoice printing/saving as PDF
+function printInvoice() {
+    // Create a custom print stylesheet
+    const printStyles = `
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            .invoice-print-area,
+            .invoice-print-area * {
+                visibility: visible;
+            }
+            .invoice-print-area {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                padding: 20px;
+                margin: 0;
+                background: white;
+                box-shadow: none;
+                border: none;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .page-break {
+                page-break-after: always;
+            }
+            .company-logo {
+                font-size: 24px;
+                color: #000 !important;
+            }
+            h1, h2, h3, h4 {
+                color: #000 !important;
+            }
+            .status-badge {
+                background: #000 !important;
+                color: white !important;
+                -webkit-print-color-adjust: exact;
+            }
+            .payment-info, .totals-section {
+                background: #f5f5f5 !important;
+                -webkit-print-color-adjust: exact;
+            }
+            .items-table th {
+                background: #333 !important;
+                color: white !important;
+                -webkit-print-color-adjust: exact;
+            }
+            .items-table tr:nth-child(even) {
+                background: #f9f9f9 !important;
+                -webkit-print-color-adjust: exact;
+            }
+            .grand-total {
+                color: #000 !important;
+                border-top: 2px solid #000 !important;
+            }
+            .btn, .action-buttons, .success-message {
+                display: none !important;
+            }
+        }
+    `;
+
+    // Add print styles to document
+    const styleSheet = document.createElement("style");
+    styleSheet.type = "text/css";
+    styleSheet.innerText = printStyles;
+    document.head.appendChild(styleSheet);
+
+    // Add watermark for demo/copy protection
+    const watermark = `
+        <div style="
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 60px;
+            opacity: 0.1;
+            color: #000;
+            z-index: 9999;
+            pointer-events: none;
+            user-select: none;
+            white-space: nowrap;
+        ">
+            {{ order.customer_name }} - {{ order.invoice_number }}
+        </div>
+    `;
+
+    // Store original body
+    const originalBody = document.body.innerHTML;
+    
+    // Create print document
+    const printContent = document.querySelector('.invoice-print-area').innerHTML + watermark;
+    
+    // Open print dialog
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Invoice - {{ order.order_id }}</title>
+            <meta charset="utf-8">
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    margin: 20px;
+                    color: #000;
+                }
+                ${printStyles}
+                .invoice-print-area {
+                    max-width: 800px;
+                    margin: 0 auto;
+                }
+                @page {
+                    margin: 20mm;
+                    @bottom-right {
+                        content: "Page " counter(page) " of " counter(pages);
+                        font-size: 10px;
+                        color: #666;
+                    }
+                }
+            </style>
+        </head>
+        <body>
+            ${printContent}
+            <script>
+                // Auto print after load
+                window.onload = function() {
+                    setTimeout(function() {
+                        window.print();
+                        setTimeout(function() {
+                            window.close();
+                        }, 100);
+                    }, 500);
+                };
+            <\/script>
+        </body>
+        </html>
+    `);
+    
+    printWindow.document.close();
+
+    // Clean up added style
+    setTimeout(() => {
+        if (styleSheet.parentNode) {
+            styleSheet.parentNode.removeChild(styleSheet);
+        }
+    }, 1000);
+}
+
+// Add event listener for before print (to show loading)
+window.addEventListener('beforeprint', function() {
+    document.body.classList.add('printing');
+});
+
+window.addEventListener('afterprint', function() {
+    document.body.classList.remove('printing');
+});
+
+// Fallback for browsers that block popups
+function fallbackPrint() {
+    const printButton = document.querySelector('.btn-primary');
+    printButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Preparing...';
+    printButton.disabled = true;
+    
+    setTimeout(() => {
+        window.print();
+        printButton.innerHTML = '<i class="fas fa-print"></i> Print / Save as PDF';
+        printButton.disabled = false;
+    }, 1000);
+}
+
+// Try the main method first, fallback if popup blocked
+document.querySelector('.btn-primary').addEventListener('click', function(e) {
+    try {
+        printInvoice();
+    } catch (error) {
+        console.log('Popup blocked, using fallback');
+        fallbackPrint();
+    }
+});
+
+// Add keyboard shortcut for printing (Ctrl+P)
+document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+        e.preventDefault();
+        printInvoice();
+    }
+});
+</script>
+{% endblock %}

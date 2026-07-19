@@ -1,0 +1,47 @@
+
+{% extends 'ecommerce/base.html' %}
+{% load static %}
+{% block title %}Order Summary{% endblock %}
+
+{% block container %}
+
+<section id="form-details">
+  <form method="POST" enctype="multipart/form-data">
+    {% csrf_token %}
+    <span>ADD AN ITEM</span>
+
+    <label for="category">Category</label>
+    <select name="category" id="category" style="width: 100%; padding: 10px; border-color: #088178; margin-bottom: 10px;">
+      <option value="">Select category</option>
+      {% for i in category %}
+        <option value="{{ i.id }}">{{ i.name }}</option>
+      {% endfor %}
+    </select>
+
+    <label for="title">Item Name</label>
+    <input type="text" id="title" name="title" placeholder="Item name">
+
+    <label for="slug">Slug</label>
+    <input type="text" id="slug" name="slug" placeholder="Slug">
+
+    <label for="price">Price</label>
+    <input type="number" id="price" name="price" placeholder="Price">
+
+    <label for="discount_price">Discount Price</label>
+    <input type="number" id="discount_price" name="discount_price" placeholder="Discount Price">
+
+    <label for="status">Status</label>
+    <input type="text" id="status" name="status" placeholder="Status">
+
+    <label for="description">Description</label>
+    <textarea id="description" name="description" cols="30" rows="10" placeholder="Description"></textarea>
+
+    <label for="image">Image</label>
+    <input type="file" id="image" name="image">
+
+    <button class="normal" type="submit">Submit</button>
+  </form>
+</section>
+
+
+{% endblock %}

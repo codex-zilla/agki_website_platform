@@ -1,0 +1,90 @@
+
+{% extends 'ecommerce/base.html' %}
+{% load static %}
+{% block container %}
+
+<section id="prodetails" class="section-p1">
+  <div class="single-pro-image">
+      <img src="{{detailed_product.image.url}}" width="100%" id="MainImg" alt="">
+  
+      <div class="small-img-group">
+          <div class="small-img-col">
+              <img src="{% static 'ecommerce/images/f1.jpg' %}" width="100%" alt="" class="small-img">
+          </div>
+          <div class="small-img-col">
+              <img src="{% static 'ecommerce/images/f2.jpg' %}" width="100%" alt="" class="small-img">
+          </div>
+          <div class="small-img-col">
+              <img src="{% static 'ecommerce/images/f3.jpg' %}" width="100%" alt="" class="small-img">
+          </div>
+          <div class="small-img-col">
+              <img src="{% static 'ecommerce/images/f4.jpg' %}" width="100%" alt="" class="small-img">
+          </div>
+      </div>
+  </div>
+  <div class="single-pro-details">
+      <!-- <h6>Home / Tshirt</h6> -->
+      <h4>{{detailed_product.title}}</h4>
+      <h2>Tsh. {{detailed_product.price}} <del> {{detailed_product.discount_price}}</del></h2>
+      <!-- <select>
+          <option>Select Size</option>
+          <option>XL</option>
+          <option>XXL</option>
+          <option>Small</option>
+          <option>Large</option>
+      </select> -->
+      {% if user.is_authenticated %}
+        <form action="{% url 'add_to_cart' detailed_product.id %}" method="post">
+            {% csrf_token %}
+            <input type="number" value="1" min="1" name="quantity">
+            <button type="submit" class="normal">Add to Cart</button>
+        </form>
+        {% else %}
+        <a href="{% url 'signin3' %}" class="normal-btn">
+            <button type="button" class="normal">Signin to Add to Cart</button>
+        </a>
+        {% endif %}
+
+      <h4>Product Details</h4>
+      <span>
+        {{detailed_product.description}}
+      </span>
+      {{detailed_product.status}} angalia
+  </div>
+</section>
+
+<section id="product1" class="section-p1">
+  <h2>Featured Products</h2>
+  <p>Summer collection new modern design</p>
+  <div class="pro-container">
+      
+    {% for x in item %}
+      <div class="pro">
+          {% if x.image %}
+          <img src="{{x.image.url}}" alt="">
+          {% else %}
+          <img src="{% static 'ecommerce/kote.jpg' %}" alt=""></a>
+          {% endif %}
+          <div class="des">
+              <span>adidas</span>
+              <h5>{{x.title}}</h5>
+              <div class="star">
+                  <i class="fas fa-star"></i>
+                  <i class="fas fa-star"></i>
+                  <i class="fas fa-star"></i>
+                  <i class="fas fa-star"></i>
+                  <i class="fas fa-star"></i>
+              </div>
+              <h4>Tsh {{x.price}} <del>Tsh. {{x.discount_price}}</del></h4>
+          </div>
+          <a href="{% url 'detailed_product' x.id %}"><i class="fal fa-shopping-cart cart"></i></a>
+      </div>
+      {% endfor %}
+
+  </div>
+</section>
+
+
+
+
+{% endblock %}

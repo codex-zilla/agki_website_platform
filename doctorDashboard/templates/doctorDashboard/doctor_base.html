@@ -1,0 +1,962 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Doctor Dashboard - MediBook</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-green: #2d5a2d;
+            --light-green: #4a7c59;
+            --gradient-green: linear-gradient(135deg, #2d5a2d 0%, #4a7c59 100%);
+            --accent-green: #7cc576;
+            --light-bg: #f8f9fa;
+            --dark-text: #333;
+            --sidebar-width: 260px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--dark-text);
+            line-height: 1.6;
+            background: var(--light-bg);
+            overflow-x: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: var(--sidebar-width);
+            background: var(--gradient-green);
+            color: white;
+            padding: 0;
+            z-index: 1000;
+            transition: all 0.3s;
+            overflow-y: auto;
+        }
+
+        .sidebar.collapsed {
+            width: 70px;
+        }
+
+        .sidebar-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .sidebar-logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .sidebar.collapsed .logo-text {
+            display: none;
+        }
+
+        .sidebar-toggle {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: white;
+            width: 35px;
+            height: 35px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+
+        .sidebar-toggle:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        /* Doctor Profile in Sidebar */
+        .doctor-profile-sidebar {
+            padding: 1.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            text-align: center;
+        }
+
+        .sidebar.collapsed .doctor-profile-sidebar {
+            padding: 1rem 0.5rem;
+        }
+
+        .doctor-avatar-sidebar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 3px solid rgba(255,255,255,0.3);
+            object-fit: cover;
+            margin-bottom: 1rem;
+        }
+
+        .sidebar.collapsed .doctor-avatar-sidebar {
+            width: 45px;
+            height: 45px;
+            margin-bottom: 0.5rem;
+        }
+
+        .doctor-name-sidebar {
+            font-weight: 700;
+            font-size: 1.1rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .doctor-specialty-sidebar {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .sidebar.collapsed .doctor-name-sidebar,
+        .sidebar.collapsed .doctor-specialty-sidebar {
+            display: none;
+        }
+
+        /* Sidebar Menu */
+        .sidebar-menu {
+            padding: 1rem 0;
+        }
+
+        .menu-section-title {
+            padding: 1rem 1.5rem 0.5rem;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.7;
+            font-weight: 600;
+        }
+
+        .sidebar.collapsed .menu-section-title {
+            display: none;
+        }
+
+        .menu-item {
+            display: flex;
+            align-items: center;
+            padding: 0.85rem 1.5rem;
+            color: rgba(255,255,255,0.9);
+            text-decoration: none;
+            transition: all 0.3s;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .menu-item:hover {
+            background: rgba(255,255,255,0.1);
+            color: white;
+        }
+
+        .menu-item.active {
+            background: rgba(255,255,255,0.15);
+            color: white;
+            border-left: 4px solid white;
+        }
+
+        .menu-item i {
+            width: 24px;
+            font-size: 1.2rem;
+            margin-right: 1rem;
+        }
+
+        .sidebar.collapsed .menu-item {
+            padding: 0.85rem 1rem;
+            justify-content: center;
+        }
+
+        .sidebar.collapsed .menu-item i {
+            margin-right: 0;
+        }
+
+        .sidebar.collapsed .menu-item-text {
+            display: none;
+        }
+
+        .menu-badge {
+            margin-left: auto;
+            background: #dc3545;
+            color: white;
+            padding: 0.15rem 0.5rem;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .sidebar.collapsed .menu-badge {
+            display: none;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            min-height: 100vh;
+            transition: margin-left 0.3s;
+        }
+
+        .sidebar.collapsed ~ .main-content {
+            margin-left: 70px;
+        }
+
+        /* Top Navigation */
+        .top-navbar {
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 999;
+        }
+
+        .page-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--primary-green);
+        }
+
+        .top-navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .notification-icon {
+            position: relative;
+            font-size: 1.3rem;
+            color: var(--dark-text);
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+
+        .notification-icon:hover {
+            color: var(--primary-green);
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #dc3545;
+            color: white;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            font-size: 0.7rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+        }
+
+        .user-menu {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            transition: background 0.3s;
+        }
+
+        .user-menu:hover {
+            background: var(--light-bg);
+        }
+
+        .user-avatar-top {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid var(--accent-green);
+            object-fit: cover;
+        }
+
+        /* Dashboard Content */
+        .dashboard-content {
+            padding: 2rem;
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            transition: all 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        .stat-icon {
+            width: 70px;
+            height: 70px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            color: white;
+        }
+
+        .stat-icon.blue {
+            background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+        }
+
+        .stat-icon.green {
+            background: var(--gradient-green);
+        }
+
+        .stat-icon.orange {
+            background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+        }
+
+        .stat-icon.red {
+            background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+        }
+
+        .stat-info {
+            flex: 1;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--dark-text);
+        }
+
+        .stat-change {
+            font-size: 0.85rem;
+            margin-top: 0.25rem;
+        }
+
+        .stat-change.positive {
+            color: #4caf50;
+        }
+
+        .stat-change.negative {
+            color: #f44336;
+        }
+
+        /* Card */
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            margin-bottom: 2rem;
+        }
+
+        .card-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--primary-green);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .card-action {
+            background: var(--gradient-green);
+            color: white;
+            border: none;
+            padding: 0.6rem 1.25rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .card-action:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(45, 90, 45, 0.3);
+        }
+
+        .card-body {
+            padding: 1.5rem;
+        }
+
+        /* Appointments Table */
+        .appointments-table {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: #f8f9fa;
+        }
+
+        th {
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: var(--dark-text);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .patient-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .patient-avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--accent-green);
+        }
+
+        .patient-name {
+            font-weight: 600;
+            color: var(--dark-text);
+            margin-bottom: 0.15rem;
+        }
+
+        .patient-id {
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .status-badge {
+            padding: 0.4rem 0.9rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .status-badge.confirmed {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-badge.pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-badge.completed {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .status-badge.cancelled {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn-action {
+            width: 35px;
+            height: 35px;
+            border-radius: 8px;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.95rem;
+        }
+
+        .btn-action.view {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .btn-action.edit {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .btn-action.delete {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+
+        .btn-action:hover {
+            transform: scale(1.1);
+        }
+
+        /* Calendar View */
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .calendar-nav {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .calendar-nav button {
+            background: white;
+            border: 2px solid #e0e0e0;
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .calendar-nav button:hover {
+            border-color: var(--primary-green);
+            color: var(--primary-green);
+        }
+
+        .calendar-month {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-green);
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1rem;
+        }
+
+        .calendar-day-header {
+            text-align: center;
+            font-weight: 600;
+            color: #666;
+            padding: 1rem;
+            font-size: 0.9rem;
+        }
+
+        .calendar-day {
+            aspect-ratio: 1;
+            background: white;
+            border: 2px solid #f0f0f0;
+            border-radius: 10px;
+            padding: 0.75rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .calendar-day:hover {
+            border-color: var(--primary-green);
+            transform: translateY(-3px);
+        }
+
+        .calendar-day.today {
+            border-color: var(--accent-green);
+            background: #f0f8f0;
+        }
+
+        .calendar-day.has-appointments {
+            background: #e8f5e9;
+        }
+
+        .day-number {
+            font-weight: 700;
+            color: var(--dark-text);
+            margin-bottom: 0.5rem;
+        }
+
+        .day-appointments {
+            font-size: 0.75rem;
+            color: var(--primary-green);
+            font-weight: 600;
+        }
+
+        /* Quick Actions */
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .quick-action-btn {
+            background: white;
+            border: 2px solid #e0e0e0;
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            color: var(--dark-text);
+        }
+
+        .quick-action-btn:hover {
+            border-color: var(--primary-green);
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .quick-action-icon {
+            font-size: 2.5rem;
+            color: var(--primary-green);
+            margin-bottom: 1rem;
+        }
+
+        .quick-action-title {
+            font-weight: 600;
+            color: var(--dark-text);
+        }
+
+        /* Responsive */
+        @media (max-width: 992px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .sidebar.mobile-open {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: 0;
+            }
+
+            .mobile-menu-toggle {
+                display: block !important;
+            }
+
+            .calendar-grid {
+                gap: 0.5rem;
+            }
+
+            .calendar-day {
+                padding: 0.5rem;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .dashboard-content {
+                padding: 1rem;
+            }
+
+            .top-navbar {
+                padding: 1rem;
+            }
+
+            .page-title {
+                font-size: 1.3rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .mobile-menu-toggle {
+            display: none;
+            background: var(--primary-green);
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+
+        .mobile-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+        }
+
+        .mobile-overlay.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                <i class="fas fa-heartbeat"></i>
+                <span class="logo-text">MediBook</span>
+            </div>
+            <button class="sidebar-toggle" id="sidebarToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+
+        <div class="doctor-profile-sidebar">
+            <img src="{{user.image.url}}" alt="{{user.username}}" class="doctor-avatar-sidebar">
+            <div class="doctor-name-sidebar">{{user.get_full_name}}</div>
+            <div class="doctor-specialty-sidebar">{{user.role}}</div>
+        </div>
+
+        <nav class="sidebar-menu">
+            <div class="menu-section-title">Main</div>
+            <a href="{% url 'doctor_admin_dashboard' %}" class="menu-item {% if request.resolver_match.url_name == 'doctor_admin_dashboard' %}active{% endif %}" data-page="dashboard">
+                <i class="fas fa-home"></i>
+                <span class="menu-item-text">Dashboard</span>
+            </a>
+            <a href="{% url 'available_appointments' %}" class="menu-item {% if request.resolver_match.url_name == 'available_appointments' %}active{% endif %}" data-page="appointments">
+                <i class="fas fa-calendar-check"></i>
+                <span class="menu-item-text">Appointments</span>
+                <span class="menu-badge">12</span>
+            </a>
+
+            <div class="menu-section-title">Management</div>
+            <a href="{% url 'doctor_availability' %}" class="menu-item {% if request.resolver_match.url_name == 'doctor_availability' %}active{% endif %}" data-page="availability">
+                <i class="fas fa-clock"></i>
+                <span class="menu-item-text">Availability</span>
+            </a>
+            <!-- <a href="#" class="menu-item" data-page="prescriptions">
+                <i class="fas fa-file-prescription"></i>
+                <span class="menu-item-text">Prescriptions</span>
+            </a>
+            <a href="#" class="menu-item" data-page="reports">
+                <i class="fas fa-chart-bar"></i>
+                <span class="menu-item-text">Reports</span>
+            </a> -->
+
+            <div class="menu-section-title">Administration</div>
+            <a href="{% url 'doctors' %}" class="menu-item {% if request.resolver_match.url_name == 'doctors' %}active{% endif %}" data-page="doctors">
+                <i class="fas fa-user-md"></i>
+                <span class="menu-item-text">Doctors</span>
+            </a>
+            <a href="#" class="menu-item {% if request.resolver_match.url_name == 'all_appointments' %}active{% endif %}" data-page="appointments">
+                <i class="fas fa-calendar-check"></i>
+                <span class="menu-item-text">All Appointments</span>
+            </a>
+
+            <!-- eccomerce -->
+             <div class="menu-section-title">E-Commerce</div>
+            <a href="{% url 'ecommerce_items' %}" class="menu-item {% if request.resolver_match.url_name == 'ecommerce_items' %}active{% endif %}" data-page="ecommerce_items">
+                <i class="fas fa-box"></i>
+                <span class="menu-item-text">Products</span>
+            </a>
+
+            <div class="menu-section-title">Settings</div>
+            <a href="{% url 'profile' %}" class="menu-item {% if request.resolver_match.url_name == 'profile' %}active{% endif %}" data-page="profile">
+                <i class="fas fa-user-md"></i>
+                <span class="menu-item-text">My Profile</span>
+            </a>
+            <a href="{% url 'logout' %}" class="menu-item" data-page="logout">
+                <i class="fas fa-sign-out-alt"></i>
+                <span class="menu-item-text">Logout</span>
+            </a>
+        </nav>
+    </aside>
+
+    <!-- Mobile Overlay -->
+    <div class="mobile-overlay" id="mobileOverlay"></div>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Top Navigation -->
+        <nav class="top-navbar">
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <button class="mobile-menu-toggle" id="mobileMenuToggle">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h1 class="page-title">Dashboard</h1>
+            </div>
+            <div class="top-navbar-right">
+                <div class="notification-icon">
+                    <i class="fas fa-bell"></i>
+                    <span class="notification-badge">8</span>
+                </div>
+                <div class="user-menu">
+                    <img src="{{user.image.url}}" alt="{{user.username}}" class="user-avatar-top">
+                    <span style="font-weight: 600;">{{user.get_full_name}}</span>
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+            </div>
+        </nav>
+
+        {% block content %}
+
+        {% endblock %}
+
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Sidebar Toggle
+        const sidebar = document.getElementById('sidebar');
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const mobileMenuToggle = document.getElementById('mobileMenuToggle');
+        const mobileOverlay = document.getElementById('mobileOverlay');
+
+        sidebarToggle.addEventListener('click', function() {
+            sidebar.classList.toggle('collapsed');
+        });
+
+        // Mobile menu toggle
+        mobileMenuToggle.addEventListener('click', function() {
+            sidebar.classList.add('mobile-open');
+            mobileOverlay.classList.add('show');
+        });
+
+        mobileOverlay.addEventListener('click', function() {
+            sidebar.classList.remove('mobile-open');
+            mobileOverlay.classList.remove('show');
+        });
+
+
+
+        // Update stats every 60 seconds
+        setInterval(updateStats, 60000);
+
+        // Responsive handling
+        function handleResize() {
+            if (window.innerWidth > 992) {
+                sidebar.classList.remove('mobile-open');
+                mobileOverlay.classList.remove('show');
+            }
+        }
+
+        window.addEventListener('resize', handleResize);
+
+        // Initialize tooltips (Bootstrap)
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'));
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+
+        // Real-time clock
+        function updateClock() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
+                minute: '2-digit'
+            });
+            // Update clock if element exists
+            const clockElement = document.getElementById('currentTime');
+            if (clockElement) {
+                clockElement.textContent = timeString;
+            }
+        }
+
+        updateClock();
+        setInterval(updateClock, 1000);
+
+        // Page load animation
+        window.addEventListener('load', function() {
+            document.querySelectorAll('.stat-card, .card').forEach((element, index) => {
+                element.style.opacity = '0';
+                element.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    element.style.transition = 'all 0.5s ease';
+                    element.style.opacity = '1';
+                    element.style.transform = 'translateY(0)';
+                }, index * 100);
+            });
+        });
+
+        // Handle keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            // Ctrl/Cmd + K to toggle sidebar
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                e.preventDefault();
+                sidebar.classList.toggle('collapsed');
+            }
+            
+            // Ctrl/Cmd + N for new appointment
+            if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+                e.preventDefault();
+                alert('Opening new appointment form...');
+            }
+        });
+
+        // Check for pending appointments that need attention
+        function checkPendingAppointments() {
+            const pendingCount = document.querySelectorAll('.status-badge.pending').length;
+            if (pendingCount > 0) {
+                console.log(`${pendingCount} appointments need confirmation`);
+                // Show notification if needed
+            }
+        }
+
+        checkPendingAppointments();
+
+        // Print functionality for appointments
+        function printAppointments() {
+            window.print();
+        }
+    </script>
+</body>
+</html>

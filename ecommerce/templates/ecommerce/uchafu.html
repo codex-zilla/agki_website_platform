@@ -1,0 +1,26 @@
+	{% if x %}
+	<table class="table" style="">
+		<tr>
+			<th>SNo</th>
+			<th>name</th>
+			<th>email</th>
+			<th>subject</th>
+			<th>message</th>
+		</tr>
+		
+		{% for i in x %}
+		<tr>
+			<td>{{i.id}}</td>
+			<td>{{i.name}}</td>
+			<td>{{i.email}}</td>
+			<td>{{i.subject}}</td>
+			<td>{{i.message}}</td>
+		</tr>
+		{% endfor %}
+
+		
+	</table>
+	{% else %}
+	<h1>No message sent yet</h1>
+	{% endif %}
+	<button><a href="{% url 'home' %}">Back to home</a></button>

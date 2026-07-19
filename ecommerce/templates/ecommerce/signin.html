@@ -1,0 +1,692 @@
+{% extends 'ecommerce/base.html' %}
+{% load static %}
+
+{% block container %}
+<div class="auth-container">
+    <div class="auth-wrapper">
+        <!-- Left side - Image/Illustration -->
+        <div class="auth-left">
+            <div class="auth-illustration">
+                <img src="{% static 'ecommerce/login-illustration.svg' %}" alt="Login Illustration">
+            </div>
+            <div class="auth-left-content">
+                <h2>Welcome Back!</h2>
+                <p>Sign in to continue shopping and access your personalized recommendations.</p>
+                <div class="auth-features">
+                    <div class="feature">
+                        <i class="fas fa-shipping-fast"></i>
+                        <span>Track your orders</span>
+                    </div>
+                    <div class="feature">
+                        <i class="fas fa-heart"></i>
+                        <span>Save favorites</span>
+                    </div>
+                    <div class="feature">
+                        <i class="fas fa-tag"></i>
+                        <span>Exclusive deals</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right side - Login Form -->
+        <div class="auth-right">
+            <div class="auth-form-container">
+                <!-- Logo/Brand -->
+                <div class="auth-header">
+                    <a href="{% url 'home' %}" class="auth-logo">
+                        <i class="fas fa-store"></i>
+                        <span>SHOPMART</span>
+                    </a>
+                    <h1>Sign In</h1>
+                    <p>Enter your credentials to access your account</p>
+                </div>
+
+                <!-- Error Messages -->
+                {% if form.errors %}
+                <div class="alert alert-error">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <div>
+                        <strong>Error!</strong>
+                        {% for field, errors in form.errors.items %}
+                            {% for error in errors %}
+                                {{ error }}
+                            {% endfor %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if messages %}
+                    {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }}">
+                        <i class="fas fa-{% if message.tags == 'success' %}check-circle{% else %}info-circle{% endif %}"></i>
+                        {{ message }}
+                    </div>
+                    {% endfor %}
+                {% endif %}
+
+                <!-- Login Form -->
+                <form method="POST" action="" class="auth-form">
+                    {% csrf_token %}
+                    
+                    <!-- Email Field -->
+                    <div class="form-group">
+                        <label for="id_login">Email Address</label>
+                        <div class="input-with-icon">
+                            <i class="fas fa-envelope"></i>
+                            <input type="email" 
+                                   id="id_login" 
+                                   name="username" 
+                                   placeholder="Enter your email" 
+                                   required
+                                   autocomplete="email"
+                                   autofocus>
+                        </div>
+                    </div>
+
+                    <!-- Password Field -->
+                    <div class="form-group">
+                        <div class="form-label-row">
+                            <label for="id_password">Password</label>
+                            <a href="{% url 'account_reset_password' %}" class="forgot-password">
+                                Forgot Password?
+                            </a>
+                        </div>
+                        <div class="input-with-icon">
+                            <i class="fas fa-lock"></i>
+                            <input type="password" 
+                                   id="id_password" 
+                                   name="password1" 
+                                   placeholder="Enter your password" 
+                                   required
+                                   autocomplete="current-password">
+                            <button type="button" class="password-toggle" onclick="togglePassword()">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Remember Me -->
+                    <div class="form-group remember-me">
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="remember" id="id_remember">
+                            <span class="checkmark"></span>
+                            Remember me
+                        </label>
+                    </div>
+
+                    <!-- Hidden redirect field if needed -->
+                    {% if redirect_field_value %}
+                    <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}" />
+                    {% endif %}
+
+                    <!-- Submit Button -->
+                    <button type="submit" class="btn-auth btn-login">
+                        <i class="fas fa-sign-in-alt"></i>
+                        Sign In
+                    </button>
+
+                    <!-- Register Link -->
+                    <div class="auth-footer">
+                        <p>Don't have an account? 
+                            <a href="{% url 'signup2' %}" class="register-link">
+                                Create Account
+                            </a>
+                        </p>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Back to Home -->
+            <div class="back-to-home">
+                <a href="{% url 'home' %}">
+                    <i class="fas fa-arrow-left"></i>
+                    Back to Home
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Main Container */
+.auth-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    padding: 20px;
+}
+
+.auth-wrapper {
+    display: flex;
+    max-width: 1000px;
+    width: 100%;
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    min-height: 600px;
+}
+
+/* Left Side */
+.auth-left {
+    flex: 1;
+    background: linear-gradient(135deg, #088178 0%, #0a9d8f 100%);
+    color: white;
+    padding: 60px 40px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.auth-left::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
+    background-size: 50px 50px;
+    opacity: 0.3;
+    z-index: 1;
+}
+
+.auth-illustration {
+    text-align: center;
+    margin-bottom: 40px;
+    position: relative;
+    z-index: 2;
+}
+
+.auth-illustration img {
+    max-width: 80%;
+    height: auto;
+}
+
+.auth-left-content {
+    position: relative;
+    z-index: 2;
+}
+
+.auth-left-content h2 {
+    font-size: 32px;
+    margin-bottom: 20px;
+    font-weight: 700;
+}
+
+.auth-left-content p {
+    font-size: 16px;
+    opacity: 0.9;
+    line-height: 1.6;
+    margin-bottom: 30px;
+}
+
+.auth-features {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.feature {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    font-size: 15px;
+}
+
+.feature i {
+    font-size: 18px;
+    width: 30px;
+    height: 30px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Right Side */
+.auth-right {
+    flex: 1;
+    padding: 60px 50px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.auth-form-container {
+    max-width: 400px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+/* Header */
+.auth-header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.auth-logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 24px;
+    font-weight: 700;
+    color: #088178;
+    text-decoration: none;
+    margin-bottom: 20px;
+}
+
+.auth-logo i {
+    font-size: 28px;
+}
+
+.auth-header h1 {
+    font-size: 32px;
+    color: #333;
+    margin-bottom: 10px;
+    font-weight: 700;
+}
+
+.auth-header p {
+    color: #666;
+    font-size: 15px;
+}
+
+/* Alerts */
+.alert {
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 25px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: 14px;
+}
+
+.alert-error {
+    background: #fee;
+    border: 1px solid #fcc;
+    color: #c00;
+}
+
+.alert-success {
+    background: #e8f7e8;
+    border: 1px solid #a3d8a3;
+    color: #2d662d;
+}
+
+.alert-info {
+    background: #e8f4fd;
+    border: 1px solid #b3d7ff;
+    color: #0066cc;
+}
+
+.alert i {
+    font-size: 18px;
+    margin-top: 1px;
+}
+
+/* Form Styles */
+.auth-form {
+    margin-bottom: 30px;
+}
+
+.form-group {
+    margin-bottom: 25px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #333;
+    font-size: 14px;
+}
+
+.form-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.forgot-password {
+    color: #088178;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 500;
+    transition: color 0.3s;
+}
+
+.forgot-password:hover {
+    color: #0a9d8f;
+    text-decoration: underline;
+}
+
+.input-with-icon {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input-with-icon i {
+    position: absolute;
+    left: 15px;
+    color: #999;
+    font-size: 16px;
+    z-index: 1;
+}
+
+.input-with-icon input {
+    width: 100%;
+    padding: 15px 15px 15px 45px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    font-size: 15px;
+    transition: all 0.3s;
+    background: white;
+}
+
+.input-with-icon input:focus {
+    outline: none;
+    border-color: #088178;
+    box-shadow: 0 0 0 3px rgba(8, 129, 120, 0.1);
+}
+
+.input-with-icon input:focus + i {
+    color: #088178;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 15px;
+    background: none;
+    border: none;
+    color: #999;
+    cursor: pointer;
+    padding: 5px;
+    font-size: 16px;
+    transition: color 0.3s;
+}
+
+.password-toggle:hover {
+    color: #088178;
+}
+
+/* Remember Me */
+.remember-me {
+    margin: 20px 0;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-size: 14px;
+    color: #555;
+    user-select: none;
+}
+
+.checkbox-label input {
+    display: none;
+}
+
+.checkmark {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    margin-right: 10px;
+    position: relative;
+    transition: all 0.3s;
+}
+
+.checkbox-label input:checked ~ .checkmark {
+    background: #088178;
+    border-color: #088178;
+}
+
+.checkbox-label input:checked ~ .checkmark::after {
+    content: '✓';
+    position: absolute;
+    color: white;
+    font-size: 14px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+/* Auth Button */
+.btn-auth {
+    width: 100%;
+    padding: 16px;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.btn-login {
+    background: linear-gradient(135deg, #088178 0%, #0a9d8f 100%);
+    color: white;
+    margin-top: 10px;
+}
+
+.btn-login:hover {
+    background: linear-gradient(135deg, #0a9d8f 0%, #0bb2a3 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(8, 129, 120, 0.3);
+}
+
+/* Divider */
+.divider {
+    display: flex;
+    align-items: center;
+    margin: 30px 0;
+    color: #999;
+    font-size: 14px;
+}
+
+.divider::before,
+.divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #eee;
+}
+
+.divider span {
+    padding: 0 15px;
+}
+
+/* Social Login */
+.social-login {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 30px;
+}
+
+.btn-social {
+    padding: 14px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    background: white;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.btn-google {
+    color: #333;
+}
+
+.btn-google:hover {
+    background: #f8f9fa;
+    border-color: #ccc;
+}
+
+.btn-facebook {
+    color: #1877f2;
+}
+
+.btn-facebook:hover {
+    background: #f0f8ff;
+    border-color: #1877f2;
+}
+
+/* Auth Footer */
+.auth-footer {
+    text-align: center;
+    color: #666;
+    font-size: 15px;
+}
+
+.register-link {
+    color: #088178;
+    text-decoration: none;
+    font-weight: 600;
+    margin-left: 5px;
+    transition: color 0.3s;
+}
+
+.register-link:hover {
+    color: #0a9d8f;
+    text-decoration: underline;
+}
+
+/* Back to Home */
+.back-to-home {
+    text-align: center;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+}
+
+.back-to-home a {
+    color: #666;
+    text-decoration: none;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: color 0.3s;
+}
+
+.back-to-home a:hover {
+    color: #088178;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .auth-wrapper {
+        flex-direction: column;
+        min-height: auto;
+    }
+    
+    .auth-left {
+        padding: 40px 20px;
+        display: none; /* Hide illustration on mobile for cleaner look */
+    }
+    
+    .auth-right {
+        padding: 40px 20px;
+    }
+    
+    .social-login {
+        grid-template-columns: 1fr;
+    }
+    
+    .auth-logo {
+        font-size: 22px;
+    }
+    
+    .auth-header h1 {
+        font-size: 28px;
+    }
+}
+
+@media (max-width: 480px) {
+    .auth-container {
+        padding: 10px;
+    }
+    
+    .auth-right {
+        padding: 30px 15px;
+    }
+    
+    .auth-form-container {
+        max-width: 100%;
+    }
+}
+</style>
+
+<script>
+function togglePassword() {
+    const passwordInput = document.getElementById('id_password');
+    const toggleButton = event.currentTarget;
+    const icon = toggleButton.querySelector('i');
+    
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        icon.className = 'fas fa-eye-slash';
+        toggleButton.setAttribute('aria-label', 'Hide password');
+    } else {
+        passwordInput.type = 'password';
+        icon.className = 'fas fa-eye';
+        toggleButton.setAttribute('aria-label', 'Show password');
+    }
+}
+
+// Add focus styles dynamically
+document.querySelectorAll('.input-with-icon input').forEach(input => {
+    input.addEventListener('focus', function() {
+        this.parentElement.classList.add('focused');
+    });
+    
+    input.addEventListener('blur', function() {
+        this.parentElement.classList.remove('focused');
+    });
+});
+
+// Form submission loading state
+document.querySelector('.auth-form').addEventListener('submit', function() {
+    const submitButton = this.querySelector('.btn-auth');
+    const originalText = submitButton.innerHTML;
+    submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in...';
+    submitButton.disabled = true;
+    
+    // Reset button after 5 seconds (in case of error)
+    setTimeout(() => {
+        submitButton.innerHTML = originalText;
+        submitButton.disabled = false;
+    }, 5000);
+});
+
+// Auto-focus on email field if empty
+document.addEventListener('DOMContentLoaded', function() {
+    const emailInput = document.getElementById('id_login');
+    if (emailInput && !emailInput.value) {
+        emailInput.focus();
+    }
+});
+</script>
+{% endblock %}

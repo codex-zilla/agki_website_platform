@@ -1,0 +1,496 @@
+{% extends 'doctorDashboard/doctor_base.html' %}
+{% load static %}
+{% block content %}
+
+<div class="dashboard-content">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="page-title mb-2">Edit Profile</h2>
+            <p class="text-muted mb-0">Update your personal information and profile settings</p>
+        </div>
+        <div>
+            <a href="{% url 'profile' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Profile
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-user-edit me-2"></i>Edit Profile Information
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data" id="profileForm">
+                        {% csrf_token %}
+
+                        <!-- User Information Section -->
+                        <div class="mb-4">
+                            <h5 class="mb-3" style="color: var(--primary-green);">
+                                <i class="fas fa-user-circle me-2"></i>User Information
+                            </h5>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">First Name</label>
+                                    <input type="text" 
+                                           class="form-control form-control-lg" 
+                                           name="first_name" 
+                                           value="{{ user_form.instance.first_name|default:'' }}"
+                                           placeholder="Enter first name">
+                                    <div class="form-text">Your legal first name</div>
+                                </div>
+
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Last Name</label>
+                                    <input type="text" 
+                                           class="form-control form-control-lg" 
+                                           name="last_name" 
+                                           value="{{ user_form.instance.last_name|default:'' }}"
+                                           placeholder="Enter last name">
+                                    <div class="form-text">Your legal last name</div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Email Address</label>
+                                <input type="email" 
+                                       class="form-control form-control-lg" 
+                                       name="email" 
+                                       value="{{ user_form.instance.email|default:'' }}"
+                                       placeholder="Enter email address">
+                                <div class="form-text">Your primary contact email</div>
+                            </div>
+                        </div>
+
+                        <!-- Profile Information Section -->
+                        <div class="mb-4">
+                            <h5 class="mb-3" style="color: var(--primary-green);">
+                                <i class="fas fa-id-card me-2"></i>Profile Information
+                            </h5>
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Bio</label>
+                                <textarea class="form-control" 
+                                          name="bio" 
+                                          rows="4"
+                                          placeholder="Tell us about yourself, your experience, and your medical philosophy...">{{ profile_form.instance.bio|default:'' }}</textarea>
+                                <div class="form-text">Brief professional biography (max 500 characters)</div>
+                                <div class="text-end small" id="bioCounter">0/500</div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Location</label>
+                                    <input type="text" 
+                                           class="form-control" 
+                                           name="location" 
+                                           value="{{ profile_form.instance.location|default:'' }}"
+                                           placeholder="City, Country">
+                                    <div class="form-text">Your current location</div>
+                                </div>
+
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Birth Date</label>
+                                    <input type="date" 
+                                           class="form-control" 
+                                           name="birth_date" 
+                                           value="{{ profile_form.instance.birth_date|date:'Y-m-d'|default:'' }}">
+                                    <div class="form-text">Your date of birth</div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Phone Number</label>
+                                    <input type="tel" 
+                                           class="form-control" 
+                                           name="phone" 
+                                           value="{{ user_form.instance.phone|default:'' }}"
+                                           placeholder="+1234567890">
+                                    <div class="form-text">Your contact number</div>
+                                </div>
+
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Address</label>
+                                    <input type="text" 
+                                           class="form-control" 
+                                           name="address" 
+                                           value="{{ profile_form.instance.address|default:'' }}"
+                                           placeholder="Street address">
+                                    <div class="form-text">Your complete address</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Professional Information Section -->
+                        <div class="mb-4">
+                            <h5 class="mb-3" style="color: var(--primary-green);">
+                                <i class="fas fa-briefcase-medical me-2"></i>Professional Information
+                            </h5>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Specialization</label>
+                                    <input type="text" 
+                                           class="form-control" 
+                                           name="expertise" 
+                                           value="{{ profile_form.instance.expertise|default:'' }}"
+                                           placeholder="e.g., Cardiology, Pediatrics">
+                                    <div class="form-text">Your medical specialization</div>
+                                </div>
+
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Qualifications</label>
+                                    <input type="text" 
+                                           class="form-control" 
+                                           name="role" 
+                                           value="{{ user_form.instance.role|default:'' }}"
+                                           placeholder="e.g., MD, MBBS, PhD">
+                                    <div class="form-text">Your medical qualifications</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Profile Image Section -->
+                        <div class="mb-4">
+                            <h5 class="mb-3" style="color: var(--primary-green);">
+                                <i class="fas fa-camera me-2"></i>Profile Image
+                            </h5>
+                            
+                            <div class="row align-items-center">
+                                <div class="col-md-4 mb-3">
+                                    <div class="text-center">
+                                        {% if user_form.instance.image %}
+                                        <img src="{{ user_form.instance.image.url }}" 
+                                             alt="Current Profile Image" 
+                                             class="img-fluid rounded-circle border border-3 border-primary mb-3"
+                                             style="width: 180px; height: 180px; object-fit: cover;"
+                                             id="profileImagePreview">
+                                        {% else %}
+                                        <div class="rounded-circle bg-light d-flex align-items-center justify-content-center mb-3"
+                                             style="width: 180px; height: 180px; border: 3px solid var(--primary-green);"
+                                             id="profileImagePreview">
+                                            <i class="fas fa-user-md text-muted" style="font-size: 4rem;"></i>
+                                        </div>
+                                        {% endif %}
+                                        
+                                        <label class="btn btn-outline-primary btn-sm">
+                                            <i class="fas fa-upload me-1"></i>Upload Image
+                                            <input type="file" 
+                                                   class="form-control d-none" 
+                                                   name="image" 
+                                                   accept="image/*"
+                                                   id="imageInput">
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-8 mb-3">
+                                    <div class="alert alert-info">
+                                        <h6 class="alert-heading"><i class="fas fa-info-circle me-2"></i>Image Guidelines</h6>
+                                        <ul class="mb-0 small">
+                                            <li>Upload a clear, professional headshot</li>
+                                            <li>Recommended size: 400x400 pixels</li>
+                                            <li>Accepted formats: JPG, PNG, GIF</li>
+                                            <li>Maximum file size: 5MB</li>
+                                            <li>Ensure good lighting and neutral background</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Form Actions -->
+                        <div class="border-top pt-4">
+                            <div class="d-flex justify-content-between">
+                                <a href="{% url 'profile' %}" class="btn btn-outline-secondary px-4">
+                                    <i class="fas fa-times me-2"></i>Cancel
+                                </a>
+                                <div class="d-flex gap-3">
+                                    <button type="submit" class="btn btn-primary px-4" style="background: var(--gradient-green); border: none;">
+                                        <i class="fas fa-save me-2"></i>Save Changes
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar Tips -->
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-lightbulb me-2"></i>Profile Tips
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-success mb-3">
+                        <h6 class="alert-heading">
+                            <i class="fas fa-check-circle me-2"></i>Complete Your Profile
+                        </h6>
+                        <p class="small mb-0">Complete profiles receive 40% more patient inquiries.</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6 class="fw-bold mb-2">Best Practices:</h6>
+                        <ul class="small text-muted">
+                            <li>Use your real, legal name</li>
+                            <li>Keep contact information up-to-date</li>
+                            <li>Write a professional, concise bio</li>
+                            <li>Use a recent, high-quality photo</li>
+                            <li>List all relevant qualifications</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="border-top pt-3">
+                        <h6 class="fw-bold mb-2">Profile Strength</h6>
+                        <div class="progress mb-2" style="height: 8px;">
+                            <div class="progress-bar" role="progressbar" 
+                                 style="width: {% firstof profile.complete_percentage '65' %}%; background: var(--gradient-green);">
+                            </div>
+                        </div>
+                        <p class="small text-muted mb-0">
+                            <span class="fw-bold">{% firstof profile.complete_percentage '65' %}% Complete</span> 
+                            • Update all fields to reach 100%
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Links -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-link me-2"></i>Quick Links
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        <a href="{% url 'profile' %}" class="list-group-item list-group-item-action border-0 py-3">
+                            <i class="fas fa-user text-primary me-3"></i>
+                            <span>View My Profile</span>
+                            <i class="fas fa-chevron-right small ms-auto text-muted"></i>
+                        </a>
+                        <!-- <a href="#" class="list-group-item list-group-item-action border-0 py-3">
+                            <i class="fas fa-key text-primary me-3"></i>
+                            <span>Change Password</span>
+                            <i class="fas fa-chevron-right small ms-auto text-muted"></i>
+                        </a> -->
+                        <a href="{% url 'doctor_availability' %}" class="list-group-item list-group-item-action border-0 py-3">
+                            <i class="fas fa-calendar-alt text-primary me-3"></i>
+                            <span>Update Availability</span>
+                            <i class="fas fa-chevron-right small ms-auto text-muted"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Custom JavaScript for Profile Edit -->
+<script>
+    // Image preview functionality
+    const imageInput = document.getElementById('imageInput');
+    const profileImagePreview = document.getElementById('profileImagePreview');
+
+    imageInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                if (profileImagePreview.tagName === 'IMG') {
+                    profileImagePreview.src = e.target.result;
+                } else {
+                    // Replace div with image
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.alt = "Profile Preview";
+                    img.className = "img-fluid rounded-circle border border-3 border-primary mb-3";
+                    img.style.width = "180px";
+                    img.style.height = "180px";
+                    img.style.objectFit = "cover";
+                    img.id = "profileImagePreview";
+                    
+                    profileImagePreview.parentNode.replaceChild(img, profileImagePreview);
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    // Bio character counter
+    const bioTextarea = document.querySelector('textarea[name="bio"]');
+    const bioCounter = document.getElementById('bioCounter');
+
+    if (bioTextarea && bioCounter) {
+        function updateBioCounter() {
+            const length = bioTextarea.value.length;
+            bioCounter.textContent = `${length}/500`;
+            
+            if (length > 500) {
+                bioCounter.style.color = '#dc3545';
+            } else if (length > 400) {
+                bioCounter.style.color = '#ff9800';
+            } else {
+                bioCounter.style.color = '#666';
+            }
+        }
+        
+        bioTextarea.addEventListener('input', updateBioCounter);
+        updateBioCounter(); // Initial update
+    }
+
+    // Form validation
+    const profileForm = document.getElementById('profileForm');
+    
+    profileForm.addEventListener('submit', function(e) {
+        const firstName = document.querySelector('input[name="first_name"]');
+        const email = document.querySelector('input[name="email"]');
+        
+        let isValid = true;
+        
+        // Clear previous errors
+        document.querySelectorAll('.is-invalid').forEach(el => {
+            el.classList.remove('is-invalid');
+        });
+        
+        // Validate first name
+        if (!firstName.value.trim()) {
+            firstName.classList.add('is-invalid');
+            isValid = false;
+        }
+        
+        // Validate email
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email.value)) {
+            email.classList.add('is-invalid');
+            isValid = false;
+        }
+        
+        if (!isValid) {
+            e.preventDefault();
+            
+            // Show error message
+            if (!document.getElementById('formError')) {
+                const errorDiv = document.createElement('div');
+                errorDiv.id = 'formError';
+                errorDiv.className = 'alert alert-danger alert-dismissible fade show mt-3';
+                errorDiv.innerHTML = `
+                    <strong><i class="fas fa-exclamation-triangle me-2"></i>Please fix the following errors:</strong>
+                    <ul class="mb-0 mt-2">
+                        ${!firstName.value.trim() ? '<li>First name is required</li>' : ''}
+                        ${!emailRegex.test(email.value) ? '<li>Valid email address is required</li>' : ''}
+                    </ul>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                profileForm.insertBefore(errorDiv, profileForm.firstChild);
+            }
+        }
+    });
+
+    // Preview button functionality
+    document.getElementById('previewBtn').addEventListener('click', function() {
+        // You can implement a preview modal here
+        alert('Preview functionality would show how your profile appears to patients. This feature will be implemented soon!');
+    });
+
+    // Initialize tooltips
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+
+    // Auto-save draft functionality (optional)
+    let saveTimeout;
+    profileForm.addEventListener('input', function() {
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(() => {
+            // You could implement auto-save to localStorage here
+            console.log('Auto-save triggered');
+        }, 2000);
+    });
+</script>
+
+<!-- Custom CSS for Edit Profile -->
+<style>
+    .form-control-lg {
+        border-radius: 8px;
+        border: 2px solid #e0e0e0;
+        padding: 0.75rem 1rem;
+        transition: all 0.3s;
+    }
+    
+    .form-control-lg:focus {
+        border-color: var(--primary-green);
+        box-shadow: 0 0 0 0.25rem rgba(45, 90, 45, 0.25);
+    }
+    
+    .form-control {
+        border-radius: 6px;
+        border: 1px solid #ddd;
+        padding: 0.5rem 0.75rem;
+    }
+    
+    .form-control:focus {
+        border-color: var(--primary-green);
+        box-shadow: 0 0 0 0.2rem rgba(45, 90, 45, 0.1);
+    }
+    
+    .form-label {
+        font-weight: 600;
+        color: var(--dark-text);
+        margin-bottom: 0.5rem;
+    }
+    
+    .form-text {
+        font-size: 0.85rem;
+        color: #666;
+        margin-top: 0.25rem;
+    }
+    
+    .is-invalid {
+        border-color: #dc3545 !important;
+    }
+    
+    .border-primary {
+        border-color: var(--primary-green) !important;
+    }
+    
+    .alert-info {
+        background-color: #f0f8f0;
+        border-color: #c3e6cb;
+        color: var(--primary-green);
+    }
+    
+    .list-group-item:hover {
+        background-color: #f8f9fa;
+        transform: translateX(5px);
+        transition: all 0.3s;
+    }
+    
+    .progress {
+        background-color: #e9ecef;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    
+    .btn-outline-primary {
+        border-color: var(--primary-green);
+        color: var(--primary-green);
+    }
+    
+    .btn-outline-primary:hover {
+        background-color: var(--primary-green);
+        border-color: var(--primary-green);
+    }
+</style>
+
+{% endblock %}

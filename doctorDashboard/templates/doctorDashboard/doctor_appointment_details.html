@@ -1,0 +1,1383 @@
+{% extends 'doctorDashboard/doctor_base.html' %}
+{% load static %}
+{% block content %}
+<!-- Dashboard Content -->
+<div class="dashboard-content">
+    <!-- Patient Header -->
+    <div class="card">
+        <div class="card-header">
+            <div style="display: flex; align-items: center; gap: 1.5rem;">
+                <!-- <img src="https://via.placeholder.com/80" alt="Patient" class="patient-header-avatar"> -->
+                <div>
+                    <h2 class="card-title" style="margin-bottom: 0.5rem;">
+                        {{appointment.fullName}}
+                    </h2>
+                    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                        <span class="info-badge">
+                            <i class="fas fa-id-card"></i>
+                            Patient ID: {{appointment.bookingID}}
+                        </span>
+                        <span class="info-badge">
+                            <i class="fas fa-calendar"></i>
+                            {{ appointment.slot.date|date:"l d F Y" }} {{ appointment.slot.time|time:"g:i A" }}
+                        </span>
+                        
+                    </div>
+                </div>
+            </div>
+            <div style="display: flex; gap: 1rem; align-items: center;">
+                {% if approval_status.is_approved %}
+                <span class="status-badge confirmed">Approved</span>
+                {% else %}
+                <span class="status-badge pending">Pending Approval</span>
+                <button class="card-action" onclick="openPatientApprovalModal()">
+                    <i class="fas fa-user-check"></i>
+                    Approve Patient
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Grid -->
+    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; margin-top: 2rem;">
+        <!-- Left Column -->
+        <div>
+            <!-- Personal Information -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-user"></i>
+                        Personal Information
+                    </h3>
+                    <button class="btn-icon-action" title="Edit Information">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="patient-info-grid">
+                        <div class="info-row">
+                            <div class="info-item">
+                                <label class="info-label">
+                                    <i class="fas fa-user-circle"></i>
+                                    Visit Times
+                                </label>
+                                <p class="info-value">{{appointment.visitType}}</p>
+                            </div>
+                            <div class="info-item">
+                                <label class="info-label">
+                                    <i class="fas fa-birthday-cake"></i>
+                                    Date of Birth
+                                </label>
+                                <p class="info-value">{{appointment.birthDate}}</p>
+                            </div>
+                        </div>
+
+                        <div class="info-row">
+                            <div class="info-item">
+                                <label class="info-label">
+                                    <i class="fas fa-venus-mars"></i>
+                                    Appointment Mode
+                                </label>
+                                <p class="info-value">{{appointment.appointmentMode}}</p>
+                            </div>
+                            <div class="info-item">
+                                <label class="info-label">
+                                    <i class="fas fa-ring"></i>
+                                    Reason for Visiting
+                                </label>
+                                <p class="info-value">{{appointment.reasonVisit}}</p>
+                            </div>
+                        </div>
+
+                        <div class="info-row">
+                            
+                            <div class="info-item">
+                                <label class="info-label">
+                                    <i class="fas fa-id-card"></i>
+                                    Concerns / Symptoms
+                                </label>
+                                <p class="info-value">{{appointment.symptoms}}</p>
+                            </div>
+                            <div class="info-item">
+                                <label class="info-label">
+                                    <i class="fas fa-venus"></i>
+                                    Gender
+                                </label>
+                                <p class="info-value">{{appointment.gender}}</p>
+                            </div>
+                        </span>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contact Information -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-address-book"></i>
+                        Contact Information
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="patient-info-grid">
+                        <div class="info-row">
+                            <div class="info-item">
+                                <label class="info-label">
+                                    <i class="fas fa-envelope"></i>
+                                    Email Address
+                                </label>
+                                <p class="info-value">{{appointment.email}}</p>
+                            </div>
+                            <div class="info-item">
+                                <label class="info-label">
+                                    <i class="fas fa-phone"></i>
+                                    Phone Number
+                                </label>
+                                <p class="info-value">{{appointment.phone}}</p>
+                            </div>
+                        </div>
+
+                        <!-- <div class="info-row">
+                            <div class="info-item">
+                                <label class="info-label">
+                                    <i class="fas fa-phone-alt"></i>
+                                    Alternative Phone
+                                </label>
+                                <p class="info-value">{{appointment.symptoms}}</p>
+                            </div>
+                            <div class="info-item">
+                                <label class="info-label">
+                                    <i class="fas fa-map-marker-alt"></i>
+                                    Address
+                                </label>
+                                <p class="info-value">{{appointment.symptoms}}</p>
+                            </div>
+                        </div> -->
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Patient Notes -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-sticky-note"></i>
+                        Patient Notes
+                    </h3>
+                    <button class="card-action" onclick="openPatientNoteModal()">
+                        <i class="fas fa-plus"></i>
+                        Add Note
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="notes-container">
+                        <!-- Sample Note 1 -->
+                        {% if appointment_notes %}
+                            {% for i in appointment_notes %}
+                                <div class="note-item">
+                                    <div class="note-header">
+                                        <div class="note-author">
+                                            <img src="{{i.added_by.image.url}}" alt="Doctor" class="note-avatar">
+                                            <div>
+                                                <div class="note-author-name">{{i.added_by.get_full_name}}</div>
+                                                <div class="note-timestamp">{{ i.created_at|date:"l, Y-m-d" }} at {{ i.created_at|time:"H:i" }}</div>
+                                            </div>
+                                        </div>
+                                        <button class="btn-icon-action" title="Delete Note">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                    <div class="note-content">
+                                        {{i.note_text}}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                        <p>No any updates</p>
+                        {% endif %}
+
+                        
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Right Column -->
+        <div>
+            <!-- Quick Actions -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-bolt"></i>
+                        Quick Actions
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="action-buttons-vertical">
+                        <button class="action-btn primary" onclick="openPatientApprovalModal()">
+                            <i class="fas fa-user-check"></i>
+                            <span>Approve Patient</span>
+                        </button>
+                        <button class="action-btn success">
+                            <i class="fas fa-calendar-plus"></i>
+                            <span>Schedule Appointment</span>
+                        </button>
+                        <button class="action-btn info" onclick="openPatientNoteModal()">
+                            <i class="fas fa-sticky-note"></i>
+                            <span>Add Note</span>
+                        </button>
+                        <button class="action-btn secondary">
+                            <i class="fas fa-paper-plane"></i>
+                            <span>Send Message</span>
+                        </button>
+                        <button class="action-btn" style="background: #e8eaf6; color: #3f51b5;">
+                            <i class="fas fa-print"></i>
+                            <span>Print Profile</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Document Upload -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-file-upload"></i>
+                        Documents
+                    </h3>
+                    <button class="btn-icon-action" title="Upload Document">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="documents-list">
+                        <div class="document-item">
+                            <i class="fas fa-file-pdf"></i>
+                            <div class="document-info">
+                                <div class="document-name">Lab Results - Oct 2025.pdf</div>
+                                <div class="document-date">Oct 16, 2025</div>
+                            </div>
+                            <button class="btn-icon-action">
+                                <i class="fas fa-download"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Patient Approval Modal -->
+<div class="modal-overlay" id="patientApprovalModal">
+    <div class="modal-container">
+        <form action="{% url 'appointment_approval' appointment.id %}" method="post">
+            {% csrf_token %}
+            <div class="modal-header">
+                <h3>
+                    <i class="fas fa-user-check"></i>
+                    Approve Patient Registration
+                </h3>
+                <button class="modal-close" onclick="closePatientApprovalModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="approval-summary">
+                    <div class="summary-item">
+                        <span class="summary-label">Patient Name:</span>
+                        <span class="summary-value">{{appointment.fullName}}</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Patient ID:</span>
+                        <span class="summary-value">{{appointment.bookingID}}</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Appointment Date:</span>
+                        <span class="summary-value">{{ appointment.slot.date|date:"l, F j, Y" }}</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Appointment Time:</span>
+                        <span class="summary-value">{{ appointment.slot.time|time:"g:i A" }}</span>
+                    </div>
+                </div>
+
+                <!-- <div class="form-group">
+                    <label class="form-label">
+                        <i class="fas fa-user-md"></i>
+                        Assign Primary Doctor
+                    </label>
+                    <select class="form-control">
+                        <option>Dr. James Smith - Cardiology</option>
+                        <option>Dr. Emily Davis - General Practice</option>
+                        <option>Dr. Michael Brown - Internal Medicine</option>
+                        <option>Dr. Lisa Anderson - Family Medicine</option>
+                    </select>
+                </div> -->
+
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="scheduleOrientation" name="is_approved"
+                        {% if approval_status and approval_status.is_approved %}
+                            checked
+                        {% endif %}
+                    >
+                    <label for="scheduleOrientation">Check to Approve an Appointment</label>
+                </div>
+
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closePatientApprovalModal()">Cancel</button>
+                <button type="submit" class="btn-primary">
+                    <i class="fas fa-check"></i>
+                    Approve Patient
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Patient Note Modal -->
+<div class="modal-overlay" id="patientNoteModal">
+    <div class="modal-container">
+        <div class="modal-header">
+            <h3>
+                <i class="fas fa-sticky-note"></i>
+                Add Patient Note
+            </h3>
+            <button class="modal-close" onclick="closePatientNoteModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <form method="post" action="{% url 'add_appointment_note' appointment.id %}">
+            {% csrf_token %}
+            <div class="modal-body">
+
+                <div class="form-group">
+                    <label class="form-label">
+                        <i class="fas fa-edit"></i>
+                        Note Content
+                    </label>
+                    <textarea class="form-control" id="patientNoteText" rows="3" name="note_text" placeholder="Enter your note here..."></textarea>
+                    <small class="form-hint">Add relevant information about the patient, observations, or important reminders.</small>
+                </div>
+
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="shareWithPatient">
+                    <label for="shareWithPatient">Share note with patient</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closePatientNoteModal()">Cancel</button>
+                <button class="btn-primary" type="submit">
+                    <i class="fas fa-save"></i>
+                    Save Note
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    /* Patient Header */
+    .patient-header-avatar {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 4px solid var(--accent-green);
+    }
+
+    .info-badge {
+        background: #f0f0f0;
+        padding: 0.4rem 0.9rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: var(--dark-text);
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .info-badge i {
+        color: var(--primary-green);
+    }
+
+    /* Patient Info Grid */
+    .patient-info-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .info-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+    }
+
+    .info-item {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .info-label {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #666;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .info-label i {
+        color: var(--primary-green);
+    }
+
+    .info-value {
+        font-size: 1rem;
+        color: var(--dark-text);
+        font-weight: 500;
+        margin: 0;
+    }
+
+    .blood-type-badge {
+        background: linear-gradient(135deg, #e53935 0%, #c62828 100%);
+        color: white;
+        padding: 0.4rem 1rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: 700;
+        display: inline-block;
+    }
+
+    .btn-icon-action {
+        background: #f0f0f0;
+        border: none;
+        width: 35px;
+        height: 35px;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s;
+        color: #666;
+    }
+
+    .btn-icon-action:hover {
+        background: #e0e0e0;
+        color: var(--primary-green);
+        transform: scale(1.05);
+    }
+
+    /* Medical History */
+    .medical-history-section {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+    }
+
+    .history-item {
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .history-item:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+
+    .history-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--primary-green);
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .tags-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+
+    .tag-badge {
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        display: inline-block;
+    }
+
+    .tag-badge.allergy {
+        background: #ffebee;
+        color: #c62828;
+        border: 2px solid #ef9a9a;
+    }
+
+    .tag-badge.condition {
+        background: #fff3e0;
+        color: #e65100;
+        border: 2px solid #ffb74d;
+    }
+
+    .medication-list,
+    .surgery-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .medication-list li,
+    .surgery-list li {
+        padding: 0.75rem;
+        background: #f8f9fa;
+        margin-bottom: 0.5rem;
+        border-radius: 8px;
+        border-left: 4px solid var(--accent-green);
+    }
+
+    .medication-list li strong {
+        color: var(--primary-green);
+    }
+
+    /* Notes */
+    .notes-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .note-item {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 1rem;
+        border-left: 4px solid var(--primary-green);
+    }
+
+    .note-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.75rem;
+    }
+
+    .note-author {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .note-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid var(--accent-green);
+    }
+
+    .note-author-name {
+        font-weight: 600;
+        color: var(--dark-text);
+    }
+
+    .note-timestamp {
+        font-size: 0.85rem;
+        color: #666;
+    }
+
+    .note-content {
+        color: var(--dark-text);
+        line-height: 1.6;
+    }
+
+    /* Appointments Table */
+    .appointments-table {
+        width: 100%;
+        overflow-x: auto;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    thead {
+        background: #f8f9fa;
+    }
+
+    th {
+        padding: 1rem;
+        text-align: left;
+        font-weight: 600;
+        color: var(--dark-text);
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    td {
+        padding: 1rem;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    tr:hover {
+        background: #f8f9fa;
+    }
+
+    .btn-action {
+        width: 35px;
+        height: 35px;
+        border-radius: 8px;
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.3s;
+        font-size: 0.95rem;
+    }
+
+    .btn-action.view {
+        background: #e3f2fd;
+        color: #1976d2;
+    }
+
+    .btn-action:hover {
+        transform: scale(1.1);
+    }
+
+    /* Quick Actions */
+    .action-buttons-vertical {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .action-btn {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1rem;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        text-align: left;
+    }
+
+    .action-btn i {
+        font-size: 1.2rem;
+        width: 24px;
+    }
+
+    .action-btn.primary {
+        background: var(--gradient-green);
+        color: white;
+    }
+
+    .action-btn.primary:hover {
+        transform: translateX(5px);
+        box-shadow: 0 4px 12px rgba(45, 90, 45, 0.3);
+    }
+
+    .action-btn.secondary {
+        background: #e0e0e0;
+        color: #666;
+    }
+
+    .action-btn.secondary:hover {
+        transform: translateX(5px);
+        background: #d0d0d0;
+    }
+
+    .action-btn.info {
+        background: #d1ecf1;
+        color: #0c5460;
+    }
+
+    .action-btn.info:hover {
+        transform: translateX(5px);
+        background: #bee5eb;
+    }
+
+    .action-btn.warning {
+        background: #fff3cd;
+        color: #856404;
+    }
+
+    .action-btn.warning:hover {
+        transform: translateX(5px);
+        background: #ffeaa7;
+    }
+
+    .action-btn.success {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .action-btn.success:hover {
+        transform: translateX(5px);
+        background: #c3e6cb;
+    }
+
+    /* Stats List */
+    .stats-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .stat-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        background: #f8f9fa;
+        border-radius: 10px;
+        transition: all 0.3s;
+    }
+
+    .stat-item:hover {
+        background: #f0f0f0;
+        transform: translateX(5px);
+    }
+
+    .stat-icon-small {
+        width: 50px;
+        height: 50px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: white;
+    }
+
+    .stat-info-small {
+        flex: 1;
+    }
+
+    .stat-label-small {
+        font-size: 0.85rem;
+        color: #666;
+        margin-bottom: 0.25rem;
+    }
+
+    .stat-value-small {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--dark-text);
+    }
+
+    /* Registration Info */
+    .registration-info {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .reg-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        padding: 1rem;
+        background: #f8f9fa;
+        border-radius: 10px;
+    }
+
+    .reg-item i {
+        font-size: 1.5rem;
+        color: var(--primary-green);
+        margin-top: 0.25rem;
+    }
+
+    .reg-label {
+        font-size: 0.85rem;
+        color: #666;
+        margin-bottom: 0.25rem;
+    }
+
+    .reg-value {
+        font-weight: 600;
+        color: var(--dark-text);
+    }
+
+    /* Documents */
+    .documents-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .document-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        background: #f8f9fa;
+        border-radius: 10px;
+        transition: all 0.3s;
+    }
+
+    .document-item:hover {
+        background: #e8f5e9;
+    }
+
+    .document-item > i {
+        font-size: 1.8rem;
+        color: var(--primary-green);
+    }
+
+    .document-info {
+        flex: 1;
+    }
+
+    .document-name {
+        font-weight: 600;
+        color: var(--dark-text);
+        margin-bottom: 0.25rem;
+    }
+
+    .document-date {
+        font-size: 0.85rem;
+        color: #666;
+    }
+
+    /* Modal Styles */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 2000;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-overlay.show {
+        display: flex;
+    }
+
+    .modal-container {
+        background: white;
+        border-radius: 16px;
+        width: 90%;
+        max-width: 600px;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        animation: modalSlideIn 0.3s ease;
+    }
+
+    @keyframes modalSlideIn {
+        from {
+            transform: translateY(-50px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    .modal-header {
+        padding: 1.5rem;
+        border-bottom: 1px solid #e0e0e0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-header h3 {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: var(--primary-green);
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin: 0;
+    }
+
+    .modal-close {
+        background: #f0f0f0;
+        border: none;
+        width: 35px;
+        height: 35px;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s;
+        color: #666;
+    }
+
+    .modal-close:hover {
+        background: #e0e0e0;
+        color: #333;
+    }
+
+    .modal-body {
+        padding: 1.5rem;
+    }
+
+    .modal-footer {
+        padding: 1.5rem;
+        border-top: 1px solid #e0e0e0;
+        display: flex;
+        justify-content: flex-end;
+        gap: 1rem;
+    }
+
+    .approval-summary {
+        background: #f8f9fa;
+        padding: 1.5rem;
+        border-radius: 10px;
+        margin-bottom: 1.5rem;
+    }
+
+    .summary-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .summary-item:last-child {
+        border-bottom: none;
+    }
+
+    .summary-label {
+        font-weight: 600;
+        color: #666;
+    }
+
+    .summary-value {
+        color: var(--dark-text);
+        font-weight: 600;
+    }
+
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+
+    .form-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 600;
+        color: var(--dark-text);
+        margin-bottom: 0.5rem;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 0.75rem;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 1rem;
+        transition: border-color 0.3s;
+        font-family: inherit;
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: var(--primary-green);
+    }
+
+    .form-hint {
+        display: block;
+        font-size: 0.85rem;
+        color: #666;
+        margin-top: 0.5rem;
+    }
+
+    .checkbox-group {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .checkbox-group input[type="checkbox"] {
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+    }
+
+    .checkbox-group label {
+        font-weight: 500;
+        color: var(--dark-text);
+        cursor: pointer;
+    }
+
+    .note-templates {
+        margin-top: 1.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid #e0e0e0;
+    }
+
+    .template-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-top: 0.75rem;
+    }
+
+    .template-btn {
+        background: #f0f0f0;
+        border: 2px solid #e0e0e0;
+        padding: 0.6rem 1rem;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 500;
+        color: var(--dark-text);
+    }
+
+    .template-btn:hover {
+        border-color: var(--primary-green);
+        background: #e8f5e9;
+        color: var(--primary-green);
+    }
+
+    .btn-primary {
+        background: var(--gradient-green);
+        color: white;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(45, 90, 45, 0.3);
+    }
+
+    .btn-secondary {
+        background: #f0f0f0;
+        color: var(--dark-text);
+        border: 2px solid #e0e0e0;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+    .btn-secondary:hover {
+        background: #e0e0e0;
+    }
+
+    /* Responsive */
+    @media (max-width: 992px) {
+        .dashboard-content > div {
+            grid-template-columns: 1fr;
+        }
+
+        .info-row {
+            grid-template-columns: 1fr;
+        }
+
+        .modal-container {
+            width: 95%;
+            margin: 1rem;
+        }
+
+        .template-buttons {
+            flex-direction: column;
+        }
+
+        .template-btn {
+            width: 100%;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .card-header {
+            flex-direction: column;
+            gap: 1rem;
+            align-items: flex-start;
+        }
+
+        .card-header > div:first-child {
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .card-action {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .action-buttons-vertical .action-btn {
+            font-size: 0.9rem;
+            padding: 0.75rem;
+        }
+
+        .modal-footer {
+            flex-direction: column;
+        }
+
+        .btn-primary,
+        .btn-secondary {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+</style>
+
+<script>
+    // Patient Approval Modal Functions
+    function openPatientApprovalModal() {
+        document.getElementById('patientApprovalModal').classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closePatientApprovalModal() {
+        document.getElementById('patientApprovalModal').classList.remove('show');
+        document.body.style.overflow = 'auto';
+    }
+
+    // Patient Note Modal Functions
+    function openPatientNoteModal() {
+        document.getElementById('patientNoteModal').classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closePatientNoteModal() {
+        document.getElementById('patientNoteModal').classList.remove('show');
+        document.body.style.overflow = 'auto';
+    }
+
+    // Close modals on overlay click
+    document.getElementById('patientApprovalModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closePatientApprovalModal();
+        }
+    });
+
+    document.getElementById('patientNoteModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closePatientNoteModal();
+        }
+    });
+
+    // Close modals on Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closePatientApprovalModal();
+            closePatientNoteModal();
+        }
+    });
+
+    // Confirm Patient Approval
+    function confirmPatientApproval() {
+        const sendWelcomeEmail = document.getElementById('sendWelcomeEmail').checked;
+        const createPatientPortal = document.getElementById('createPatientPortal').checked;
+        const scheduleOrientation = document.getElementById('scheduleOrientation').checked;
+        
+        // Simulate API call
+        console.log('Approving patient:', {
+            sendWelcomeEmail: sendWelcomeEmail,
+            createPatientPortal: createPatientPortal,
+            scheduleOrientation: scheduleOrientation
+        });
+
+        // Show success message
+        alert('Patient approved successfully! Welcome email sent.');
+        
+        // Close modal
+        closePatientApprovalModal();
+        
+        // Update UI
+        const statusBadge = document.querySelector('.status-badge');
+        if (statusBadge) {
+            statusBadge.className = 'status-badge confirmed';
+            statusBadge.textContent = 'Active Patient';
+        }
+
+        // Update approval button
+        const approvalBtn = document.querySelector('.card-header .card-action');
+        if (approvalBtn) {
+            approvalBtn.innerHTML = '<i class="fas fa-check-circle"></i> Approved';
+            approvalBtn.style.background = '#d4edda';
+            approvalBtn.style.color = '#155724';
+            approvalBtn.disabled = true;
+            approvalBtn.style.cursor = 'not-allowed';
+        }
+    }
+
+    // Save Patient Note
+    function savePatientNote() {
+        const noteText = document.getElementById('patientNoteText').value.trim();
+        const noteCategory = document.getElementById('noteCategory').value;
+        const markImportant = document.getElementById('markImportant').checked;
+        const shareWithPatient = document.getElementById('shareWithPatient').checked;
+        
+        if (!noteText) {
+            alert('Please enter a note before saving.');
+            return;
+        }
+
+        // In production: Make API call to save note
+        console.log('Saving patient note:', {
+            noteText: noteText,
+            category: noteCategory,
+            important: markImportant,
+            shareWithPatient: shareWithPatient
+        });
+
+        // Add note to UI
+        addPatientNoteToUI(noteText, noteCategory);
+
+        // Clear textarea
+        document.getElementById('patientNoteText').value = '';
+        document.getElementById('markImportant').checked = false;
+        document.getElementById('shareWithPatient').checked = false;
+
+        // Show success message
+        alert('Patient note saved successfully!');
+
+        // Close modal
+        closePatientNoteModal();
+    }
+
+    // Add patient note to UI
+    function addPatientNoteToUI(noteText, category) {
+        const notesContainer = document.querySelector('.notes-container');
+        const currentDate = new Date().toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        const noteHTML = `
+            <div class="note-item" style="animation: slideIn 0.3s ease;">
+                <div class="note-header">
+                    <div class="note-author">
+                        <img src="https://via.placeholder.com/40" alt="Doctor" class="note-avatar">
+                        <div>
+                            <div class="note-author-name">Dr. Current User</div>
+                            <div class="note-timestamp">${currentDate}</div>
+                        </div>
+                    </div>
+                    <button class="btn-icon-action" title="Delete Note" onclick="deleteNote(this)">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+                <div class="note-content">${noteText}</div>
+            </div>
+        `;
+
+        notesContainer.insertAdjacentHTML('afterbegin', noteHTML);
+    }
+
+
+
+    // Delete note function
+    function deleteNote(button) {
+        if (confirm('Are you sure you want to delete this note?')) {
+            const noteItem = button.closest('.note-item');
+            noteItem.style.opacity = '0';
+            noteItem.style.transform = 'translateX(-20px)';
+            setTimeout(() => {
+                noteItem.remove();
+            }, 300);
+        }
+    }
+
+    // Quick action handlers
+    document.addEventListener('DOMContentLoaded', function() {
+        // Schedule appointment
+        const scheduleBtn = document.querySelector('.action-btn.success');
+        if (scheduleBtn) {
+            scheduleBtn.addEventListener('click', function() {
+                alert('Opening appointment scheduler...');
+            });
+        }
+
+        // Create prescription
+        const prescriptionBtn = document.querySelector('.action-btn.warning');
+        if (prescriptionBtn) {
+            prescriptionBtn.addEventListener('click', function() {
+                alert('Opening prescription form...');
+            });
+        }
+
+        // Send message
+        const messageBtn = document.querySelectorAll('.action-btn.secondary')[0];
+        if (messageBtn) {
+            messageBtn.addEventListener('click', function() {
+                alert('Opening messaging interface...');
+            });
+        }
+
+        // Print profile
+        const printBtn = document.querySelectorAll('.action-btn')[5];
+        if (printBtn) {
+            printBtn.addEventListener('click', function() {
+                window.print();
+            });
+        }
+    });
+
+    // Animation for page load
+    window.addEventListener('load', function() {
+        const cards = document.querySelectorAll('.card');
+        cards.forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            setTimeout(() => {
+                card.style.transition = 'all 0.5s ease';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, index * 50);
+        });
+    });
+
+    // Add CSS animation
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+    `;
+    document.head.appendChild(style);
+</script>
+
+{% endblock %}

@@ -1,0 +1,117 @@
+
+{% extends 'ecommerce/base.html' %}
+{% load static %}
+{% block container %}
+
+
+<section id="hero" style="background-image: url('{% static 'ecommerce/hero.jpg' %}');">
+  <h4>Trade in offer</h4>
+  <h2>Super value deals</h2>
+  <h1>On all products</h1>
+  <p>Save more with coupons $ up to 70% off</p>
+  <button style="background-image: url('{% static 'ecommerce/brush.png' %}');">Shop now</button>
+</section>
+
+<section id="feature" class="section-p1">
+  <div class="fe-box">
+      <img src="{% static 'ecommerce/feature1.png' %}" alt="">
+      <h6>Free shipping</h6>
+  </div>
+  <div class="fe-box">
+      <img src="{% static 'ecommerce/feature1.png' %}" alt="">
+      <h6>24/7 Active</h6>
+  </div>
+  <div class="fe-box">
+      <img src="{% static 'ecommerce/feature1.png' %}" alt="">
+      <h6>Free Online Help</h6>
+  </div>
+  <div class="fe-box">
+      <img src="{% static 'ecommerce/feature1.png' %}" alt="">
+      <h6>OnTime Delivery</h6>
+  </div>
+</section>
+
+<section id="category">
+    <div>
+        {% for x in categories %}
+        <li>
+            <a href="{{x.get_absolute_url}}">{{x.name}}</a> 
+        </li>
+        {% endfor %}
+        <li>
+            <a href="{% url 'ourproduct' %}">All products</a> 
+        </li>
+    </div>
+</section>
+  
+              <section id="product1" class="section-p1">
+                <h2>Featured Products</h2>
+                <p>Electronics  collection with new modern design</p>
+                <div class="pro-container">
+                    
+                  {% for x in item %}
+                    <div class="pro">
+                        {% if x.image %}
+                        <img src="{{x.image.url}}" alt="">
+                        {% else %}
+                        <img src="{% static 'ecommerce/kote.jpg' %}" alt=""></a>
+                        {% endif %}
+                        <div class="des">
+                            <span>adidas</span>
+                            <h5>{{x.title}}</h5>
+                            <div class="star">
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                            </div>
+                            <h4>Tsh {{x.price}} <del>Tsh. {{x.discount_price}}</del></h4>
+                        </div>
+                        <a href="{% url 'detailed_product' x.id %}"><i class="fal fa-shopping-cart cart"></i></a>
+                    </div>
+                    {% endfor %}
+
+                </div>
+              </section>
+
+              <section id="banner" class="section-m1" style="background-image: url('{% static 'ecommerce/b2.jpg' %}');">
+                <h4>Electronic Devices Services</h4>
+                <h2>Up to <span>70% off</span> - All  Electronics & accessories</h2>
+                <button class="normal">Exprole More</button>
+              </section>
+
+              <section id="sm-banner" class="section-p1">
+                <div class="banner-box" style="background-image: url('{% static 'ecommerce/smbanner2.jpg' %}');">
+                    <h4>Crazy deals</h4>
+                    <h2>Buy 1 get an offer free</h2>
+                    <span>The best classic computers is on sale at McColn</span>
+                    <button class="white">Learn More</button>
+                </div>
+                <div class="banner-box banner-box2" style="background-image: url('{% static 'ecommerce/smbanner1.jpg' %}');">
+                    <h4>Holiday seasons</h4>
+                    <h2>Upcoming Season</h2>
+                    <span>The best classic  is on sale at McColn</span>
+                    <button class="white">Collection</button>
+                </div>
+            </section>
+        
+            <section id="banner3">
+                <div class="banner-box" style="background-image: url('{% static 'ecommerce/banner31.jpg' %}');">
+                    <h2>SEASONAL SALE</h2>
+                    <h3>Printer Collection -50% OFF</h3>
+                </div>
+                <div class="banner-box banner-box2" style="background-image: url('{% static 'ecommerce/banner32.jpg' %}');">
+                    <h2>SEASONAL SALE</h2>
+                    <h3>Laptop Collection -50% OFF</h3>
+                </div>
+                <div class="banner-box banner-box3" style="background-image: url('{% static 'ecommerce/banner33.jpg' %}');">
+                    <h2>SEASONAL SALE</h2>
+                    <h3>Radio Collection -50% OFF</h3>
+                </div>
+            </section>
+              
+
+
+
+{% endblock %}

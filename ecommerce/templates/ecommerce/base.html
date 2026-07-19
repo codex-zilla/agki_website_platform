@@ -1,0 +1,124 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="https://pro.fontawesome.com/releases/v5.10.0/css/all.css" />
+    <link rel="stylesheet" href="{% static 'ecommerce/style.css' %}">
+    <!-- SweetAlert2 CDN for popup-->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+
+    <!-- Django Messages + SweetAlert -->
+    {% if messages %}
+        <script>
+            {% for message in messages %}
+                Swal.fire({
+                    title: "Success!",
+                    text: "{{ message|escapejs }}",
+                    icon: "success",
+                    confirmButtonText: "OK"
+                });
+            {% endfor %}
+        </script>
+    {% endif %}
+
+    <section id="header">
+        <a href="{% url 'ourproduct' %}"><img src="{% static 'app/logo.png' %}" alt="logo"></a>
+        <div>
+            <ul id="navbar">
+                <li><a class="{% if request.path == '/' %}active{% endif %}" href="{% url 'ourproduct' %}">Shop</a></li>
+                <li><a class="{% if request.path == '/contact/' %}active{% endif %}" href="{% url 'contact' %}">Contact</a></li>
+                {% if user.is_superuser %}
+                <li><a class="{% if request.path == '/item_add/' %}active{% endif %}" href="{% url 'item_add' %}">AddItem</a></li>
+                {% endif %}
+                <!-- display logedin username -->
+
+                {% if user.is_authenticated %}
+                <li><a href="#">Welcome, {{ user.username }}</a></li>
+                <li><a href="{% url 'logout3' %}">Signout</a></li>
+                <li id="lg-bag"><a class="{% if request.path == '/order_summary/' %}active{% endif %}" href="{% url 'order_summary' %}"><i class="far fa-shopping-bag"></i></a></li>
+                {% else %}
+                <li><a href="{% url 'signin3' %}">Signin</a></li>
+                {% endif %}
+                
+                <a href="#" id="close"><i class="far fa-times"></i></a>
+            </ul>
+        </div>
+        <div id="mobile">
+            {% if user.is_authenticated %}
+            <a href="{% url 'order_summary' %}"><i class="far fa-shopping-bag"></i></a>
+            {% endif %}
+            <i id="bar" class="fas fa-outdent"></i>
+        </div>
+    </section>
+
+	{% block container %}
+	{% endblock %}
+
+    <section id="newsletter" class="section-p1" style="background-image: url('{% static 'ecommerce/b14.png' %}');">
+        <div class="newstext">
+            <h4>Signup for Newsletters</h4>
+            <p>Get E-mail updates about our latest shop and <span>special offers</span></p>
+        </div>
+        <div class="form">
+            <input type="text" placeholder="Your Email address">
+            <button class="normal">Sign up</button>
+        </div>
+    </section>
+
+    <footer class="section-p1">
+        <div class="col">
+            <img class="logo" src="{% static 'app/logo.png' %}" alt="">
+            <h4>Contact</h4>
+            <p><strong>Address:</strong> Kibaha PWANI</p>
+            <p><strong>Tanzania</strong></p>
+            <div class="follow">
+                <h4>Follow us</h4>
+                <div class="icon">
+                    <i class="fab fa-facebook-f"></i>
+                    <i class="fab fa-twitter"></i>
+                    <i class="fab fa-instagram"></i>
+                    <i class="fab fa-youtube"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <h4>About</h4>
+            <a href="#">About us</a>
+            <a href="#">Delivery Informations</a>
+            <a href="#">Privacy Policy</a>
+            <a href="#">Terms & Conditions</a>
+            <a href="#">Contact us</a>
+        </div>
+        <div class="col">
+            <h4>My Account</h4>
+            <a href="#">Sign in</a>
+            <a href="#">View cart</a>
+            <a href="#">My Wishlist</a>
+            <a href="#">Track my order</a>
+            <a href="#">Help</a>
+        </div>
+        <div class="col install">
+            <h4>Install App</h4>
+            <p>From App store or Google Play</p>
+            <div class="row">
+                <img src="{% static 'ecommerce/app.jpg' %}" alt="">
+                <img src="{% static 'ecommerce/play.jpg' %}" alt="">
+            </div>
+            <p>Secured Payment Gateway</p>
+            <img src="{% static 'ecommerce/pay.png' %}" alt="">
+        </div>
+
+        <div class="copyright">
+            <p>2026, AGKI MEDICAL LABORATORY</p>
+        </div>
+
+    </footer>
+   
+    <script src="{% static 'ecommerce/script.js' %}"></script>
+</body>
+</html>

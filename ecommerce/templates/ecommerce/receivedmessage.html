@@ -1,0 +1,45 @@
+{% extends 'ecommerce/base.html' %}
+{% load static %}
+{% block title %}Order Summary{% endblock %}
+
+{% block container %}
+
+
+  
+  <section id="cart" class="section-p1">
+    {% if x %}
+    <table width="'100%">
+        <thead>
+          
+            <tr>
+                <td>**</td>
+                <td>sn</td>
+                <td>name</td>
+                <td>Email</td>
+                <td>Subjec</td>
+                <td>Message</td>
+            </tr>
+          
+        </thead>
+        <tbody>
+  
+          {% for i in x %}
+            <tr>
+                <td><a href="#"><i class="far fa-times-circle"></i></a></td>
+                <td>{{i.id}}</td>
+                <td>{{i.name}}</td>
+                <td>{{i.email}}</td>
+                <td>{{i.subject}}</td>
+                <td>{{i.message}}</td>
+            </tr>
+          {% endfor %}
+          
+        </tbody>
+    </table>
+
+    {% else %}
+    <h1>No message sent yet</h1>
+    {% endif %}
+  </section>
+
+{% endblock %}

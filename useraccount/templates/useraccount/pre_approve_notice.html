@@ -1,0 +1,832 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-T256LX3B9J"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-T256LX3B9J');
+    </script>
+
+    
+    <meta charset="UTF-8">
+    <link rel = "shortcut icon" type = "x-icon" href="{% static 'app/logo.png' %}" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AGKI Medical Laboratory - Account Activation</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary-green: #2d5a2d;
+            --light-green: #4a7c59;
+            --gradient-green: linear-gradient(135deg, #2d5a2d 0%, #4a7c59 100%);
+            --accent-green: #7cc576;
+            --light-bg: #f8f9fa;
+            --dark-text: #333;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            line-height: 1.6;
+            color: var(--dark-text);
+            overflow-x: hidden;
+            background-color: var(--light-bg);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        
+        /* Navbar Styles */
+        .navbar {
+            background: rgba(45, 90, 45, 0.95) !important;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            padding: 15px 0;
+        }
+        
+        .navbar.scrolled {
+            background: var(--primary-green) !important;
+            padding: 10px 0;
+        }
+        
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.8rem;
+            color: white !important;
+        }
+        
+        .navbar-nav .nav-link {
+            color: white !important;
+            font-weight: 500;
+            margin: 0 10px;
+            transition: color 0.3s ease;
+        }
+        
+        .navbar-nav .nav-link:hover {
+            color: var(--accent-green) !important;
+        }
+        
+        /* Activation Section */
+        .activation-section {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 100px 20px 80px;
+        }
+        
+        .activation-container {
+            max-width: 600px;
+            width: 100%;
+            margin: 0 auto;
+        }
+        
+        .activation-card {
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        
+        .activation-header {
+            background: var(--gradient-green);
+            padding: 40px;
+            color: white;
+        }
+        
+        .activation-header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        
+        .activation-header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .activation-body {
+            padding: 50px 40px;
+        }
+        
+        .activation-icon {
+            width: 120px;
+            height: 120px;
+            background: linear-gradient(135deg, #7cc576, #91d68a);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 30px;
+            font-size: 3.5rem;
+            color: white;
+            box-shadow: 0 8px 25px rgba(124, 197, 118, 0.3);
+        }
+        
+        .activation-content h2 {
+            font-size: 1.8rem;
+            color: var(--primary-green);
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        
+        .activation-content p {
+            font-size: 1.1rem;
+            color: #666;
+            margin-bottom: 15px;
+            line-height: 1.8;
+        }
+        
+        .highlight-box {
+            background: linear-gradient(to right, rgba(124, 197, 118, 0.1), rgba(74, 124, 89, 0.1));
+            border-left: 4px solid var(--accent-green);
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 0 10px 10px 0;
+            text-align: left;
+        }
+        
+        .highlight-box p {
+            color: var(--dark-text);
+            margin: 0;
+            font-weight: 500;
+        }
+        
+        .highlight-box p i {
+            color: var(--accent-green);
+            margin-right: 10px;
+        }
+        
+        .status-timeline {
+            display: flex;
+            justify-content: space-between;
+            margin: 40px 0;
+            position: relative;
+        }
+        
+        .status-timeline::before {
+            content: '';
+            position: absolute;
+            top: 25px;
+            left: 10%;
+            right: 10%;
+            height: 3px;
+            background: #e0e0e0;
+            z-index: 1;
+        }
+        
+        .status-step {
+            text-align: center;
+            position: relative;
+            z-index: 2;
+            flex: 1;
+        }
+        
+        .status-icon {
+            width: 50px;
+            height: 50px;
+            background: #e0e0e0;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 15px;
+            font-size: 1.2rem;
+            color: white;
+            transition: all 0.3s ease;
+        }
+        
+        .status-step.active .status-icon {
+            background: var(--accent-green);
+            transform: scale(1.1);
+        }
+        
+        .status-step.active .status-text {
+            color: var(--primary-green);
+            font-weight: 600;
+        }
+        
+        .status-step.completed .status-icon {
+            background: var(--primary-green);
+        }
+        
+        .status-text {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .btn-primary-custom {
+            background: linear-gradient(45deg, var(--accent-green), #91d68a);
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border-radius: 50px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(124, 197, 118, 0.4);
+            color: white;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 20px;
+        }
+        
+        .btn-primary-custom:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(124, 197, 118, 0.6);
+            color: white;
+        }
+        
+        .btn-secondary-custom {
+            background: transparent;
+            border: 2px solid var(--light-green);
+            padding: 13px 30px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border-radius: 50px;
+            transition: all 0.3s ease;
+            color: var(--light-green);
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 20px;
+            margin-left: 15px;
+        }
+        
+        .btn-secondary-custom:hover {
+            background: rgba(74, 124, 89, 0.1);
+            color: var(--light-green);
+            transform: translateY(-2px);
+        }
+        
+        .activation-footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+        
+        .activation-footer p {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .activation-footer a {
+            color: var(--light-green);
+            text-decoration: none;
+            font-weight: 500;
+        }
+        
+        .activation-footer a:hover {
+            text-decoration: underline;
+        }
+        
+        /* Notification Card */
+        .notification-card {
+            background: linear-gradient(to right, rgba(124, 197, 118, 0.05), rgba(74, 124, 89, 0.05));
+            border: 1px solid rgba(124, 197, 118, 0.2);
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 30px;
+            text-align: left;
+        }
+        
+        .notification-card h4 {
+            color: var(--primary-green);
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        .notification-card h4 i {
+            margin-right: 10px;
+            color: var(--accent-green);
+        }
+        
+        .notification-card ul {
+            padding-left: 20px;
+            margin-bottom: 0;
+        }
+        
+        .notification-card li {
+            margin-bottom: 10px;
+            color: #666;
+        }
+        
+        .notification-card li:last-child {
+            margin-bottom: 0;
+        }
+        
+        .notification-card li strong {
+            color: var(--primary-green);
+        }
+        
+        /* Footer */
+        .footer {
+            background: #1a1a1a;
+            color: white;
+            padding: 30px 0 20px;
+            margin-top: auto;
+        }
+        
+        .footer h5 {
+            color: var(--accent-green);
+            margin-bottom: 20px;
+        }
+        
+        .footer a {
+            color: #ccc;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+        
+        .footer a:hover {
+            color: var(--accent-green);
+        }
+        
+        .social-links a {
+            display: inline-block;
+            margin-right: 15px;
+            font-size: 1.5rem;
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .activation-section {
+                padding: 80px 15px 60px;
+            }
+            
+            .activation-header {
+                padding: 30px 20px;
+            }
+            
+            .activation-header h1 {
+                font-size: 2rem;
+            }
+            
+            .activation-body {
+                padding: 40px 20px;
+            }
+            
+            .activation-icon {
+                width: 100px;
+                height: 100px;
+                font-size: 2.8rem;
+            }
+            
+            .activation-content h2 {
+                font-size: 1.5rem;
+            }
+            
+            .status-timeline {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .status-timeline::before {
+                display: none;
+            }
+            
+            .status-step {
+                margin-bottom: 30px;
+            }
+            
+            .status-step:last-child {
+                margin-bottom: 0;
+            }
+            
+            .btn-secondary-custom {
+                margin-left: 0;
+                margin-top: 10px;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .activation-header {
+                padding: 25px 15px;
+            }
+            
+            .activation-header h1 {
+                font-size: 1.8rem;
+            }
+            
+            .activation-body {
+                padding: 30px 15px;
+            }
+            
+            .activation-icon {
+                width: 80px;
+                height: 80px;
+                font-size: 2.2rem;
+            }
+        }
+        
+        /* Animation */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .fade-in-up {
+            animation: fadeInUp 0.8s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
+        <div class="container">
+            <a class="navbar-brand" href="{% url 'home' %}">
+                <img src="{% static 'app/logo.png' %}" alt="" height="40px" width="40px">
+                AGKI Lab
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">Home</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'signin' %}">Login</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'register' %}">Register</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Activation Success Section -->
+    <section class="activation-section">
+        <div class="container activation-container">
+            <div class="activation-card fade-in-up">
+                <div class="activation-header">
+                    <h1>Account Activation</h1>
+                    <p>Your registration with AGKI Medical Laboratory</p>
+                </div>
+                <div class="activation-body">
+                    <div class="activation-icon pulse-animation">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    
+                    <div class="activation-content">
+                        <h2>Email Successfully Activated!</h2>
+                        
+                        <p>Congratulations! Your email address has been successfully verified and your account activation is now in progress.</p>
+                        
+                        <div class="highlight-box">
+                            <p><i class="fas fa-info-circle"></i> Your account will be accessible for login once it has been reviewed and approved by our administration team.</p>
+                        </div>
+                        
+                        <p>An approval confirmation email will be sent to your registered email address once your account has been approved. You will be able to log in and access all features only after receiving this approval notification.</p>
+                        
+                        <!-- Status Timeline -->
+                        <div class="status-timeline">
+                            <div class="status-step completed">
+                                <div class="status-icon">
+                                    <i class="fas fa-user-check"></i>
+                                </div>
+                                <div class="status-text">Registration</div>
+                            </div>
+                            <div class="status-step active">
+                                <div class="status-icon">
+                                    <i class="fas fa-envelope"></i>
+                                </div>
+                                <div class="status-text">Email Verified</div>
+                            </div>
+                            <div class="status-step">
+                                <div class="status-icon">
+                                    <i class="fas fa-user-shield"></i>
+                                </div>
+                                <div class="status-text">Admin Approval</div>
+                            </div>
+                            <div class="status-step">
+                                <div class="status-icon">
+                                    <i class="fas fa-check-circle"></i>
+                                </div>
+                                <div class="status-text">Account Active</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Notification Card -->
+                        <div class="notification-card">
+                            <h4><i class="fas fa-bell"></i> What happens next?</h4>
+                            <ul>
+                                <li><strong>Immediate:</strong> Your email has been verified successfully</li>
+                                <li><strong>Within 24-48 hours:</strong> Our admin team will review your registration</li>
+                                <li><strong>Upon approval:</strong> You will receive an approval email notification</li>
+                                <li><strong>After approval:</strong> You can log in and access the platform</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="activation-footer">
+                            <p>If you don't receive an approval email within 48 hours, please check your spam folder or <a href="mailto:support@agkimedicallaboratory.co.tz">contact our support team</a>.</p>
+                            
+                            <div class="mt-4">
+                                <a href="{% url 'home' %}" class="btn-primary-custom">
+                                    <i class="fas fa-home me-2"></i>Back to Home
+                                </a>
+                                <a href="{% url 'signin' %}" class="btn-secondary-custom">
+                                    <i class="fas fa-sign-in-alt me-2"></i>Go to Login
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Additional Info Card -->
+            <div class="activation-card mt-4 fade-in-up" style="animation-delay: 0.3s;">
+                <div class="activation-body">
+                    <h4 style="color: var(--primary-green); margin-bottom: 20px;">
+                        <i class="fas fa-question-circle me-2"></i>Frequently Asked Questions
+                    </h4>
+                    
+                    <div class="accordion" id="faqAccordion">
+                        <div class="accordion-item mb-3">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
+                                    Why is admin approval required?
+                                </button>
+                            </h2>
+                            <div id="faq1" class="accordion-collapse collapse show" data-bs-parent="#faqAccordion">
+                                <div class="accordion-body">
+                                    To ensure the security and integrity of our healthcare platform, all new registrations require manual verification by our administration team. This helps us maintain a trusted environment for both patients and healthcare professionals.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="accordion-item mb-3">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
+                                    How long does approval take?
+                                </button>
+                            </h2>
+                            <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                                <div class="accordion-body">
+                                    Typically, account approvals are processed within 24-48 hours during business days. If you haven't received approval after 48 hours, please check your spam folder or contact our support team.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="accordion-item mb-3">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">
+                                    What if I need immediate access?
+                                </button>
+                            </h2>
+                            <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                                <div class="accordion-body">
+                                    If you require urgent access to our services, please contact our support team directly at +255 717 308 796 or email support@agkimedicallaboratory.co.tz with your registration details.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-4 mb-4">
+                    <h5>AGKI Medical Laboratory</h5>
+                    <p>Empowering communities with accessible, affordable, and innovative healthcare solutions in Tanzania and beyond.</p>
+                    <div class="social-links">
+                        <a href="#"><i class="fab fa-facebook"></i></a>
+                        <a href="#"><i class="fab fa-twitter"></i></a>
+                        <a href="#"><i class="fab fa-instagram"></i></a>
+                        <a href="#"><i class="fab fa-linkedin"></i></a>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-4">
+                    <h5>Quick Links</h5>
+                    <ul class="list-unstyled">
+                        <li><a href="{% url 'home' %}">Home</a></li>
+                        <li><a href="{% url 'signin' %}">Login</a></li>
+                        <li><a href="{% url 'register' %}">Register</a></li>
+                        <li><a href="{% url 'appointment_home' %}">Book Appointment</a></li>
+                    </ul>
+                </div>
+                <div class="col-md-4 mb-4">
+                    <h5>Contact Info</h5>
+                    <p><i class="fas fa-map-marker-alt me-2"></i>Kibaha Pwani, Tanzania</p>
+                    <p><i class="fas fa-phone me-2"></i>+255 717 308 796</p>
+                    <p><i class="fas fa-envelope me-2"></i>info@agkimedicallaboratory.co.tz</p>
+                </div>
+            </div>
+            <hr style="border-color: #333;">
+            <div class="row">
+                <div class="col-12 text-center">
+                    <p>&copy; 2025 AGKI Medical Laboratory. All rights reserved | Transforming Healthcare in Rural Communities</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Navbar scroll effect
+        window.addEventListener('scroll', function() {
+            const navbar = document.querySelector('.navbar');
+            if (window.scrollY > 50) {
+                navbar.classList.add('scrolled');
+            } else {
+                navbar.classList.remove('scrolled');
+            }
+        });
+
+        // Auto-update timeline status (simulated)
+        function updateTimelineStatus() {
+            const steps = document.querySelectorAll('.status-step');
+            
+            // Simulate admin approval after 3 seconds
+            setTimeout(() => {
+                steps[2].classList.add('completed');
+                steps[2].classList.remove('active');
+                steps[3].classList.add('active');
+                
+                // Show success message
+                showSuccessMessage();
+            }, 3000);
+        }
+
+        function showSuccessMessage() {
+            // Create success notification
+            const notification = document.createElement('div');
+            notification.className = 'alert alert-success alert-dismissible fade show';
+            notification.style.cssText = `
+                position: fixed;
+                top: 100px;
+                right: 20px;
+                z-index: 1000;
+                max-width: 400px;
+                box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+                border-radius: 10px;
+                border: none;
+                background: linear-gradient(135deg, #7cc576, #91d68a);
+                color: white;
+            `;
+            
+            notification.innerHTML = `
+                <div style="display: flex; align-items: center;">
+                    <i class="fas fa-check-circle me-3" style="font-size: 1.5rem;"></i>
+                    <div>
+                        <strong>Account Approved!</strong>
+                        <div>Your account has been approved. You can now log in.</div>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close" style="filter: brightness(0) invert(1);"></button>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 5000);
+        }
+
+        // Initialize timeline animation
+        setTimeout(() => {
+            const timelineSteps = document.querySelectorAll('.status-step');
+            timelineSteps.forEach((step, index) => {
+                setTimeout(() => {
+                    step.classList.add('fade-in-up');
+                }, index * 200);
+            });
+        }, 500);
+
+        // Countdown timer for estimated approval time
+        function startCountdown() {
+            const countdownElement = document.getElementById('countdown');
+            if (!countdownElement) return;
+            
+            let hours = 48;
+            let minutes = 0;
+            
+            function updateCountdown() {
+                countdownElement.textContent = `${hours}h ${minutes}m`;
+                
+                if (minutes === 0) {
+                    if (hours === 0) {
+                        countdownElement.textContent = "Under review";
+                        return;
+                    }
+                    hours--;
+                    minutes = 59;
+                } else {
+                    minutes--;
+                }
+            }
+            
+            updateCountdown();
+            setInterval(updateCountdown, 60000); // Update every minute
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            // Start simulated timeline updates (for demo only)
+            // setTimeout(updateTimelineStatus, 5000);
+            
+            // Start countdown timer
+            startCountdown();
+            
+            // Add hover effects to buttons
+            const buttons = document.querySelectorAll('.btn-primary-custom, .btn-secondary-custom');
+            buttons.forEach(button => {
+                button.addEventListener('mouseenter', function() {
+                    this.style.transform = 'translateY(-2px)';
+                });
+                
+                button.addEventListener('mouseleave', function() {
+                    this.style.transform = 'translateY(0)';
+                });
+            });
+            
+            // Animate check icon on page load
+            const checkIcon = document.querySelector('.activation-icon');
+            checkIcon.style.transform = 'scale(0)';
+            
+            setTimeout(() => {
+                checkIcon.style.transition = 'transform 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
+                checkIcon.style.transform = 'scale(1)';
+            }, 300);
+        });
+
+        // Email check simulation (for demo purposes)
+        function simulateEmailCheck() {
+            const emailCheckBtn = document.createElement('button');
+            emailCheckBtn.className = 'btn-secondary-custom mt-3';
+            emailCheckBtn.innerHTML = '<i class="fas fa-sync-alt me-2"></i>Check Approval Status';
+            emailCheckBtn.style.display = 'block';
+            emailCheckBtn.style.margin = '20px auto 0';
+            
+            const activationBody = document.querySelector('.activation-body');
+            activationBody.appendChild(emailCheckBtn);
+            
+            emailCheckBtn.addEventListener('click', function() {
+                this.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Checking...';
+                this.disabled = true;
+                
+                setTimeout(() => {
+                    this.innerHTML = '<i class="fas fa-clock me-2"></i>Status: Pending Approval';
+                    this.style.background = '#f8f9fa';
+                    this.style.color = '#666';
+                    this.style.borderColor = '#dee2e6';
+                    
+                    setTimeout(() => {
+                        this.innerHTML = '<i class="fas fa-check-circle me-2"></i>Approved! You can now log in';
+                        this.style.background = 'linear-gradient(45deg, var(--accent-green), #91d68a)';
+                        this.style.color = 'white';
+                        this.style.borderColor = 'transparent';
+                        
+                        // Enable login
+                        const loginBtn = document.querySelector('a[href*="signin"]');
+                        loginBtn.classList.remove('btn-secondary-custom');
+                        loginBtn.classList.add('btn-primary-custom');
+                        loginBtn.innerHTML = '<i class="fas fa-sign-in-alt me-2"></i>Login Now';
+                    }, 2000);
+                }, 1500);
+            });
+        }
+
+        // Uncomment to enable email check simulation (for demo)
+        // setTimeout(simulateEmailCheck, 2000);
+    </script>
+</body>
+</html>

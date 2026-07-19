@@ -1,0 +1,999 @@
+{% extends 'doctorDashboard/doctor_base.html' %}
+{% load static %}
+{% block content %}
+<!-- Dashboard Content -->
+<div class="dashboard-content">
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon blue">
+                <i class="fas fa-box"></i>
+            </div>
+            <div class="stat-info">
+                <div class="stat-label">Total Products</div>
+                <div class="stat-value">{{ items|length }}</div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon orange">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-info">
+                <div class="stat-label">Available</div>
+                <div class="stat-value">{{ available_count }}</div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon green">
+                <i class="fas fa-fire"></i>
+            </div>
+            <div class="stat-info">
+                <div class="stat-label">Featured</div>
+                <div class="stat-value">{{ featured_count }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Product Button -->
+    <div class="mb-4">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProductModal">
+            <i class="fas fa-plus me-2"></i>Add New Product
+        </button>
+    </div>
+
+    <!-- Products Table -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <i class="fas fa-box-open"></i>
+                Products Inventory
+            </h2>
+            <div class="d-flex gap-2">
+                <button class="card-action" onclick="exportProducts()">
+                    <i class="fas fa-download me-2"></i>Export
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="appointments-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>SN</th>
+                            <th>Product</th>
+                            <th>Category</th>
+                            <th>Discounted Price</th>
+                            <th>Price</th>
+                            <th>Status</th>
+                            <th>Availability</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if items %}
+                        {% for item in items %}
+                        <tr>
+                            <td><strong>{{forloop.counter}}</strong></td>
+                            <td>
+                                <div class="product-info">
+                                    {% if item.image %}
+                                    <img src="{{ item.image.url }}" alt="{{ item.title }}" class="product-avatar">
+                                    {% else %}
+                                    <div class="product-avatar" style="background: var(--gradient-green); display: flex; align-items: center; justify-content: center;">
+                                        <i class="fas fa-box text-white"></i>
+                                    </div>
+                                    {% endif %}
+                                    <div>
+                                        <div class="product-name">{{ item.title }}</div>
+                                        <div class="product-id">SKU: {{ item.slug|upper }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>{{item.category.name}}</td>
+                            <td>${{item.discount_price}}</td>
+                            <td>
+                                {% if item.discount_price %}
+                                    <span class="discount-price">${{item.price}}</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="status-badge 
+                                    {% if item.status == 'In Stock' %}confirmed
+                                    {% elif item.status == 'Out of Stock' %}cancelled
+                                    {% elif item.status == 'Low Stock' %}pending
+                                    {% else %}completed{% endif %}">
+                                    {{item.status}}
+                                </span>
+                            </td>
+                            <td>
+                                {% if item.available %}
+                                    <span class="status-badge confirmed">Available</span>
+                                {% else %}
+                                    <span class="status-badge cancelled">Unavailable</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <!-- <div class="action-buttons">
+                                    <button class="btn-action view" title="View Details" 
+                                            onclick="showProductDetails({{ item.id }})">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn-action edit" title="Edit Product" onclick="editProduct({{item.id}})">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn-action delete" title="Delete Product" onclick="deleteProduct({{item.id}}, '{{item.title|escapejs}}')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div> -->
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% else %}
+                        <tr>
+                            <td colspan="8" style="text-align: center; padding: 2rem; color: #666;">
+                                No products found. Add your first product!
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- View Product Details Modal -->
+<div class="modal fade" id="viewProductModal" tabindex="-1" aria-labelledby="viewProductModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header" style="background: var(--gradient-green);">
+                <h5 class="modal-title text-white" id="viewProductModalLabel">
+                    <i class="fas fa-box me-2"></i>Product Details
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <!-- Product Image -->
+                    <div class="col-md-5 mb-4">
+                        <div class="product-image-container text-center">
+                            <div id="detailProductImage" class="product-avatar-large mb-3" style="width: 250px; height: 250px; margin: 0 auto;">
+                                <i class="fas fa-box"></i>
+                            </div>
+                            <h4 id="detailProductTitle" class="product-title-display">Product Name</h4>
+                            <p id="detailProductSKU" class="product-sku-display">SKU: -</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Product Details -->
+                    <div class="col-md-7">
+                        <div class="row">
+                            <div class="col-12 mb-3">
+                                <h5 class="section-title mb-3"><i class="fas fa-info-circle me-2"></i>Product Information</h5>
+                                <table class="table table-bordered">
+                                    <tbody>
+                                        <tr>
+                                            <th style="width: 40%;"><i class="fas fa-tag me-2"></i>Category</th>
+                                            <td id="detailCategory">-</td>
+                                        </tr>
+                                        <tr>
+                                            <th><i class="fas fa-dollar-sign me-2"></i>Price</th>
+                                            <td id="detailPrice">-</td>
+                                        </tr>
+                                        <tr>
+                                            <th><i class="fas fa-percentage me-2"></i>Discount Price</th>
+                                            <td id="detailDiscountPrice">-</td>
+                                        </tr>
+                                        <tr>
+                                            <th><i class="fas fa-chart-bar me-2"></i>Status</th>
+                                            <td id="detailStatus">-</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <div class="col-12 mb-3">
+                                <h5 class="section-title mb-3"><i class="fas fa-cogs me-2"></i>Additional Details</h5>
+                                <div class="row">
+                                    <div class="col-md-6 mb-2">
+                                        <div class="detail-item">
+                                            <span class="detail-label"><i class="fas fa-check-circle me-2"></i>Availability:</span>
+                                            <span class="detail-value" id="detailAvailability">-</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <div class="detail-item">
+                                            <span class="detail-label"><i class="fas fa-star me-2"></i>Featured:</span>
+                                            <span class="detail-value" id="detailFeatured">-</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <div class="detail-item">
+                                            <span class="detail-label"><i class="fas fa-clock me-2"></i>Latest:</span>
+                                            <span class="detail-value" id="detailLatest">-</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <div class="detail-item">
+                                            <span class="detail-label"><i class="fas fa-calendar me-2"></i>Created:</span>
+                                            <span class="detail-value" id="detailCreatedDate">-</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-12 mb-2">
+                                        <div class="detail-item">
+                                            <span class="detail-label"><i class="fas fa-sync me-2"></i>Updated:</span>
+                                            <span class="detail-value" id="detailUpdatedDate">-</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-12">
+                                <h5 class="section-title mb-3"><i class="fas fa-align-left me-2"></i>Description</h5>
+                                <div class="product-description" id="detailDescription">
+                                    No description available.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="editCurrentProduct()">
+                    <i class="fas fa-edit me-2"></i>Edit Product
+                </button>
+                <button type="button" class="btn btn-danger" onclick="deleteCurrentProduct()">
+                    <i class="fas fa-trash me-2"></i>Delete Product
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Product Modal -->
+<div class="modal fade" id="addProductModal" tabindex="-1" aria-labelledby="addProductModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header" style="background: var(--gradient-green);">
+                <h5 class="modal-title text-white" id="addProductModalLabel">
+                    <i class="fas fa-box me-2"></i>Add New Product
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="addProductForm" method="POST" action="{% url 'item_add' %}" enctype="multipart/form-data" novalidate>
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="title" class="form-label">Product Title *</label>
+                            <input type="text" class="form-control" id="title" name="title" required>
+                            <div class="invalid-feedback">
+                                Please enter product title.
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="category" class="form-label">Category *</label>
+                            <select class="form-control" id="category" name="category" required>
+                                <option value="">Select Category</option>
+                                {% for category in categories %}
+                                <option value="{{ category.id }}">{{ category.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="invalid-feedback">
+                                Please select a category.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="slug" class="form-label">Slug *</label>
+                            <input type="text" class="form-control" id="slug" name="slug" required>
+                            <div class="invalid-feedback">
+                                Please enter a slug (URL-friendly name).
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="status" class="form-label">Status *</label>
+                            <select class="form-control" id="status" name="status" required>
+                                <option value="">Select Status</option>
+                                <option value="In Stock">In Stock</option>
+                                <option value="Out of Stock">Out of Stock</option>
+                                <option value="Low Stock">Low Stock</option>
+                                <option value="Discontinued">Discontinued</option>
+                            </select>
+                            <div class="invalid-feedback">
+                                Please select product status.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="price" class="form-label">Price ($) *</label>
+                            <input type="number" class="form-control" id="price" name="price" min="0" step="0.01" required>
+                            <div class="invalid-feedback">
+                                Please enter a valid price.
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="discount_price" class="form-label">Discount Price ($)</label>
+                            <input type="number" class="form-control" id="discount_price" name="discount_price" min="0" step="0.01">
+                            <div class="form-text">
+                                Optional. Leave empty for no discount.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label for="description" class="form-label">Description *</label>
+                            <textarea class="form-control" id="description" name="description" rows="4" required></textarea>
+                            <div class="invalid-feedback">
+                                Please enter product description.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="image" class="form-label">Product Image</label>
+                            <input type="file" class="form-control" id="image" name="image" accept="image/*">
+                            <div class="form-text">
+                                Recommended: 500x500 pixels, max 2MB
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="form-check mt-4">
+                                <input class="form-check-input" type="checkbox" id="available" name="available" checked>
+                                <label class="form-check-label" for="available">
+                                    Product is available for sale
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="is_featured" name="is_featured">
+                                <label class="form-check-label" for="is_featured">
+                                    Mark as featured product
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="is_latest" name="is_latest">
+                                <label class="form-check-label" for="is_latest">
+                                    Mark as latest product
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="formMessages">
+                        {% if messages %}
+                        {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }}">
+                            {{ message }}
+                        </div>
+                        {% endfor %}
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" style="background: var(--gradient-green); border: none;">
+                        <i class="fas fa-save me-2"></i>Save Product
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Product Modal -->
+<div class="modal fade" id="deleteProductModal" tabindex="-1" aria-labelledby="deleteProductModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteProductModalLabel">
+                    <i class="fas fa-trash me-2"></i>Delete Product
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete "<span id="deleteProductName"></span>"?</p>
+                <p class="text-danger"><strong>Warning:</strong> This action cannot be undone. All product data will be permanently deleted.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form id="deleteProductForm" method="POST" style="display: inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="product_id" id="deleteProductId">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash me-2"></i>Delete Product
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Product-specific styles */
+.product-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.product-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    object-fit: cover;
+    border: 2px solid #e2e8f0;
+}
+
+.product-avatar-large {
+    width: 250px;
+    height: 250px;
+    border-radius: 12px;
+    background: var(--gradient-green);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 4rem;
+    border: 3px solid var(--accent-green);
+    overflow: hidden;
+    margin: 0 auto;
+}
+
+.product-avatar-large img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.product-name {
+    font-weight: 600;
+    color: var(--dark-text);
+    margin-bottom: 4px;
+}
+
+.product-id {
+    font-size: 0.8rem;
+    color: #666;
+}
+
+.product-title-display {
+    margin: 1rem 0 0.5rem;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--dark-text);
+    text-align: center;
+}
+
+.product-sku-display {
+    color: var(--primary-green);
+    font-weight: 600;
+    margin: 0;
+    font-size: 1rem;
+    text-align: center;
+}
+
+.discount-price {
+    color: #f44336;
+    font-weight: 600;
+    text-decoration: line-through;
+}
+
+.product-description {
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid var(--primary-green);
+    line-height: 1.6;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--dark-text);
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.detail-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+    background: #f8f9fa;
+    border-radius: 6px;
+}
+
+.detail-label {
+    font-weight: 600;
+    color: #495057;
+    min-width: 120px;
+    margin-right: 1rem;
+}
+
+.detail-value {
+    color: var(--dark-text);
+    font-weight: 500;
+}
+
+.product-image-container {
+    padding: 1rem;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border: 1px solid #dee2e6;
+}
+
+/* Modal specific styles */
+.modal-lg {
+    max-width: 900px;
+}
+
+/* Table styles */
+.table-bordered th {
+    background: #f8f9fa;
+    font-weight: 600;
+}
+
+/* Status badges */
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 50px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.status-badge.confirmed {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-badge.pending {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-badge.cancelled {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.status-badge.inactive {
+    background: #e2e3e5;
+    color: #383d41;
+}
+
+/* Action buttons */
+.btn-action {
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    border: none;
+    background: #f8f9fa;
+    color: #6c757d;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 3px;
+}
+
+.btn-action:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.btn-action.view:hover {
+    background: #0d6efd;
+    color: white;
+}
+
+.btn-action.edit:hover {
+    background: #ffc107;
+    color: white;
+}
+
+.btn-action.delete:hover {
+    background: #dc3545;
+    color: white;
+}
+
+/* Form styles */
+.form-check-input:checked {
+    background-color: var(--primary-green);
+    border-color: var(--primary-green);
+}
+
+.form-check-input:focus {
+    border-color: var(--primary-green);
+    box-shadow: 0 0 0 0.25rem rgba(45, 90, 45, 0.25);
+}
+
+/* Scrollbar styling */
+.product-description::-webkit-scrollbar {
+    width: 6px;
+}
+
+.product-description::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.product-description::-webkit-scrollbar-thumb {
+    background: var(--primary-green);
+    border-radius: 3px;
+}
+</style>
+
+<script>
+// Global variables
+let currentProductId = null;
+let currentProductData = null;
+
+// Function to show product details using AJAX
+function showProductDetails(productId) {
+    // Show loading state
+    const modal = new bootstrap.Modal(document.getElementById('viewProductModal'));
+    modal.show();
+    
+    // Fetch product details via AJAX
+    fetch(`/api/products/${productId}/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                populateProductDetails(data.product);
+                currentProductId = productId;
+                currentProductData = data.product;
+            } else {
+                alert('Failed to load product details');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error loading product details');
+        });
+}
+
+// Alternative: If you don't have an API endpoint, use Django template data
+function showProductDetailsFromTemplate(itemId) {
+    // This function would be called with pre-loaded data from Django template
+    // For now, we'll use a simpler approach with onclick parameters
+    
+    currentProductId = itemId;
+    
+    // Get data from data attributes or find the row data
+    const row = document.querySelector(`tr[data-product-id="${itemId}"]`);
+    if (row) {
+        const data = JSON.parse(row.dataset.productInfo);
+        populateProductDetails(data);
+    }
+}
+
+// Populate modal with product data
+function populateProductDetails(product) {
+    // Basic information
+    document.getElementById('detailProductTitle').textContent = product.title;
+    document.getElementById('detailProductSKU').textContent = `SKU: ${product.slug.toUpperCase()}`;
+    document.getElementById('detailCategory').textContent = product.category;
+    document.getElementById('detailPrice').textContent = `$${parseFloat(product.price).toFixed(2)}`;
+    
+    // Discount price
+    const discountPriceElem = document.getElementById('detailDiscountPrice');
+    if (product.discount_price && product.discount_price > 0) {
+        const savings = parseFloat(product.price) - parseFloat(product.discount_price);
+        discountPriceElem.innerHTML = `
+            <span class="text-success fw-bold">$${parseFloat(product.discount_price).toFixed(2)}</span>
+            <small class="text-muted ms-2">
+                (Save $${savings.toFixed(2)})
+            </small>
+        `;
+    } else {
+        discountPriceElem.textContent = 'No discount';
+    }
+    
+    // Status
+    const statusElem = document.getElementById('detailStatus');
+    let statusClass = 'confirmed';
+    let statusText = product.status;
+    
+    switch(product.status) {
+        case 'Out of Stock':
+            statusClass = 'cancelled';
+            break;
+        case 'Low Stock':
+            statusClass = 'pending';
+            break;
+        case 'Discontinued':
+            statusClass = 'inactive';
+            break;
+    }
+    
+    statusElem.innerHTML = `<span class="status-badge ${statusClass}">${statusText}</span>`;
+    
+    // Availability
+    const availabilityElem = document.getElementById('detailAvailability');
+    availabilityElem.innerHTML = product.available 
+        ? '<span class="status-badge confirmed">Available</span>' 
+        : '<span class="status-badge cancelled">Unavailable</span>';
+    
+    // Featured
+    const featuredElem = document.getElementById('detailFeatured');
+    featuredElem.innerHTML = product.is_featured 
+        ? '<span class="status-badge confirmed">Yes</span>' 
+        : '<span class="status-badge cancelled">No</span>';
+    
+    // Latest
+    const latestElem = document.getElementById('detailLatest');
+    latestElem.innerHTML = product.is_latest 
+        ? '<span class="status-badge confirmed">Yes</span>' 
+        : '<span class="status-badge cancelled">No</span>';
+    
+    // Dates
+    document.getElementById('detailCreatedDate').textContent = formatDateTime(product.created);
+    document.getElementById('detailUpdatedDate').textContent = formatDateTime(product.updated);
+    
+    // Description
+    const descriptionElem = document.getElementById('detailDescription');
+    descriptionElem.textContent = product.description || 'No description available.';
+    
+    // Image
+    const imageElem = document.getElementById('detailProductImage');
+    if (product.image_url) {
+        imageElem.innerHTML = `<img src="${product.image_url}" alt="${product.title}" style="width:100%;height:100%;object-fit:cover;">`;
+    } else {
+        imageElem.innerHTML = '<i class="fas fa-box"></i>';
+        imageElem.style.background = 'var(--gradient-green)';
+    }
+}
+
+// Format date for display
+function formatDateTime(dateTimeString) {
+    if (!dateTimeString) return 'N/A';
+    
+    try {
+        const date = new Date(dateTimeString);
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } catch (error) {
+        return dateTimeString;
+    }
+}
+
+// Delete product
+function deleteProduct(productId, productName) {
+    document.getElementById('deleteProductId').value = productId;
+    document.getElementById('deleteProductName').textContent = productName;
+    
+    // Set form action
+    const form = document.getElementById('deleteProductForm');
+    form.action = `/products/delete/${productId}/`;
+    
+    // Close view modal if open
+    const viewModal = bootstrap.Modal.getInstance(document.getElementById('viewProductModal'));
+    if (viewModal) viewModal.hide();
+    
+    // Show delete modal
+    const deleteModal = new bootstrap.Modal(document.getElementById('deleteProductModal'));
+    deleteModal.show();
+}
+
+// Delete current product from details modal
+function deleteCurrentProduct() {
+    if (currentProductId && currentProductData) {
+        // Close view modal
+        const viewModal = bootstrap.Modal.getInstance(document.getElementById('viewProductModal'));
+        if (viewModal) viewModal.hide();
+        
+        // Show delete modal
+        deleteProduct(currentProductId, currentProductData.title);
+    }
+}
+
+// Edit current product
+function editCurrentProduct() {
+    if (currentProductId) {
+        // Close view modal
+        const viewModal = bootstrap.Modal.getInstance(document.getElementById('viewProductModal'));
+        if (viewModal) viewModal.hide();
+        
+        // Redirect to edit page
+        window.location.href = `/products/edit/${currentProductId}/`;
+    }
+}
+
+// Edit product function
+function editProduct(productId) {
+    window.location.href = `/products/edit/${productId}/`;
+}
+
+// Export products
+function exportProducts() {
+    window.location.href = '/products/export/';
+}
+
+// Auto-generate slug from title
+function generateSlug() {
+    const title = document.getElementById('title');
+    const slug = document.getElementById('slug');
+    
+    if (title && slug) {
+        title.addEventListener('input', function() {
+            if (!slug.value || slug.dataset.manual !== 'true') {
+                const generatedSlug = title.value
+                    .toLowerCase()
+                    .replace(/[^\w\s-]/g, '')
+                    .replace(/[\s_-]+/g, '-')
+                    .replace(/^-+|-+$/g, '');
+                slug.value = generatedSlug;
+            }
+        });
+        
+        slug.addEventListener('input', function() {
+            this.dataset.manual = 'true';
+        });
+    }
+}
+
+// Form validation
+function validateProductForm() {
+    const form = document.getElementById('addProductForm');
+    if (form) {
+        form.addEventListener('submit', function(event) {
+            let isValid = true;
+            
+            // Validate required fields
+            const requiredFields = form.querySelectorAll('[required]');
+            requiredFields.forEach(field => {
+                if (!field.value.trim()) {
+                    field.classList.add('is-invalid');
+                    isValid = false;
+                } else {
+                    field.classList.remove('is-invalid');
+                }
+            });
+            
+            // Validate price
+            const price = document.getElementById('price').value;
+            if (price <= 0) {
+                document.getElementById('price').classList.add('is-invalid');
+                isValid = false;
+            } else {
+                document.getElementById('price').classList.remove('is-invalid');
+            }
+            
+            // Validate discount price
+            const discountPrice = document.getElementById('discount_price').value;
+            if (discountPrice && discountPrice >= price) {
+                document.getElementById('discount_price').classList.add('is-invalid');
+                alert('Discount price must be less than regular price!');
+                isValid = false;
+            } else {
+                document.getElementById('discount_price').classList.remove('is-invalid');
+            }
+            
+            // Validate image size
+            const imageInput = document.getElementById('image');
+            if (imageInput.files.length > 0) {
+                const fileSize = imageInput.files[0].size / 1024 / 1024; // in MB
+                if (fileSize > 2) {
+                    alert('Image size must be less than 2MB!');
+                    imageInput.classList.add('is-invalid');
+                    isValid = false;
+                } else {
+                    imageInput.classList.remove('is-invalid');
+                }
+            }
+            
+            if (!isValid) {
+                event.preventDefault();
+            }
+            
+            return isValid;
+        });
+    }
+}
+
+// Initialize when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-generate slug
+    generateSlug();
+    
+    // Form validation
+    validateProductForm();
+    
+    // Handle delete form submission
+    const deleteForm = document.getElementById('deleteProductForm');
+    if (deleteForm) {
+        deleteForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            if (confirm('Are you absolutely sure? This action cannot be undone.')) {
+                this.submit();
+            }
+        });
+    }
+    
+    // Clear form when modal is hidden
+    const addProductModal = document.getElementById('addProductModal');
+    if (addProductModal) {
+        addProductModal.addEventListener('hidden.bs.modal', function () {
+            const form = document.getElementById('addProductForm');
+            if (form) {
+                form.reset();
+                form.classList.remove('was-validated');
+                
+                // Reset validation states
+                const invalidElements = form.querySelectorAll('.is-invalid');
+                invalidElements.forEach(el => el.classList.remove('is-invalid'));
+                
+                // Reset slug manual flag
+                const slug = document.getElementById('slug');
+                if (slug) slug.dataset.manual = 'false';
+            }
+        });
+    }
+    
+    // Auto-dismiss alerts after 5 seconds
+    setTimeout(function() {
+        const alerts = document.querySelectorAll('.alert');
+        alerts.forEach(alert => {
+            const bsAlert = new bootstrap.Alert(alert);
+            bsAlert.close();
+        });
+    }, 5000);
+    
+    // Setup data attributes on table rows for easier access
+    setupProductRows();
+});
+
+// Setup product rows with data attributes
+function setupProductRows() {
+    const rows = document.querySelectorAll('table tbody tr');
+    rows.forEach(row => {
+        const cells = row.cells;
+        if (cells.length >= 8) {
+            // Extract product info from the row
+            const productName = cells[1].querySelector('.product-name').textContent;
+            const productId = cells[1].querySelector('.product-id').textContent.replace('SKU: ', '');
+            const category = cells[2].textContent;
+            const discountPrice = cells[3].textContent.replace('$', '') || null;
+            const price = cells[4].querySelector('.discount-price')?.textContent.replace('$', '') || 
+                         cells[4].querySelector('.text-muted')?.textContent === '-' ? null : cells[4].textContent.replace('$', '');
+            const status = cells[5].querySelector('.status-badge').textContent;
+            const available = cells[6].querySelector('.status-badge').textContent === 'Available';
+            
+            // Store basic info in data attribute
+            row.dataset.productId = row.querySelector('.btn-action.view').getAttribute('onclick').match(/\d+/)[0];
+            row.dataset.productInfo = JSON.stringify({
+                title: productName,
+                slug: productId.toLowerCase(),
+                category: category,
+                price: price,
+                discount_price: discountPrice,
+                status: status,
+                available: available,
+                image_url: row.querySelector('.product-avatar img')?.src || null
+            });
+        }
+    });
+}
+</script>
+{% endblock %}

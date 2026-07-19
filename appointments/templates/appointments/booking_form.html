@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete Your Booking - MediBook</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-green: #2d5a2d;
+            --light-green: #4a7c59;
+            --gradient-green: linear-gradient(135deg, #2d5a2d 0%, #4a7c59 100%);
+            --accent-green: #7cc576;
+            --light-bg: #f8f9fa;
+            --dark-text: #333;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--dark-text);
+            line-height: 1.6;
+            background: var(--light-bg);
+        }
+
+        /* Navigation */
+        .navbar {
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 1rem 0;
+        }
+
+        .navbar-brand {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: var(--primary-green) !important;
+        }
+
+        .nav-link {
+            color: var(--dark-text) !important;
+            font-weight: 500;
+            margin: 0 0.5rem;
+        }
+
+        /* Progress Steps */
+        .progress-steps {
+            background: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .steps-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 600px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .step {
+            text-align: center;
+            position: relative;
+            flex: 1;
+        }
+
+        .step-circle {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 0.5rem;
+            font-weight: bold;
+            color: #999;
+            position: relative;
+            z-index: 2;
+            transition: all 0.3s;
+        }
+
+        .step.active .step-circle {
+            background: var(--gradient-green);
+            color: white;
+        }
+
+        .step.completed .step-circle {
+            background: var(--primary-green);
+            color: white;
+        }
+
+        .step-label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #999;
+        }
+
+        .step.active .step-label,
+        .step.completed .step-label {
+            color: var(--primary-green);
+        }
+
+        .step-line {
+            position: absolute;
+            top: 25px;
+            left: 50%;
+            width: 100%;
+            height: 3px;
+            background: #e0e0e0;
+            z-index: 1;
+        }
+
+        .step.completed .step-line {
+            background: var(--primary-green);
+        }
+
+        .step:last-child .step-line {
+            display: none;
+        }
+
+        /* Main Content */
+        .booking-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 15px;
+        }
+
+        .booking-content {
+            display: flex;
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        /* Left Column - Form */
+        .form-section {
+            flex: 1;
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-green);
+            margin-bottom: 0.5rem;
+        }
+
+        .section-subtitle {
+            color: #666;
+            margin-bottom: 2rem;
+            font-size: 0.95rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            font-weight: 600;
+            color: var(--dark-text);
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+
+        .required {
+            color: #dc3545;
+            margin-left: 0.25rem;
+        }
+
+        .form-control, .form-select {
+            padding: 0.75rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            width: 100%;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        .form-control:focus, .form-select:focus {
+            outline: none;
+            border-color: var(--primary-green);
+            box-shadow: 0 0 0 0.2rem rgba(45, 90, 45, 0.15);
+        }
+
+        textarea.form-control {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .radio-group, .checkbox-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .radio-option, .checkbox-option {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .radio-option:hover, .checkbox-option:hover {
+            border-color: var(--primary-green);
+            background: #f8fff8;
+        }
+
+        .radio-option input[type="radio"],
+        .checkbox-option input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            margin-right: 1rem;
+            cursor: pointer;
+            accent-color: var(--primary-green);
+        }
+
+        .radio-option.selected,
+        .checkbox-option.selected {
+            border-color: var(--primary-green);
+            background: #f0f8f0;
+        }
+
+        .option-content {
+            flex: 1;
+        }
+
+        .option-title {
+            font-weight: 600;
+            color: var(--dark-text);
+            margin-bottom: 0.25rem;
+        }
+
+        .option-description {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        /* Insurance Card Upload */
+        .file-upload {
+            border: 2px dashed #e0e0e0;
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #fafafa;
+        }
+
+        .file-upload:hover {
+            border-color: var(--primary-green);
+            background: #f8fff8;
+        }
+
+        .file-upload.has-file {
+            border-color: var(--primary-green);
+            background: #f0f8f0;
+        }
+
+        .file-upload-icon {
+            font-size: 3rem;
+            color: var(--light-green);
+            margin-bottom: 1rem;
+        }
+
+        .file-upload-text {
+            color: #666;
+            margin-bottom: 0.5rem;
+        }
+
+        .file-upload-info {
+            font-size: 0.85rem;
+            color: #999;
+        }
+
+        .file-preview {
+            display: none;
+            margin-top: 1rem;
+            padding: 1rem;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid var(--accent-green);
+        }
+
+        .file-preview.show {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* Right Column - Summary */
+        .summary-section {
+            width: 380px;
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            height: fit-content;
+            position: sticky;
+            top: 20px;
+        }
+
+        .doctor-summary {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .doctor-avatar-small {
+            width: 70px;
+            height: 70px;
+            border-radius: 10px;
+            object-fit: cover;
+            border: 2px solid var(--accent-green);
+        }
+
+        .doctor-summary-info {
+            flex: 1;
+        }
+
+        .doctor-name-small {
+            font-weight: 700;
+            color: var(--primary-green);
+            margin-bottom: 0.25rem;
+            font-size: 1.1rem;
+        }
+
+        .doctor-specialty-small {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .appointment-details {
+            margin-bottom: 1.5rem;
+        }
+
+        .detail-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding: 0.75rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .detail-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--gradient-green);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            margin-right: 1rem;
+        }
+
+        .detail-content {
+            flex: 1;
+        }
+
+        .detail-label {
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 0.15rem;
+        }
+
+        .detail-value {
+            font-weight: 600;
+            color: var(--dark-text);
+        }
+
+        .price-breakdown {
+            border-top: 2px solid #f0f0f0;
+            padding-top: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .price-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.75rem;
+            color: #666;
+        }
+
+        .price-total {
+            display: flex;
+            justify-content: space-between;
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--primary-green);
+            padding-top: 1rem;
+            border-top: 2px solid #f0f0f0;
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .btn-back {
+            flex: 1;
+            padding: 1rem;
+            background: white;
+            border: 2px solid var(--primary-green);
+            color: var(--primary-green);
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-back:hover {
+            background: #f0f0f0;
+        }
+
+        .btn-confirm {
+            flex: 2;
+            padding: 1rem;
+            background: var(--gradient-green);
+            border: none;
+            color: white;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(45, 90, 45, 0.3);
+        }
+
+        .btn-confirm:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(45, 90, 45, 0.4);
+        }
+
+        .btn-confirm:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Alert Messages */
+        .alert-custom {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .alert-info {
+            background: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            color: #004085;
+        }
+
+        /* Terms Checkbox */
+        .terms-agreement {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .terms-checkbox {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+        }
+
+        .terms-checkbox input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            margin-top: 0.15rem;
+            cursor: pointer;
+            accent-color: var(--primary-green);
+        }
+
+        .terms-text {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .terms-text a {
+            color: var(--primary-green);
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .terms-text a:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive */
+        @media (max-width: 992px) {
+            .booking-content {
+                flex-direction: column-reverse;
+            }
+
+            .summary-section {
+                width: 100%;
+                position: relative;
+                top: 0;
+            }
+
+            .steps-container {
+                padding: 0 1rem;
+            }
+
+            .step-label {
+                font-size: 0.8rem;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .form-section, .summary-section {
+                padding: 1.5rem;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+            }
+
+            .step-circle {
+                width: 40px;
+                height: 40px;
+                font-size: 0.9rem;
+            }
+
+            .step-line {
+                top: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg sticky-top">
+        <div class="container">
+            <a class="navbar-brand" href="{% url 'appointment_home' %}">
+                <i class="fas fa-heartbeat"></i> MediBook
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto align-items-center">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'appointment_home' %}">Home</a>
+                    </li>
+                    
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Progress Steps -->
+    <div class="progress-steps">
+        <div class="steps-container">
+            <div class="step completed">
+                <div class="step-circle">
+                    <i class="fas fa-check"></i>
+                </div>
+                <div class="step-label">Select Time</div>
+                <div class="step-line"></div>
+            </div>
+            <div class="step active">
+                <div class="step-circle">2</div>
+                <div class="step-label">Patient Info</div>
+                <div class="step-line"></div>
+            </div>
+            <div class="step">
+                <div class="step-circle">3</div>
+                <div class="step-label">Confirmation</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="booking-container">
+        <div class="booking-content">
+            <!-- Left Column - Form -->
+            <div class="form-section">
+                <h2 class="section-title">Patient Information</h2>
+                <p class="section-subtitle">Please provide your details to complete the booking</p>
+
+                <form id="bookingForm" method="post">
+                    {% csrf_token %}
+                    <!-- Personal Information -->
+                    <div class="form-group">
+                        <label class="form-label">Full Name <span class="required">*</span></label>
+                        <input type="text" class="form-control" id="fullName" name="fullName" placeholder="Enter your full name" required>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Date of Birth <span class="required">*</span></label>
+                                <input type="date" class="form-control" name="birthDate" id="dob" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Gender <span class="required">*</span></label>
+                                <select class="form-select" id="gender" name="gender" required>
+                                    <option value="">Select gender</option>
+                                    <option value="male">Male</option>
+                                    <option value="female">Female</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Contact Information -->
+                    <div class="form-group">
+                        <label class="form-label">Email Address <span class="required">*</span></label>
+                        <input type="email" class="form-control" id="email" name="email" placeholder="your.email@example.com" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Phone Number <span class="required">*</span></label>
+                        <input type="tel" class="form-control" id="phone" name="phone" placeholder="+255xxxxxxx" required>
+                    </div>
+
+                    <!-- Visit Type -->
+                    <div class="form-group">
+                        <label class="form-label">Visit Type <span class="required">*</span></label>
+                        <div class="radio-group">
+                            <label class="radio-option">
+                                <input type="radio" name="visitType" value="first" required>
+                                <div class="option-content">
+                                    <div class="option-title">First Visit</div>
+                                    <div class="option-description">This is my first appointment with this doctor</div>
+                                </div>
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" name="visitType" value="followup">
+                                <div class="option-content">
+                                    <div class="option-title">Follow-up Visit</div>
+                                    <div class="option-description">I've seen this doctor before</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Reason for Visit -->
+                    <div class="form-group">
+                        <label class="form-label">Reason for Visit <span class="required">*</span></label>
+                        <select class="form-select" id="reasonVisit" name="reasonVisit" required>
+                            <option value="">Select reason</option>
+                            <option value="routine">Routine Checkup</option>
+                            <option value="consultation">Consultation</option>
+                            <option value="followup">Follow-up</option>
+                            <option value="symptoms">Specific Symptoms</option>
+                            <option value="test-results">Test Results Review</option>
+                            <option value="medication">Medication Management</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+
+                    <!-- Symptoms/Concerns -->
+                    <div class="form-group">
+                        <label class="form-label">Please describe your symptoms or concerns</label>
+                        <textarea class="form-control" id="symptoms" name="symptoms" placeholder="Please provide details about your symptoms, when they started, and any relevant information..." rows="4"></textarea>
+                        <small style="color: #666; font-size: 0.85rem;">This helps the doctor prepare for your appointment</small>
+                    </div>
+
+
+                    <div class="form-group">
+                        <label class="form-label">Are you currently taking any medications?</label>
+                        <textarea class="form-control" id="currentMedications" name="currentMedications" placeholder="List all current medications, dosages, and frequency..." rows="3"></textarea>
+                    </div>
+
+                    <!-- Insurance Information -->
+                    <!-- <div class="alert-custom alert-info">
+                        <i class="fas fa-info-circle" style="font-size: 1.5rem;"></i>
+                        <div>
+                            <strong>Insurance Accepted</strong><br>
+                            <small>This provider accepts most major insurance plans</small>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Do you have insurance?</label>
+                        <div class="radio-group">
+                            <label class="radio-option">
+                                <input type="radio" name="hasInsurance" value="yes">
+                                <div class="option-content">
+                                    <div class="option-title">Yes, I have insurance</div>
+                                </div>
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" name="hasInsurance" value="no">
+                                <div class="option-content">
+                                    <div class="option-title">No, I'll pay out of pocket</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="insuranceFields" style="display: none;">
+                        <div class="form-group">
+                            <label class="form-label">Insurance Provider</label>
+                            <select class="form-select" id="insuranceProvider">
+                                <option value="">Select your insurance provider</option>
+                                <option value="blue-cross">Blue Cross Blue Shield</option>
+                                <option value="aetna">Aetna</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label">Member ID</label>
+                                    <input type="text" class="form-control" id="memberId" placeholder="Insurance member ID">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label">Group Number</label>
+                                    <input type="text" class="form-control" id="groupNumber" placeholder="Group number">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Upload Insurance Card (Optional)</label>
+                            <div class="file-upload" id="fileUpload">
+                                <input type="file" id="insuranceCard" accept="image/*,.pdf" style="display: none;">
+                                <div class="file-upload-icon">
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                </div>
+                                <div class="file-upload-text">
+                                    Click to upload or drag and drop
+                                </div>
+                                <div class="file-upload-info">
+                                    PNG, JPG, or PDF (Max 5MB)
+                                </div>
+                            </div>
+                            <div class="file-preview" id="filePreview">
+                                <div>
+                                    <i class="fas fa-file-image" style="color: var(--primary-green); margin-right: 0.5rem;"></i>
+                                    <span id="fileName"></span>
+                                </div>
+                                <button type="button" class="btn btn-sm" id="removeFile" style="color: #dc3545;">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div> -->
+
+
+                    <!-- Terms Agreement -->
+                    <div class="terms-agreement">
+                        <div class="terms-checkbox">
+                            <input type="checkbox" id="agreeTerms" required>
+                            <label for="agreeTerms" class="terms-text">
+                                I agree to the <a href="#" target="_blank">Terms of Service</a> and <a href="#" target="_blank">Privacy Policy</a>. I confirm that the information provided is accurate and complete.
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="action-buttons">
+                        <button type="button" class="btn-back" onclick="history.back()">
+                            <i class="fas fa-arrow-left"></i> Back
+                        </button>
+                        <button type="submit" class="btn-confirm" id="confirmBtn">
+                            Confirm Appointment <i class="fas fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Right Column - Summary -->
+            <div class="summary-section">
+                <h3 class="section-title" style="font-size: 1.3rem; margin-bottom: 1.5rem;">Appointment Summary</h3>
+
+                <div class="doctor-summary">
+                    <img src="{{doctor.user.image.url}}" alt="Dr. Sarah Johnson" class="doctor-avatar-small">
+                    <div class="doctor-summary-info">
+                        <div class="doctor-name-small">Dr. {{slot.user.first_name}} {{slot.user.last_name}}</div>
+                        <div class="doctor-specialty-small">{{doctor.expertise}}</div>
+                        <div style="color: #ffc107; font-size: 0.9rem; margin-top: 0.25rem;">
+                            ⭐ {{rating.average_rating}} ({{rating.total_reviews}} reviews)
+                        </div>
+                    </div>
+                </div>
+
+                <div class="appointment-details">
+                    <div class="detail-item">
+                        <div class="detail-icon">
+                            <i class="fas fa-calendar"></i>
+                        </div>
+                        <div class="detail-content">
+                            <div class="detail-label">Date</div>
+                            <div class="detail-value">{{ slot.date|date:"l, d F Y" }}</div>
+                        </div>
+                    </div>
+
+                    <div class="detail-item">
+                        <div class="detail-icon">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="detail-content">
+                            <div class="detail-label">Time</div>
+                            <div class="detail-value">{{ slot.time|time:"h:i A" }}</div>
+                        </div>
+                    </div>
+
+                    <div class="detail-item">
+                        <div class="detail-icon">
+                            <i class="fas fa-map-marker-alt"></i>
+                        </div>
+                        <div class="detail-content">
+                            <div class="detail-label">Location</div>
+                            <div class="detail-value">{{doctor.region}}<br>
+                            <small style="color: #666; font-weight: 400;">{{doctor.location}}</small></div>
+                        </div>
+                    </div>
+
+                    <div class="detail-item">
+                        <div class="detail-icon">
+                            <i class="fas fa-stethoscope"></i>
+                        </div>
+                        <div class="detail-content">
+                            <div class="detail-label">Visit Type</div>
+                            <div class="detail-value">In-Person Consultation</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- <div class="price-breakdown">
+                    <h4 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; color: var(--primary-green);">
+                        Payment Details
+                    </h4>
+                    <div class="price-item">
+                        <span>Consultation Fee</span>
+                        <span>$150.00</span>
+                    </div>
+                    <div class="price-item">
+                        <span>Booking Fee</span>
+                        <span>$5.00</span>
+                    </div>
+                    <div class="price-item" style="color: var(--accent-green);">
+                        <span>Insurance Coverage (Est.)</span>
+                        <span id="insuranceCoverage">-$0.00</span>
+                    </div>
+                    <div class="price-total">
+                        <span>Total</span>
+                        <span id="totalPrice">$155.00</span>
+                    </div>
+                </div>
+
+                <div style="background: #f8f9fa; padding: 1rem; border-radius: 8px; font-size: 0.85rem; color: #666;">
+                    <i class="fas fa-info-circle" style="color: var(--primary-green);"></i>
+                    You will be charged after your appointment is completed. Cancellations made 24 hours before are free.
+                </div> -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer style="background: #1a1a1a; color: white; padding: 2rem 0 1rem; margin-top: 4rem;">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-4">
+                    <h5 style="color: var(--accent-green); margin-bottom: 1rem;">MediBook</h5>
+                    <p style="color: #ccc; font-size: 0.9rem;">Making healthcare accessible to everyone, everywhere.</p>
+                </div>
+                <div class="col-md-4">
+                    <h5 style="color: var(--accent-green); margin-bottom: 1rem;">Support</h5>
+                    <a href="#" style="color: #ccc; text-decoration: none; display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">Help Center</a>
+                    <a href="#" style="color: #ccc; text-decoration: none; display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">Contact Us</a>
+                    <a href="#" style="color: #ccc; text-decoration: none; display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">FAQs</a>
+                </div>
+                <div class="col-md-4">
+                    <h5 style="color: var(--accent-green); margin-bottom: 1rem;">Legal</h5>
+                    <a href="#" style="color: #ccc; text-decoration: none; display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">Privacy Policy</a>
+                    <a href="#" style="color: #ccc; text-decoration: none; display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">Terms of Service</a>
+                </div>
+            </div>
+            <div style="text-align: center; padding-top: 2rem; margin-top: 2rem; border-top: 1px solid #333; color: #999;">
+                <p>&copy; 2025 MediBook. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Radio option selection styling
+        document.querySelectorAll('.radio-option input[type="radio"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                // Remove selected class from all options in this group
+                const group = this.closest('.radio-group');
+                group.querySelectorAll('.radio-option').forEach(opt => {
+                    opt.classList.remove('selected');
+                });
+                // Add selected class to this option
+                if (this.checked) {
+                    this.closest('.radio-option').classList.add('selected');
+                }
+            });
+        });
+
+        // Checkbox option selection styling
+        document.querySelectorAll('.checkbox-option input[type="checkbox"]').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                if (this.checked) {
+                    this.closest('.checkbox-option').classList.add('selected');
+                } else {
+                    this.closest('.checkbox-option').classList.remove('selected');
+                }
+            });
+        });
+
+        // Insurance fields toggle
+        document.querySelectorAll('input[name="hasInsurance"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                const insuranceFields = document.getElementById('insuranceFields');
+                const insuranceCoverage = document.getElementById('insuranceCoverage');
+                const totalPrice = document.getElementById('totalPrice');
+                
+                if (this.value === 'yes') {
+                    insuranceFields.style.display = 'block';
+                    insuranceCoverage.textContent = '-$100.00';
+                    totalPrice.textContent = '$55.00';
+                } else {
+                    insuranceFields.style.display = 'none';
+                    insuranceCoverage.textContent = '-$0.00';
+                    totalPrice.textContent = '$155.00';
+                }
+            });
+        });
+
+        // File upload handling
+        const fileUpload = document.getElementById('fileUpload');
+        const fileInput = document.getElementById('insuranceCard');
+        const filePreview = document.getElementById('filePreview');
+        const fileName = document.getElementById('fileName');
+        const removeFileBtn = document.getElementById('removeFile');
+
+        fileUpload.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileUpload.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileUpload.style.borderColor = 'var(--primary-green)';
+            fileUpload.style.background = '#f8fff8';
+        });
+
+        fileUpload.addEventListener('dragleave', () => {
+            fileUpload.style.borderColor = '#e0e0e0';
+            fileUpload.style.background = '#fafafa';
+        });
+
+        fileUpload.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileUpload.style.borderColor = '#e0e0e0';
+            fileUpload.style.background = '#fafafa';
+            
+            if (e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                handleFile(this.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            // Check file size (5MB limit)
+            if (file.size > 5 * 1024 * 1024) {
+                alert('File size must be less than 5MB');
+                return;
+            }
+
+            // Check file type
+            const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf'];
+            if (!allowedTypes.includes(file.type)) {
+                alert('Only PNG, JPG, and PDF files are allowed');
+                return;
+            }
+
+            fileName.textContent = file.name;
+            filePreview.classList.add('show');
+            fileUpload.classList.add('has-file');
+        }
+
+        removeFileBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            fileInput.value = '';
+            filePreview.classList.remove('show');
+            fileUpload.classList.remove('has-file');
+        });
+
+        // "No Known Allergies" checkbox logic
+        const allergyCheckboxes = document.querySelectorAll('input[name="allergies"]');
+        const noneCheckbox = document.querySelector('input[name="allergies"][value="none"]');
+
+        allergyCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                if (this.value === 'none' && this.checked) {
+                    // Uncheck all other allergy checkboxes
+                    allergyCheckboxes.forEach(cb => {
+                        if (cb.value !== 'none') {
+                            cb.checked = false;
+                            cb.closest('.checkbox-option').classList.remove('selected');
+                        }
+                    });
+                } else if (this.value !== 'none' && this.checked) {
+                    // Uncheck "No Known Allergies"
+                    noneCheckbox.checked = false;
+                    noneCheckbox.closest('.checkbox-option').classList.remove('selected');
+                }
+            });
+        });
+
+        // Form validation and submission
+        const bookingForm = document.getElementById('bookingForm');
+        const confirmBtn = document.getElementById('confirmBtn');
+
+        // Enable/disable confirm button based on terms agreement
+        document.getElementById('agreeTerms').addEventListener('change', function() {
+            confirmBtn.disabled = !this.checked;
+        });
+
+        bookingForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            // Validate form
+            if (!this.checkValidity()) {
+                this.reportValidity();
+                return;
+            }
+
+            // Check if terms are agreed
+            if (!document.getElementById('agreeTerms').checked) {
+                alert('Please agree to the Terms of Service and Privacy Policy');
+                return;
+            }
+
+            // Collect form data
+            const formData = {
+                personalInfo: {
+                    fullName: document.getElementById('fullName').value,
+                    dob: document.getElementById('dob').value,
+                    gender: document.getElementById('gender').value,
+                    email: document.getElementById('email').value,
+                    phone: document.getElementById('phone').value
+                },
+                appointmentInfo: {
+                    visitType: document.querySelector('input[name="visitType"]:checked')?.value,
+                    reason: document.getElementById('reasonVisit').value,
+                    symptoms: document.getElementById('symptoms').value,
+                    additionalNotes: document.getElementById('additionalNotes').value
+                },
+                medicalInfo: {
+                    allergies: Array.from(document.querySelectorAll('input[name="allergies"]:checked')).map(cb => cb.value),
+                    allergyDetails: document.getElementById('allergyDetails').value,
+                    currentMedications: document.getElementById('currentMedications').value
+                },
+                insurance: {
+                    hasInsurance: document.querySelector('input[name="hasInsurance"]:checked')?.value,
+                    provider: document.getElementById('insuranceProvider')?.value || null,
+                    memberId: document.getElementById('memberId')?.value || null,
+                    groupNumber: document.getElementById('groupNumber')?.value || null
+                }
+            };
+
+            console.log('Booking Data:', formData);
+
+            // Show loading state
+            confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+            confirmBtn.disabled = true;
+
+            // Simulate API call
+            setTimeout(() => {
+                alert('Appointment booked successfully!\n\nYou will receive a confirmation email shortly.');
+                // Redirect to confirmation page
+                // window.location.href = 'booking-confirmation.html';
+                
+                // Reset button
+                confirmBtn.innerHTML = 'Confirm Appointment <i class="fas fa-arrow-right"></i>';
+                confirmBtn.disabled = false;
+            }, 2000);
+        });
+
+        // Auto-fill demo data (for testing - remove in production)
+        function fillDemoData() {
+            document.getElementById('fullName').value = 'John Doe';
+            document.getElementById('dob').value = '1990-05-15';
+            document.getElementById('gender').value = 'male';
+            document.getElementById('email').value = 'john.doe@example.com';
+            document.getElementById('phone').value = '+1 (555) 123-4567';
+            document.querySelector('input[name="visitType"][value="first"]').checked = true;
+            document.querySelector('input[name="visitType"][value="first"]').closest('.radio-option').classList.add('selected');
+            document.getElementById('reasonVisit').value = 'consultation';
+            document.getElementById('symptoms').value = 'Experiencing chest pain and shortness of breath during exercise.';
+            document.querySelector('input[name="allergies"][value="none"]').checked = true;
+            document.querySelector('input[name="allergies"][value="none"]').closest('.checkbox-option').classList.add('selected');
+        }
+
+        // Uncomment to auto-fill demo data for testing
+        // fillDemoData();
+
+        // Smooth scroll to first error
+        bookingForm.addEventListener('invalid', function(e) {
+            e.preventDefault();
+            const firstInvalid = this.querySelector(':invalid');
+            if (firstInvalid) {
+                firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                firstInvalid.focus();
+            }
+        }, true);
+
+        // Format phone number as user types
+        document.getElementById('phone').addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length > 0) {
+                if (value.length <= 3) {
+                    value = `+1 (${value}`;
+                } else if (value.length <= 6) {
+                    value = `+1 (${value.slice(0, 3)}) ${value.slice(3)}`;
+                } else {
+                    value = `+1 (${value.slice(0, 3)}) ${value.slice(3, 6)}-${value.slice(6, 10)}`;
+                }
+            }
+            e.target.value = value;
+        });
+
+        // Prevent future dates in DOB
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('dob').setAttribute('max', today);
+
+        // Character counter for textareas (optional enhancement)
+        document.querySelectorAll('textarea').forEach(textarea => {
+            textarea.addEventListener('input', function() {
+                const length = this.value.length;
+                if (length > 500) {
+                    this.value = this.value.substring(0, 500);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

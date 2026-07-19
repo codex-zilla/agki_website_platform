@@ -1,0 +1,558 @@
+{% load static %}
+{% load socialaccount %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Doctor Login - Medical Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- sweet alert -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- SweetAlert2 CDN for popup-->
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        :root {
+            --primary-green: #2e7d32;
+            --light-green: #4caf50;
+            --gradient-green: linear-gradient(135deg, #2e7d32 0%, #4caf50 100%);
+            --dark-text: #2c3e50;
+            --light-text: #7f8c8d;
+            --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            --hover-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+        }
+
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4efe9 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        a {
+            text-decoration: none;
+        }
+
+        .login-container {
+            display: flex;
+            width: 100%;
+            max-width: 1000px;
+            min-height: 600px;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: var(--card-shadow);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .login-container:hover {
+            box-shadow: var(--hover-shadow);
+        }
+
+        .login-left {
+            flex: 1;
+            background: var(--gradient-green);
+            color: white;
+            padding: 50px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .login-left::before {
+            content: '';
+            position: absolute;
+            top: -50px;
+            right: -50px;
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .login-left::after {
+            content: '';
+            position: absolute;
+            bottom: -80px;
+            left: -80px;
+            width: 250px;
+            height: 250px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .logo i {
+            font-size: 2.5rem;
+            margin-right: 15px;
+        }
+
+        .logo h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+
+        .welcome-text h2 {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+
+        .welcome-text p {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            opacity: 0.9;
+            margin-bottom: 30px;
+        }
+
+        .features {
+            margin-top: 30px;
+        }
+
+        .feature {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .feature i {
+            font-size: 1.2rem;
+            margin-right: 15px;
+            background: rgba(255, 255, 255, 0.2);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .feature span {
+            font-size: 1rem;
+        }
+
+        .login-right {
+            flex: 1;
+            background: white;
+            padding: 50px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .login-header h2 {
+            font-size: 2rem;
+            color: var(--dark-text);
+            margin-bottom: 10px;
+        }
+
+        .login-header p {
+            color: var(--light-text);
+            font-size: 1rem;
+        }
+
+        .login-form {
+            width: 100%;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+            position: relative;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--dark-text);
+            font-size: 0.95rem;
+        }
+
+        .input-with-icon {
+            position: relative;
+        }
+
+        .input-with-icon i {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--light-text);
+            font-size: 1.1rem;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 15px 15px 15px 50px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s;
+            background: #fafafa;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary-green);
+            background: white;
+            box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.1);
+        }
+
+        .remember-forgot {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        .remember-me {
+            display: flex;
+            align-items: center;
+        }
+
+        .remember-me input {
+            margin-right: 8px;
+        }
+
+        .forgot-password {
+            color: var(--primary-green);
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.3s;
+        }
+
+        .forgot-password:hover {
+            color: var(--light-green);
+            text-decoration: underline;
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 15px;
+            background: var(--gradient-green);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+
+        .btn-login:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(46, 125, 50, 0.3);
+        }
+
+        .btn-login:active {
+            transform: translateY(-1px);
+        }
+
+        .divider {
+            text-align: center;
+            position: relative;
+            margin: 25px 0;
+            color: var(--light-text);
+        }
+
+        .divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: #e0e0e0;
+        }
+
+        .divider span {
+            background: white;
+            padding: 0 15px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .social-login {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .social-btn {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .social-btn.google {
+            color: #db4437;
+        }
+
+        .social-btn.microsoft {
+            color: #0078d4;
+        }
+
+        .social-btn:hover {
+            border-color: var(--primary-green);
+            transform: translateY(-2px);
+        }
+
+        .signup-link {
+            text-align: center;
+            color: var(--light-text);
+        }
+
+        .signup-link a {
+            color: var(--primary-green);
+            text-decoration: none;
+            font-weight: 600;
+            margin-left: 5px;
+        }
+
+        .signup-link a:hover {
+            text-decoration: underline;
+        }
+
+        .demo-accounts {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid var(--primary-green);
+        }
+
+        .demo-accounts h3 {
+            font-size: 1rem;
+            margin-bottom: 10px;
+            color: var(--dark-text);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .demo-account {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+
+        .demo-account:last-child {
+            margin-bottom: 0;
+        }
+
+        .demo-account .role {
+            font-weight: 600;
+            color: var(--dark-text);
+        }
+
+        .demo-account .credentials {
+            color: var(--light-text);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 900px) {
+            .login-container {
+                flex-direction: column;
+                max-width: 500px;
+            }
+
+            .login-left, .login-right {
+                padding: 40px 30px;
+            }
+
+            .login-left {
+                text-align: center;
+            }
+
+            .feature {
+                justify-content: center;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .login-left, .login-right {
+                padding: 30px 20px;
+            }
+
+            .welcome-text h2 {
+                font-size: 2rem;
+            }
+
+            .remember-forgot {
+                flex-direction: column;
+                gap: 15px;
+                align-items: flex-start;
+            }
+
+            .social-login {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+
+  <!-- Django Messages + SweetAlert -->
+{% if messages %}
+    <script>
+        {% for message in messages %}
+            Swal.fire({
+                title: "{% if message.tags == 'success' %}Success!{% elif message.tags == 'error' %}Error!{% elif message.tags == 'warning' %}Warning!{% else %}Notice{% endif %}",
+                text: "{{ message|escapejs }}",
+                icon: "{{ message.tags }}",
+                confirmButtonText: "OK"
+            });
+        {% endfor %}
+    </script>
+{% endif %}
+<!-- end -->
+
+
+    <div class="login-container">
+        <!-- Left Section with Welcome Message -->
+        <div class="login-left">
+            <div class="logo">
+                <i class="fas fa-stethoscope"></i>
+                <h1>AGKI Medical Lab</h1>
+            </div>
+            <div class="welcome-text">
+                <h2>Welcome Back, Doctor</h2>
+                <p>Access your medical dashboard to manage appointments, view patient schedules, and update your availability.</p>
+            </div>
+            <div class="features">
+                <div class="feature">
+                    <i class="fas fa-calendar-check"></i>
+                    <span>Manage your appointment schedule</span>
+                </div>
+                <div class="feature">
+                    <i class="fas fa-user-injured"></i>
+                    <span>View patient information and history</span>
+                </div>
+                <div class="feature">
+                    <i class="fas fa-clock"></i>
+                    <span>Set your availability with ease</span>
+                </div>
+                <div class="feature">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Track your practice performance</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Section with Login Form -->
+        <div class="login-right">
+            <div class="login-header">
+                <h2>Sign In to Your Account</h2>
+                <p>Enter your credentials to access the dashboard</p>
+            </div>
+
+            <form method="post" class="login-form" id="loginForm">
+                {% csrf_token %}
+              <div class="form-group">
+                    <label class="form-label" for="email">Email Address</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-envelope"></i>
+                        <input type="email" name="username" id="email" class="form-control" placeholder="doctor@example.com" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="password">Password</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-lock"></i>
+                        <input type="password" name="password1" id="password" class="form-control" placeholder="Enter your password" required>
+                    </div>
+                </div>
+
+                <div class="remember-forgot">
+                    <div class="remember-me">
+                        <input type="checkbox" id="remember">
+                        <label for="remember">Remember me</label>
+                    </div>
+                    <a href="#" class="forgot-password">Forgot Password?</a>
+                </div>
+
+                <button type="submit" class="btn-login">
+                    <i class="fas fa-sign-in-alt"></i>
+                    Sign In
+                </button>
+
+                <div class="divider">
+                    <span>Or continue with</span>
+                </div>
+
+                <div class="social-login">
+                    <!-- <a href="{% provider_login_url 'google' %}">
+                      <button type="button" class="social-btn google">
+                          <i class="fab fa-google"></i>
+                          Google
+                      </button>
+                    </a> -->
+                    <a href="{% provider_login_url 'google' %}" class="social-btn microsoft">
+                        <i class="fab fa-google"></i>
+                          Google
+                    </a>
+                </div>
+
+
+                <div class="signup-link">
+                    Don't have an account? <a href="{% url 'signup' %}">Signup Here</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        
+
+        // Add some interactive effects
+        const inputs = document.querySelectorAll('.form-control');
+        inputs.forEach(input => {
+            input.addEventListener('focus', function() {
+                this.parentElement.parentElement.classList.add('focused');
+            });
+            
+            input.addEventListener('blur', function() {
+                if (!this.value) {
+                    this.parentElement.parentElement.classList.remove('focused');
+                }
+            });
+        });
+
+      
+    </script>
+</body>
+</html>

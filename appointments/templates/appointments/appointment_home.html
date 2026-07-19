@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediBook - Book Your Healthcare Appointments Online</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-green: #2d5a2d;
+            --light-green: #4a7c59;
+            --gradient-green: linear-gradient(135deg, #2d5a2d 0%, #4a7c59 100%);
+            --accent-green: #7cc576;
+            --light-bg: #f8f9fa;
+            --dark-text: #333;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--dark-text);
+            line-height: 1.6;
+        }
+
+        /* Navigation */
+        .navbar {
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 1rem 0;
+        }
+
+        .navbar-brand {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: var(--primary-green) !important;
+        }
+
+        .nav-link {
+            color: var(--dark-text) !important;
+            font-weight: 500;
+            margin: 0 0.5rem;
+            transition: color 0.3s;
+        }
+
+        .nav-link:hover {
+            color: var(--primary-green) !important;
+        }
+
+        .btn-login {
+            border: 2px solid var(--primary-green);
+            color: var(--primary-green);
+            padding: 0.5rem 1.5rem;
+            border-radius: 25px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .btn-login:hover {
+            background: var(--primary-green);
+            color: white;
+        }
+
+        /* Hero Section */
+        .hero-section {
+            background: var(--gradient-green);
+            color: white;
+            padding: 4rem 0 6rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 50%;
+            height: 100%;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="%23ffffff" fill-opacity="0.1" d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,122.7C672,117,768,139,864,154.7C960,171,1056,181,1152,165.3C1248,149,1344,107,1392,85.3L1440,64L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>') no-repeat;
+            background-size: cover;
+            opacity: 0.3;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .hero-title {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+        }
+
+        .hero-subtitle {
+            font-size: 1.3rem;
+            margin-bottom: 2rem;
+            opacity: 0.95;
+        }
+
+        /* Search Box */
+        .search-box {
+            background: white;
+            border-radius: 15px;
+            padding: 2rem;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+            margin-top: -4rem;
+            position: relative;
+            z-index: 10;
+        }
+
+        .search-tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 0;
+        }
+
+        .search-tab {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            background: none;
+            color: var(--dark-text);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+        }
+
+        .search-tab.active {
+            color: var(--primary-green);
+            border-bottom-color: var(--primary-green);
+        }
+
+        .search-form {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .search-input-group {
+            flex: 1;
+            min-width: 250px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 1rem 1rem 1rem 3rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary-green);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--light-green);
+            font-size: 1.2rem;
+        }
+
+        .btn-search {
+            background: var(--gradient-green);
+            color: white;
+            border: none;
+            padding: 1rem 2.5rem;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(45, 90, 45, 0.3);
+            width: 100%;
+        }
+
+        .btn-search:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(45, 90, 45, 0.4);
+        }
+
+        /* Features Section */
+        .features-section {
+            padding: 5rem 0;
+            background: var(--light-bg);
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary-green);
+            margin-bottom: 1rem;
+        }
+
+        .section-subtitle {
+            text-align: center;
+            font-size: 1.2rem;
+            color: #666;
+            margin-bottom: 3rem;
+        }
+
+        .feature-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            text-align: center;
+            transition: all 0.3s;
+            height: 100%;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .feature-icon {
+            width: 80px;
+            height: 80px;
+            background: var(--gradient-green);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            color: white;
+            font-size: 2rem;
+        }
+
+        .feature-title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: var(--primary-green);
+            margin-bottom: 1rem;
+        }
+
+        .feature-text {
+            color: #666;
+            font-size: 1rem;
+        }
+
+        /* Specialties Section */
+        .specialties-section {
+            padding: 5rem 0;
+        }
+
+        .specialty-card {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 15px;
+            padding: 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 1rem;
+        }
+
+        .specialty-card:hover {
+            border-color: var(--primary-green);
+            background: var(--gradient-green);
+            color: white;
+            transform: scale(1.05);
+        }
+
+        .specialty-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            color: var(--light-green);
+        }
+
+        .specialty-card:hover .specialty-icon {
+            color: white;
+        }
+
+        .specialty-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        /* How It Works */
+        .how-it-works {
+            padding: 5rem 0;
+            background: var(--light-bg);
+        }
+
+        .step-card {
+            text-align: center;
+            position: relative;
+        }
+
+        .step-number {
+            width: 60px;
+            height: 60px;
+            background: var(--gradient-green);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin: 0 auto 1.5rem;
+        }
+
+        .step-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--primary-green);
+            margin-bottom: 1rem;
+        }
+
+        .step-text {
+            color: #666;
+        }
+
+        /* CTA Section */
+        .cta-section {
+            background: var(--gradient-green);
+            color: white;
+            padding: 4rem 0;
+            text-align: center;
+        }
+
+        .cta-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .cta-text {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            opacity: 0.95;
+        }
+
+        .btn-cta {
+            background: white;
+            color: var(--primary-green);
+            padding: 1rem 3rem;
+            border-radius: 50px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .btn-cta:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+
+        /* Footer */
+        .footer {
+            background: #1a1a1a;
+            color: white;
+            padding: 3rem 0 1rem;
+        }
+
+        .footer-title {
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--accent-green);
+        }
+
+        .footer-link {
+            color: #ccc;
+            text-decoration: none;
+            display: block;
+            margin-bottom: 0.5rem;
+            transition: color 0.3s;
+        }
+
+        .footer-link:hover {
+            color: var(--accent-green);
+        }
+
+        .footer-bottom {
+            text-align: center;
+            padding-top: 2rem;
+            margin-top: 2rem;
+            border-top: 1px solid #333;
+            color: #999;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero-title {
+                font-size: 2rem;
+            }
+
+            .hero-subtitle {
+                font-size: 1.1rem;
+            }
+
+            .search-form {
+                flex-direction: column;
+            }
+
+            .btn-search {
+                width: 100%;
+            }
+
+            .section-title {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg sticky-top">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-heartbeat"></i> MediBook
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto align-items-center">
+                    <li class="nav-item">
+                        <a class="nav-link" href="#specialties">Specialties</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#how-it-works">How It Works</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#features">Features</a>
+                    </li>
+                    <li class="nav-item ms-3">
+                        <a href="{% url 'booking_id_lookup' %}">
+                            <button class="btn-login">Trace an Appointment</button>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero-section">
+        <div class="container">
+            <div class="hero-content text-center">
+                <h1 class="hero-title">Book Your Healthcare Appointments Instantly</h1>
+                <p class="hero-subtitle">Find and book doctors, specialists, dentists, and clinics near you in seconds</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Search Box -->
+    <!-- <section class="container">
+        <div class="search-box">
+            <div class="search-tabs">
+                <button class="search-tab active" data-tab="doctor">
+                    <i class="fas fa-user-md"></i> Doctor
+                </button>
+                <button class="search-tab" data-tab="clinic">
+                    <i class="fas fa-hospital"></i> Clinic
+                </button>
+                <button class="search-tab" data-tab="teleconsult">
+                    <i class="fas fa-video"></i> Teleconsultation
+                </button>
+            </div>
+            <div class="search-form">
+                <div class="search-input-group">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" class="search-input" placeholder="What are you looking for? (Doctor, specialty, service...)">
+                </div>
+                <div class="search-input-group">
+                    <i class="fas fa-map-marker-alt search-icon"></i>
+                    <input type="text" class="search-input" placeholder="Where? (City, ZIP code...)">
+                </div>
+                <a href="{% url 'search_results' %}">
+                    <button class="btn-search">
+                        <i class="fas fa-search"></i> Search
+                    </button>
+                </a>
+            </div>
+        </div>
+    </section> -->
+
+    <!-- Search Box -->
+    <section class="container">
+        <div class="search-box">
+            <a href="{% url 'search_results' %}" style="text-decoration: none;">
+                <div class="search-form" style="display: flex; align-items: center; justify-content: center;">
+                    <p style="color: var(--primary-green); font-size: 24px; font-weight: 700;">
+                        Click Here to Book an Appointment
+                    </p>
+                </div>
+            </a>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features-section" id="features">
+        <div class="container">
+            <h2 class="section-title">Why Choose MediBook?</h2>
+            <p class="section-subtitle">Your health, simplified</p>
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <h3 class="feature-title">24/7 Booking</h3>
+                        <p class="feature-text">Book appointments anytime, anywhere. Real-time availability at your fingertips.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-bell"></i>
+                        </div>
+                        <h3 class="feature-title">Smart Reminders</h3>
+                        <p class="feature-text">Never miss an appointment with SMS and email reminders.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-video"></i>
+                        </div>
+                        <h3 class="feature-title">Video Consultations</h3>
+                        <p class="feature-text">Consult with doctors from the comfort of your home.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-calendar-check"></i>
+                        </div>
+                        <h3 class="feature-title">Easy Rescheduling</h3>
+                        <p class="feature-text">Manage, reschedule, or cancel appointments with one click.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-file-prescription"></i>
+                        </div>
+                        <h3 class="feature-title">Digital Prescriptions</h3>
+                        <p class="feature-text">Access your prescriptions and medical records online.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-credit-card"></i>
+                        </div>
+                        <h3 class="feature-title">Secure Payments</h3>
+                        <p class="feature-text">Pay online securely with multiple payment options.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Specialties Section -->
+    <section class="specialties-section" id="specialties">
+        <div class="container">
+            <h2 class="section-title">Popular Specialties</h2>
+            <p class="section-subtitle">Find the right specialist for your needs</p>
+            <div class="row g-3">
+                <div class="col-6 col-md-3">
+                    <div class="specialty-card">
+                        <div class="specialty-icon">🦷</div>
+                        <div class="specialty-name">Dentist</div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="specialty-card">
+                        <div class="specialty-icon">👁️</div>
+                        <div class="specialty-name">Ophthalmologist</div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="specialty-card">
+                        <div class="specialty-icon">❤️</div>
+                        <div class="specialty-name">Cardiologist</div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="specialty-card">
+                        <div class="specialty-icon">🧠</div>
+                        <div class="specialty-name">Neurologist</div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="specialty-card">
+                        <div class="specialty-icon">🩺</div>
+                        <div class="specialty-name">General Practice</div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="specialty-card">
+                        <div class="specialty-icon">🦴</div>
+                        <div class="specialty-name">Orthopedist</div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="specialty-card">
+                        <div class="specialty-icon">👶</div>
+                        <div class="specialty-name">Pediatrician</div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="specialty-card">
+                        <div class="specialty-icon">🧬</div>
+                        <div class="specialty-name">Dermatologist</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works -->
+    <section class="how-it-works" id="how-it-works">
+        <div class="container">
+            <h2 class="section-title">How It Works</h2>
+            <p class="section-subtitle">Book an appointment in 3 simple steps</p>
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="step-card">
+                        <div class="step-number">1</div>
+                        <h3 class="step-title">Search</h3>
+                        <p class="step-text">Find doctors, specialists, or clinics by location, specialty, or service</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="step-card">
+                        <div class="step-number">2</div>
+                        <h3 class="step-title">Choose</h3>
+                        <p class="step-text">View real-time availability and select a convenient time slot</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="step-card">
+                        <div class="step-number">3</div>
+                        <h3 class="step-title">Book</h3>
+                        <p class="step-text">Confirm your appointment and receive instant confirmation</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-section">
+        <div class="container">
+            <h2 class="cta-title">Ready to Take Control of Your Health?</h2>
+            <p class="cta-text">Join thousands of patients who book their healthcare appointments with ease</p>
+            <a href="{% url 'search_results' %}">
+                <button class="btn-cta">Get Started Now</button>
+            </a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-3">
+                    <h5 class="footer-title">MediBook</h5>
+                    <p style="color: #ccc;">Making healthcare accessible to everyone, everywhere.</p>
+                </div>
+                <div class="col-md-3">
+                    <h5 class="footer-title">For Patients</h5>
+                    <a href="#" class="footer-link">Find a Doctor</a>
+                    <a href="#" class="footer-link">Specialties</a>
+                    <a href="#" class="footer-link">Teleconsultation</a>
+                    <a href="#" class="footer-link">How It Works</a>
+                </div>
+                <div class="col-md-3">
+                    <h5 class="footer-title">For Doctors</h5>
+                    <a href="{% url 'signin' %}" class="footer-link">Login Your Practice</a>
+                    <!-- <a href="#" class="footer-link">Pricing</a> -->
+                    <a href="#" class="footer-link">Support</a>
+                </div>
+                <div class="col-md-3">
+                    <h5 class="footer-title">Company</h5>
+                    <a href="#" class="footer-link">About Us</a>
+                    <a href="#" class="footer-link">Contact</a>
+                    <a href="#" class="footer-link">Privacy Policy</a>
+                    <a href="#" class="footer-link">Terms of Service</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 MediBook. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Search tabs functionality
+        const tabs = document.querySelectorAll('.search-tab');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', function() {
+                tabs.forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+
+        // Smooth scroll for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

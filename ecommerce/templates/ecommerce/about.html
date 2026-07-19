@@ -1,0 +1,64 @@
+{% extends 'ecommerce/base.html' %}
+{% load static %}
+{% block container %}
+
+<section id="page-header" class="about-header" style="background-image: url('{% static 'ecommerce/banner.png' %}');">
+  <h2>#Know us</h2>
+  <p>Read case studies about our products</p>
+</section>
+
+
+<section id="about-head" class="section-p1">
+  <img src="{% static 'ecommerce/a6.jpg' %}" alt="">
+  <div>
+      <h2>Who we are</h2>
+      <p>
+        Welcome to McColn, your premier destination for 
+        cutting-edge electronic devices online. At McColn, 
+        we are dedicated to providing our customers with 
+        the latest and most innovative technology products 
+        that enhance everyday life. From smartphones and 
+        laptops to smart home devices and accessories, 
+        we offer a comprehensive range of electronics 
+        to meet all your needs.
+      </p>
+      <abbr title="">
+        Our mission is to deliver high-quality products at 
+        competitive prices, ensuring that technology is 
+        accessible to everyone.
+      </abbr>
+      <br><br>
+      <marquee bgcolor = '#ccc' loop="'-1" scrollamount="'5" width="'100%">
+        Whether you're a tech enthusiast, a professional in need of reliable equipment, 
+        or simply looking to upgrade your gadgets, McColn is your trusted partner
+      </marquee>
+  </div>
+</section>
+
+<section id="about-app" class="section-p1">
+  <h1>Download Our <a href="#">App</a></h1>
+  <div class="video">
+      <video autoplay muted loop src="{% static 'ecommerce/1.mp4' %}"></video>
+  </div>
+</section>
+
+<section id="feature" class="section-p1">
+    <div class="fe-box">
+        <img src="{% static 'ecommerce/feature1.png' %}" alt="">
+        <h6>Free shipping</h6>
+    </div>
+    <div class="fe-box">
+        <img src="{% static 'ecommerce/feature1.png' %}" alt="">
+        <h6>24/7 Active</h6>
+    </div>
+    <div class="fe-box">
+        <img src="{% static 'ecommerce/feature1.png' %}" alt="">
+        <h6>Free Online Help</h6>
+    </div>
+    <div class="fe-box">
+        <img src="{% static 'ecommerce/feature1.png' %}" alt="">
+        <h6>OnTime Delivery</h6>
+    </div>
+  </section>
+
+{% endblock %}

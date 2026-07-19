@@ -1,0 +1,775 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-T256LX3B9J"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-T256LX3B9J');
+    </script>
+
+    
+    <meta charset="UTF-8">
+    <link rel = "shortcut icon" type = "x-icon" href="{% static 'app/logo.png' %}" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AGKI Medical Laboratory - Registration</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary-green: #2d5a2d;
+            --light-green: #4a7c59;
+            --gradient-green: linear-gradient(135deg, #2d5a2d 0%, #4a7c59 100%);
+            --accent-green: #7cc576;
+            --light-bg: #f8f9fa;
+            --dark-text: #333;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            line-height: 1.6;
+            color: var(--dark-text);
+            overflow-x: hidden;
+            background-color: var(--light-bg);
+        }
+        
+        /* Navbar Styles */
+        .navbar {
+            background: rgba(45, 90, 45, 0.95) !important;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            padding: 15px 0;
+        }
+        
+        .navbar.scrolled {
+            background: var(--primary-green) !important;
+            padding: 10px 0;
+        }
+        
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.8rem;
+            color: white !important;
+        }
+        
+        .navbar-nav .nav-link {
+            color: white !important;
+            font-weight: 500;
+            margin: 0 10px;
+            transition: color 0.3s ease;
+        }
+        
+        .navbar-nav .nav-link:hover {
+            color: var(--accent-green) !important;
+        }
+        
+        /* Registration Section */
+        .registration-section {
+            padding: 100px 0 80px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+        }
+        
+        .registration-container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        .registration-card {
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .registration-header {
+            background: var(--gradient-green);
+            padding: 40px;
+            text-align: center;
+            color: white;
+        }
+        
+        .registration-header h2 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        
+        .registration-header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .registration-body {
+            padding: 40px;
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+        }
+        
+        .form-label {
+            font-weight: 600;
+            color: var(--primary-green);
+            margin-bottom: 8px;
+            display: block;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            font-family: 'Poppins', sans-serif;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: var(--light-green);
+            box-shadow: 0 0 0 3px rgba(74, 124, 89, 0.1);
+        }
+        
+        .form-control.error {
+            border-color: #dc3545;
+        }
+        
+        .error-message {
+            color: #dc3545;
+            font-size: 0.875rem;
+            margin-top: 5px;
+            display: none;
+        }
+        
+        .row {
+            display: flex;
+            flex-wrap: wrap;
+            margin: 0 -10px;
+        }
+        
+        .col-md-6 {
+            flex: 0 0 50%;
+            max-width: 50%;
+            padding: 0 10px;
+        }
+        
+        .col-12 {
+            flex: 0 0 100%;
+            max-width: 100%;
+            padding: 0 10px;
+        }
+        
+        @media (max-width: 768px) {
+            .col-md-6 {
+                flex: 0 0 100%;
+                max-width: 100%;
+            }
+        }
+        
+        .file-upload {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+        
+        .file-upload-label {
+            display: block;
+            padding: 12px 15px;
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            cursor: pointer;
+            text-align: center;
+            color: #666;
+            transition: all 0.3s ease;
+        }
+        
+        .file-upload-label:hover {
+            border-color: var(--light-green);
+            color: var(--light-green);
+        }
+        
+        .file-upload-label i {
+            margin-right: 8px;
+        }
+        
+        .file-upload-input {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+        
+        .file-name {
+            margin-top: 8px;
+            font-size: 0.875rem;
+            color: #666;
+        }
+        
+        .select-wrapper {
+            position: relative;
+        }
+        
+        .select-wrapper i {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #666;
+            pointer-events: none;
+        }
+        
+        select.form-control {
+            appearance: none;
+            padding-right: 40px;
+        }
+        
+        .password-toggle {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #666;
+            cursor: pointer;
+        }
+        
+        .password-input-wrapper {
+            position: relative;
+        }
+        
+        .btn-primary-custom {
+            background: linear-gradient(45deg, var(--accent-green), #91d68a);
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border-radius: 50px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(124, 197, 118, 0.4);
+            color: white;
+            width: 100%;
+            cursor: pointer;
+            font-family: 'Poppins', sans-serif;
+        }
+        
+        .btn-primary-custom:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(124, 197, 118, 0.6);
+        }
+        
+        .btn-primary-custom:active {
+            transform: translateY(0);
+        }
+        
+        .login-link {
+            text-align: center;
+            margin-top: 30px;
+            color: #666;
+        }
+        
+        .login-link a {
+            color: var(--light-green);
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        .login-link a:hover {
+            text-decoration: underline;
+        }
+        
+        .form-footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+        
+        .terms-checkbox {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+        
+        .terms-checkbox input {
+            margin-top: 3px;
+            margin-right: 10px;
+        }
+        
+        .terms-checkbox label {
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
+        .terms-checkbox a {
+            color: var(--light-green);
+            text-decoration: none;
+        }
+        
+        .terms-checkbox a:hover {
+            text-decoration: underline;
+        }
+        
+        /* Footer */
+        .footer {
+            background: #1a1a1a;
+            color: white;
+            padding: 30px 0 20px;
+            margin-top: auto;
+        }
+        
+        .footer h5 {
+            color: var(--accent-green);
+            margin-bottom: 20px;
+        }
+        
+        .footer a {
+            color: #ccc;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+        
+        .footer a:hover {
+            color: var(--accent-green);
+        }
+        
+        .social-links a {
+            display: inline-block;
+            margin-right: 15px;
+            font-size: 1.5rem;
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .registration-section {
+                padding: 80px 0 60px;
+            }
+            
+            .registration-header {
+                padding: 30px 20px;
+            }
+            
+            .registration-header h2 {
+                font-size: 2rem;
+            }
+            
+            .registration-body {
+                padding: 30px 20px;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .registration-header {
+                padding: 25px 15px;
+            }
+            
+            .registration-header h2 {
+                font-size: 1.8rem;
+            }
+            
+            .registration-body {
+                padding: 25px 15px;
+            }
+            
+            .form-control {
+                padding: 10px 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <img src="{% static 'app/logo.png' %}" alt="" height="40px" width="40px">
+                AGKI Lab
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">Home</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'signin' %}">Login</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Registration Section -->
+    <section class="registration-section">
+        <div class="container registration-container">
+            <div class="registration-card">
+                <div class="registration-header">
+                    <h2>Create Your Account</h2>
+                    <p>Join AGKI Medical Laboratory and access our healthcare services</p>
+                </div>
+                <div class="registration-body">
+                    <form id="registrationForm" method="POST" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label" for="firstname">First Name</label>
+                                    <input type="text" id="firstname" name="firstname" class="form-control" required>
+                                    <div class="error-message" id="firstname-error">Please enter your first name</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label" for="lastname">Last Name</label>
+                                    <input type="text" id="lastname" name="lastname" class="form-control" required>
+                                    <div class="error-message" id="lastname-error">Please enter your last name</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label" for="username">Username</label>
+                                    <input type="text" id="username" name="username" class="form-control" required>
+                                    <div class="error-message" id="username-error">Please choose a username</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label" for="email">Email Address</label>
+                                    <input type="email" id="email" name="email" class="form-control" required>
+                                    <div class="error-message" id="email-error">Please enter a valid email address</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label" for="phone">Phone Number</label>
+                                    <input type="tel" id="phone" name="phone" class="form-control" required>
+                                    <div class="error-message" id="phone-error">Please enter a valid phone number</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label" for="role">Role</label>
+                                    <input type="tel" id="role" name="role" class="form-control" required>
+                                    <div class="error-message" id="role-error">Please select your role</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Profile Image</label>
+                            <div class="file-upload">
+                                <label class="file-upload-label" for="image">
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                    Choose Profile Image
+                                </label>
+                                <input type="file" id="image" name="image" class="file-upload-input" accept="image/*">
+                                <div class="file-name" id="fileName">No file chosen</div>
+                            </div>
+                            <small class="text-muted">Max file size: 5MB. Allowed formats: JPG, PNG, GIF</small>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label" for="password">Password</label>
+                                    <div class="password-input-wrapper">
+                                        <input type="password" id="password" name="password1" class="form-control" required>
+                                        <button type="button" class="password-toggle" id="togglePassword">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
+                                    <div class="error-message" id="password-error">Password must be at least 8 characters</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label" for="confirmPassword">Confirm Password</label>
+                                    <div class="password-input-wrapper">
+                                        <input type="password" id="confirmPassword" name="password2" class="form-control" required>
+                                        <button type="button" class="password-toggle" id="toggleConfirmPassword">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
+                                    <div class="error-message" id="confirmPassword-error">Passwords do not match</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <div class="terms-checkbox">
+                                <input type="checkbox" id="terms" name="terms" required>
+                                <label for="terms">
+                                    I agree to the <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>
+                                </label>
+                            </div>
+                            <div class="error-message" id="terms-error">You must agree to the terms</div>
+                        </div>
+                        
+                        <button type="submit" class="btn-primary-custom">
+                            <i class="fas fa-user-plus me-2"></i>Create Account
+                        </button>
+                        
+                        <div class="form-footer">
+                            <div class="login-link">
+                                Already have an account? <a href="{% url 'signin' %}">Sign In</a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-4 col-md-4 mb-4">
+                    <h5>AGKI Medical Laboratory</h5>
+                    <p>Empowering communities with accessible, affordable, and innovative healthcare solutions in Tanzania and beyond.</p>
+                    <div class="social-links">
+                        <a href="#"><i class="fab fa-facebook"></i></a>
+                        <a href="#"><i class="fab fa-twitter"></i></a>
+                        <a href="#"><i class="fab fa-instagram"></i></a>
+                        <a href="#"><i class="fab fa-linkedin"></i></a>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-4 mb-4">
+                    <h5>Quick Links</h5>
+                    <ul class="list-unstyled">
+                        <li><a href="{% url 'home' %}">Home</a></li>
+                        <li><a href="{% url 'signin' %}">Login</a></li>
+                        <li><a href="{% url 'appointment_home' %}">Book Appointment</a></li>
+                    </ul>
+                </div>
+                <div class="col-lg-4 col-md-4 mb-4">
+                    <h5>Contact Info</h5>
+                    <p><i class="fas fa-map-marker-alt me-2"></i>Kibaha Pwani, Tanzania</p>
+                    <p><i class="fas fa-phone me-2"></i>+255 717 308 796</p>
+                    <p><i class="fas fa-envelope me-2"></i>info@agkimedicallaboratory.co.tz</p>
+                </div>
+            </div>
+            <hr style="border-color: #333;">
+            <div class="row">
+                <div class="col-12 text-center">
+                    <p>&copy; 2025 AGKI Medical Laboratory. All rights reserved | Transforming Healthcare in Rural Communities</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Navbar scroll effect
+        window.addEventListener('scroll', function() {
+            const navbar = document.querySelector('.navbar');
+            if (window.scrollY > 50) {
+                navbar.classList.add('scrolled');
+            } else {
+                navbar.classList.remove('scrolled');
+            }
+        });
+
+        // File upload display
+        document.getElementById('image').addEventListener('change', function(e) {
+            const fileName = e.target.files[0] ? e.target.files[0].name : 'No file chosen';
+            document.getElementById('fileName').textContent = fileName;
+        });
+
+        // Password toggle visibility
+        const togglePassword = document.getElementById('togglePassword');
+        const passwordInput = document.getElementById('password');
+        const toggleConfirmPassword = document.getElementById('toggleConfirmPassword');
+        const confirmPasswordInput = document.getElementById('confirmPassword');
+
+        togglePassword.addEventListener('click', function() {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            this.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
+        });
+
+        toggleConfirmPassword.addEventListener('click', function() {
+            const type = confirmPasswordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            confirmPasswordInput.setAttribute('type', type);
+            this.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
+        });
+
+        // Form validation
+        const form = document.getElementById('registrationForm');
+        const errorMessages = {};
+
+        function showError(fieldId, message) {
+            const field = document.getElementById(fieldId);
+            const errorElement = document.getElementById(fieldId + '-error');
+            
+            field.classList.add('error');
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+            errorMessages[fieldId] = message;
+        }
+
+        function clearError(fieldId) {
+            const field = document.getElementById(fieldId);
+            const errorElement = document.getElementById(fieldId + '-error');
+            
+            field.classList.remove('error');
+            errorElement.style.display = 'none';
+            delete errorMessages[fieldId];
+        }
+
+        function validateEmail(email) {
+            const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return re.test(email);
+        }
+
+        function validatePhone(phone) {
+            const re = /^[\+]?[0-9]{10,15}$/;
+            return re.test(phone.replace(/[\s\-\(\)]/g, ''));
+        }
+
+        function validateForm() {
+            let isValid = true;
+
+            // Validate First Name
+            const firstName = document.getElementById('firstname').value.trim();
+            if (!firstName) {
+                showError('firstname', 'Please enter your first name');
+                isValid = false;
+            } else {
+                clearError('firstname');
+            }
+
+            // Validate Last Name
+            const lastName = document.getElementById('lastname').value.trim();
+            if (!lastName) {
+                showError('lastname', 'Please enter your last name');
+                isValid = false;
+            } else {
+                clearError('lastname');
+            }
+
+            // Validate Username
+            const username = document.getElementById('username').value.trim();
+            if (!username) {
+                showError('username', 'Please choose a username');
+                isValid = false;
+            } else if (username.length < 3) {
+                showError('username', 'Username must be at least 3 characters');
+                isValid = false;
+            } else {
+                clearError('username');
+            }
+
+            // Validate Email
+            const email = document.getElementById('email').value.trim();
+            if (!email) {
+                showError('email', 'Please enter your email address');
+                isValid = false;
+            } else if (!validateEmail(email)) {
+                showError('email', 'Please enter a valid email address');
+                isValid = false;
+            } else {
+                clearError('email');
+            }
+
+            // Validate Phone
+            const phone = document.getElementById('phone').value.trim();
+            if (!phone) {
+                showError('phone', 'Please enter your phone number');
+                isValid = false;
+            } else if (!validatePhone(phone)) {
+                showError('phone', 'Please enter a valid phone number');
+                isValid = false;
+            } else {
+                clearError('phone');
+            }
+
+            // Validate Role
+            const role = document.getElementById('role').value;
+            if (!role) {
+                showError('role', 'Please select your role');
+                isValid = false;
+            } else {
+                clearError('role');
+            }
+
+            // Validate Password
+            const password = document.getElementById('password').value;
+            if (!password) {
+                showError('password', 'Please enter a password');
+                isValid = false;
+            } else if (password.length < 8) {
+                showError('password', 'Password must be at least 8 characters');
+                isValid = false;
+            } else {
+                clearError('password');
+            }
+
+            // Validate Confirm Password
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            if (!confirmPassword) {
+                showError('confirmPassword', 'Please confirm your password');
+                isValid = false;
+            } else if (password !== confirmPassword) {
+                showError('confirmPassword', 'Passwords do not match');
+                isValid = false;
+            } else {
+                clearError('confirmPassword');
+            }
+
+            // Validate Terms
+            const terms = document.getElementById('terms').checked;
+            if (!terms) {
+                showError('terms', 'You must agree to the terms and conditions');
+                isValid = false;
+            } else {
+                clearError('terms');
+            }
+
+            return isValid;
+        }
+
+        // Real-time validation
+        const inputs = ['firstname', 'lastname', 'username', 'email', 'phone', 'role', 'password', 'confirmPassword'];
+        
+        inputs.forEach(inputId => {
+            const input = document.getElementById(inputId);
+            input.addEventListener('blur', function() {
+                validateField(inputId);
+            });
+        });
+
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,221 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OTP Verification</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .otp-input {
+            width: 50px;
+            height: 50px;
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            margin: 0 5px;
+            transition: all 0.3s ease;
+        }
+        
+        .otp-input:focus {
+            border-color: #198754;
+            box-shadow: 0 0 0 0.2rem rgba(25, 135, 84, 0.25);
+            outline: none;
+        }
+        
+        .otp-input.filled {
+            border-color: #198754;
+            background-color: #f8f9fa;
+        }
+        
+        .otp-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        @media (max-width: 576px) {
+            .otp-input {
+                width: 40px;
+                height: 40px;
+                font-size: 1.2rem;
+                margin: 0 3px;
+            }
+            
+            .otp-container {
+                gap: 5px;
+            }
+        }
+    </style>
+</head>
+<body class="bg-light">
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+
+            <!-- Django Messages -->
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <div class="card shadow-lg border-0 rounded-3">
+                <div class="card-body p-4">
+                    <h4 class="card-title text-center mb-4">Enter OTP</h4>
+                    <p class="text-center text-muted mb-4">Please enter the 6-digit code sent to your email</p>
+                    
+                    <form action="" method="post" id="otpForm">
+                        {% csrf_token %}
+                        
+                        <!-- OTP Input Container -->
+                        <div class="otp-container">
+                            <input type="text" class="otp-input" maxlength="1" data-index="0" autocomplete="off">
+                            <input type="text" class="otp-input" maxlength="1" data-index="1" autocomplete="off">
+                            <input type="text" class="otp-input" maxlength="1" data-index="2" autocomplete="off">
+                            <input type="text" class="otp-input" maxlength="1" data-index="3" autocomplete="off">
+                            <input type="text" class="otp-input" maxlength="1" data-index="4" autocomplete="off">
+                            <input type="text" class="otp-input" maxlength="1" data-index="5" autocomplete="off">
+                        </div>
+                        
+                        <!-- Hidden input to store the complete OTP -->
+                        <input type="hidden" name="otp_code" id="otp_code">
+                        
+                        <button type="submit" class="btn btn-success w-100 mt-3" id="verifyBtn" disabled>Verify</button>
+                    </form>
+                    
+                    <div class="text-center mt-3">
+                        <a href="{% url 'resend-otp' %}" class="text-decoration-none">Resend OTP</a>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const otpInputs = document.querySelectorAll('.otp-input');
+    const otpCodeInput = document.getElementById('otp_code');
+    const verifyBtn = document.getElementById('verifyBtn');
+    
+    // Focus on first input when page loads
+    otpInputs[0].focus();
+    
+    otpInputs.forEach((input, index) => {
+        input.addEventListener('input', function(e) {
+            // Only allow numbers
+            this.value = this.value.replace(/[^0-9]/g, '');
+            
+            // Add filled class if input has value
+            if (this.value) {
+                this.classList.add('filled');
+                // Move to next input if current is filled
+                if (index < otpInputs.length - 1) {
+                    otpInputs[index + 1].focus();
+                }
+            } else {
+                this.classList.remove('filled');
+            }
+            
+            updateOTPCode();
+        });
+        
+        input.addEventListener('keydown', function(e) {
+            // Handle backspace
+            if (e.key === 'Backspace') {
+                if (!this.value && index > 0) {
+                    // If current input is empty, go to previous input
+                    otpInputs[index - 1].focus();
+                    otpInputs[index - 1].value = '';
+                    otpInputs[index - 1].classList.remove('filled');
+                } else if (this.value) {
+                    // Clear current input
+                    this.value = '';
+                    this.classList.remove('filled');
+                }
+                updateOTPCode();
+            }
+            
+            // Handle arrow keys
+            if (e.key === 'ArrowLeft' && index > 0) {
+                otpInputs[index - 1].focus();
+            } else if (e.key === 'ArrowRight' && index < otpInputs.length - 1) {
+                otpInputs[index + 1].focus();
+            }
+            
+            // Handle paste
+            if (e.key === 'v' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                navigator.clipboard.readText().then(text => {
+                    const numbers = text.replace(/[^0-9]/g, '').slice(0, 6);
+                    numbers.split('').forEach((digit, i) => {
+                        if (otpInputs[i]) {
+                            otpInputs[i].value = digit;
+                            otpInputs[i].classList.add('filled');
+                        }
+                    });
+                    updateOTPCode();
+                    
+                    // Focus on next empty input or last input
+                    const nextEmptyIndex = numbers.length < 6 ? numbers.length : 5;
+                    otpInputs[nextEmptyIndex].focus();
+                });
+            }
+        });
+        
+        // Prevent non-numeric input
+        input.addEventListener('paste', function(e) {
+            e.preventDefault();
+            const paste = (e.clipboardData || window.clipboardData).getData('text');
+            const numbers = paste.replace(/[^0-9]/g, '').slice(0, 6);
+            
+            numbers.split('').forEach((digit, i) => {
+                if (otpInputs[index + i]) {
+                    otpInputs[index + i].value = digit;
+                    otpInputs[index + i].classList.add('filled');
+                }
+            });
+            updateOTPCode();
+            
+            // Focus on next empty input
+            const nextEmptyIndex = Math.min(index + numbers.length, 5);
+            otpInputs[nextEmptyIndex].focus();
+        });
+    });
+    
+    function updateOTPCode() {
+        const otp = Array.from(otpInputs).map(input => input.value).join('');
+        otpCodeInput.value = otp;
+        
+        // Enable/disable verify button based on OTP length
+        verifyBtn.disabled = otp.length !== 6;
+    }
+    
+    // Form submission
+    document.getElementById('otpForm').addEventListener('submit', function(e) {
+        const otp = Array.from(otpInputs).map(input => input.value).join('');
+        if (otp.length !== 6) {
+            e.preventDefault();
+            alert('Please enter all 6 digits of the OTP');
+            return false;
+        }
+        otpCodeInput.value = otp;
+    });
+});
+</script>
+
+</body>
+</html>

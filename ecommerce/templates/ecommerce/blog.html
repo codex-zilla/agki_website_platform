@@ -1,0 +1,83 @@
+{% extends 'ecommerce/base.html' %}
+{% load static %}
+{% block container %}
+
+    <section id="page-header" class="blog-header" style="background-image: url('{% static 'ecommerce/header.jpg' %}');">
+        <h2>#readMore</h2>
+        <p>Read case studies about our products</p>
+    </section>
+
+    <section id="blog">
+        <div class="blog-box">
+            <div class="blog-img">
+                <img src="{% static 'ecommerce/blog1.jpg' %}" alt="">
+            </div>
+            <div class="blog-details">
+                <h4>Top 10 Must-Have Gadgets for 2024</h4>
+                <p>
+                    As technology continues to evolve, staying updated 
+                    with the latest gadgets can significantly enhance 
+                    your lifestyle. Here are the top 10 must-have 
+                    gadgets for 2024 that you should consider adding 
+                    to your tech collection.
+                </p>
+                <a href="#"></a>
+            </div>
+            <H1>13/01</H1>
+        </div>
+        <div class="blog-box">
+            <div class="blog-img">
+                <img src="{% static 'ecommerce/blog2.jpg' %}" alt="">
+            </div>
+            <div class="blog-details">
+                <h4>Essential Accessories for Your Mobile Devices</h4>
+                <p>
+                    Enhance your mobile experience with these essential 
+                    accessories. From protective cases to high-quality 
+                    chargers, we’ve got you covered.
+                </p>
+                <a href="#">CONTINUE READING</a>
+            </div>
+            <H1>13/01</H1>
+        </div>
+    </section>
+
+    <section id="pagination" class="section-p1">
+        <a href="#">1</a>
+        <a href="#">2</a>
+        <a href="#"><i class="fal fa-long-arrow-alt-right"></i></a>
+    </section>
+
+    <section id="sm-banner" class="section-p1">
+        <div class="banner-box" style="background-image: url('{% static 'ecommerce/smbanner2.jpg' %}');">
+            <h4>Crazy deals</h4>
+            <h2>Buy 1 get an offer free</h2>
+            <span>The best classic computers is on sale at McColn</span>
+            <button class="white">Learn More</button>
+        </div>
+        <div class="banner-box banner-box2" style="background-image: url('{% static 'ecommerce/smbanner1.jpg' %}');">
+            <h4>Holiday seasons</h4>
+            <h2>Upcoming Season</h2>
+            <span>The best classic  is on sale at McColn</span>
+            <button class="white">Collection</button>
+        </div>
+    </section>
+
+    <section id="banner3">
+        <div class="banner-box" style="background-image: url('{% static 'ecommerce/banner31.jpg' %}');">
+            <h2>SEASONAL SALE</h2>
+            <h3>Printer Collection -50% OFF</h3>
+        </div>
+        <div class="banner-box banner-box2" style="background-image: url('{% static 'ecommerce/banner32.jpg' %}');">
+            <h2>SEASONAL SALE</h2>
+            <h3>Laptop Collection -50% OFF</h3>
+        </div>
+        <div class="banner-box banner-box3" style="background-image: url('{% static 'ecommerce/banner33.jpg' %}');">
+            <h2>SEASONAL SALE</h2>
+            <h3>Radio Collection -50% OFF</h3>
+        </div>
+    </section>
+
+
+
+{% endblock %}

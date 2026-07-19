@@ -1,0 +1,1500 @@
+{% extends 'doctorDashboard/doctor_base.html' %}
+{% load slot_filters %}
+{% load static %}
+{% block content %}
+<!-- Dashboard Content -->
+<div class="dashboard-content">
+    <!-- Page Header -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h2 class="card-title">
+                    <i class="fas fa-clock"></i>
+                    My Availability Schedule
+                </h2>
+                <p style="margin: 0.5rem 0 0 0; color: #666; font-size: 0.9rem;">
+                    Manage your available time slots for patient appointments
+                </p>
+            </div>
+            <button class="card-action" onclick="openAddAvailabilityModal()">
+                <i class="fas fa-plus-circle"></i>
+                Add Availability
+            </button>
+        </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="stats-grid" style="margin-top: 2rem;">
+        <div class="stat-card">
+            <div class="stat-icon blue">
+                <i class="fas fa-calendar-alt"></i>
+            </div>
+            <div class="stat-info">
+                <div class="stat-label">Total Slots This Week</div>
+                <div class="stat-value">{{ stats.total_slots }}</div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon green">
+                <i class="fas fa-calendar-check"></i>
+            </div>
+            <div class="stat-info">
+                <div class="stat-label">Available Slots</div>
+                <div class="stat-value">{{ stats.available_slots }}</div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon orange">
+                <i class="fas fa-user-clock"></i>
+            </div>
+            <div class="stat-info">
+                <div class="stat-label">Booked Slots</div>
+                <div class="stat-value">{{ stats.booked_slots }}</div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon red">
+                <i class="fas fa-percentage"></i>
+            </div>
+            <div class="stat-info">
+                <div class="stat-label">Utilization Rate</div>
+                <div class="stat-value">{{ stats.utilization_rate }}%</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Toggle -->
+    <div class="view-toggle-container">
+        <div class="view-toggle">
+            <button class="toggle-btn" data-view="week" onclick="switchView('week')">
+                <i class="fas fa-calendar-week"></i>
+                Week View
+            </button>
+            <button class="toggle-btn active" data-view="list" onclick="switchView('list')">
+                <i class="fas fa-list"></i>
+                List View
+            </button>
+        </div>
+        <div class="date-navigation">
+            <button class="nav-btn" onclick="previousPeriod()">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <span class="current-period">
+                {{ start_of_week|date:"M d" }} - {{ end_of_week|date:"M d, Y" }}
+            </span>
+            <button class="nav-btn" onclick="nextPeriod()">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+            <button class="nav-btn today-btn" onclick="goToToday()">
+                <i class="fas fa-calendar-day"></i>
+                Today
+            </button>
+        </div>
+    </div>
+
+    <!-- List View -->
+    <div class="list-view-container" id="listView">
+        {% if available_slots %}
+            {% regroup available_slots by date as slots_by_date %}
+            
+            {% for date_group in slots_by_date %}
+            <div class="date-card">
+                <div class="date-header">
+                    <div class="date-title">
+                        <h3>{{ date_group.grouper|date:"l, F j, Y" }}</h3>
+                        <span class="slot-count">{{ date_group.list|length }} slot{{ date_group.list|length|pluralize }}</span>
+                    </div>
+                    <div class="date-actions">
+                        <button class="btn-icon" onclick="addSlotForDate('{{ date_group.grouper|date:"Y-m-d" }}')" title="Add Slot">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="slots-container">
+                    {% for slot in date_group.list %}
+                    <div class="slot-card {% if slot.is_booked %}booked{% else %}available{% endif %}" 
+                         onclick="openSlotDetails(this, '{{ slot.id }}')"
+                         data-date="{{ slot.date|date:'Y-m-d' }}"
+                         data-time="{{ slot.time|time:'H:i' }}">
+                        <div class="slot-time">
+                            <i class="fas fa-clock"></i>
+                            {{ slot.time|time:"g:i A" }}
+                        </div>
+                        <div class="slot-info">
+                            <div class="slot-status">
+                                {% if slot.is_booked %}
+                                <i class="fas fa-user-check"></i>
+                                <span>Booked</span>
+                                {% else %}
+                                <i class="fas fa-check-circle"></i>
+                                <span>Available</span>
+                                {% endif %}
+                            </div>
+                            {% if slot.is_booked and slot.patient %}
+                            <div class="slot-patient">
+                                <i class="fas fa-user"></i>
+                                {{ slot.patient.get_full_name|default:"Patient" }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="slot-actions">
+                            {% if not slot.is_booked %}
+                            <button class="btn-icon small" onclick="event.stopPropagation(); deleteSlot('{{ slot.id }}')" title="Delete Slot">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">
+                    <i class="fas fa-calendar-times"></i>
+                </div>
+                <h3>No Availability Slots</h3>
+                <p>You haven't added any availability slots for this period.</p>
+                <button class="btn-primary" onclick="openAddAvailabilityModal()">
+                    <i class="fas fa-plus-circle"></i>
+                    Add Your First Slot
+                </button>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Week View (Hidden by default) -->
+    <div class="week-view-container" id="weekView" style="display: none;">
+        <!-- Week view content -->
+        <div class="schedule-container">
+            <div class="schedule-header">
+                <div class="time-column-header">Time</div>
+                {% for day_name, day_slots in slots_by_day.items %}
+                <div class="day-header">
+                    <div class="day-name">{{ day_name }}</div>
+                    {% if day_slots.0 %}
+                    <div class="day-date">{{ day_slots.0.date|date:"M d" }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            
+            <div class="schedule-grid">
+                <div class="time-column">
+                    <!-- Time slots from 8 AM to 5 PM -->
+                    {% for hour in "8,9,10,11,12,13,14,15,16,17"|split:"," %}
+                    <div class="time-slot">{{ hour }}:00</div>
+                    {% endfor %}
+                </div>
+                
+                {% for day_name, day_slots in slots_by_day.items %}
+                <div class="day-column">
+                    {% for hour in "8,9,10,11,12,13,14,15,16,17"|split:"," %}
+                        {% with hour_slot=day_slots|get_slot_by_hour:hour %}
+                            {% if hour_slot %}
+                            <div class="slot-item {% if hour_slot.is_booked %}booked{% else %}available{% endif %}" 
+                                 onclick="openSlotDetails(this, '{{ hour_slot.id }}')"
+                                 data-date="{{ hour_slot.date|date:'Y-m-d' }}"
+                                 data-time="{{ hour_slot.time|time:'H:i' }}">
+                                <div class="slot-time">{{ hour_slot.time|time:"g:i A" }}</div>
+                                <div class="slot-status">
+                                    {% if hour_slot.is_booked %}
+                                    <i class="fas fa-user-check"></i>
+                                    <span>Booked</span>
+                                    {% else %}
+                                    <i class="fas fa-check-circle"></i>
+                                    <span>Available</span>
+                                    {% endif %}
+                                </div>
+                                {% if hour_slot.is_booked and hour_slot.patient %}
+                                <div class="slot-patient">{{ hour_slot.patient.get_full_name|default:"Patient" }}</div>
+                                {% endif %}
+                            </div>
+                            {% else %}
+                            <div class="empty-slot"></div>
+                            {% endif %}
+                        {% endwith %}
+                    {% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- Legend -->
+        <div class="legend-container">
+            <div class="legend-item">
+                <div class="legend-color available-color"></div>
+                <span>Available</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color booked-color"></div>
+                <span>Booked</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color empty-color"></div>
+                <span>No Availability</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Availability Modal -->
+<div class="modal-overlay" id="addAvailabilityModal">
+    <div class="modal-container">
+        <div class="modal-header">
+            <h3>
+                <i class="fas fa-plus-circle"></i>
+                Add Availability Slot
+            </h3>
+            <button class="modal-close" onclick="closeAddAvailabilityModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <form action="{% url 'add_doctor_availability' %}" method="post">
+            {% csrf_token %}
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">
+                        <i class="fas fa-calendar"></i>
+                        Select Date
+                    </label>
+                    <input type="date" name="date" class="form-control" id="availabilityDate">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fas fa-clock"></i>
+                            Start Time
+                        </label>
+                        <input type="time" name="time" class="form-control" id="startTime">
+                    </div>
+                    <!-- <div class="form-group">
+                        <label class="form-label">
+                            <i class="fas fa-clock"></i>
+                            End Time
+                        </label>
+                        <input type="time" class="form-control" id="endTime">
+                    </div> -->
+                </div>
+
+                <!-- <div class="form-group">
+                    <label class="form-label">
+                        <i class="fas fa-redo"></i>
+                        Repeat Pattern
+                    </label>
+                    <select class="form-control" id="repeatPattern" onchange="toggleRepeatOptions()">
+                        <option value="none">Does not repeat</option>
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                    </select>
+                </div>
+
+                <div id="repeatOptions" style="display: none;">
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fas fa-calendar-alt"></i>
+                            Repeat Until
+                        </label>
+                        <input type="date" class="form-control" id="repeatUntil">
+                    </div>
+
+                    <div id="weeklyOptions" style="display: none;">
+                        <label class="form-label">
+                            <i class="fas fa-calendar-week"></i>
+                            Repeat On
+                        </label>
+                        <div class="weekday-selector">
+                            <label class="weekday-checkbox">
+                                <input type="checkbox" value="monday">
+                                <span>Mon</span>
+                            </label>
+                            <label class="weekday-checkbox">
+                                <input type="checkbox" value="tuesday">
+                                <span>Tue</span>
+                            </label>
+                            <label class="weekday-checkbox">
+                                <input type="checkbox" value="wednesday">
+                                <span>Wed</span>
+                            </label>
+                            <label class="weekday-checkbox">
+                                <input type="checkbox" value="thursday">
+                                <span>Thu</span>
+                            </label>
+                            <label class="weekday-checkbox">
+                                <input type="checkbox" value="friday">
+                                <span>Fri</span>
+                            </label>
+                            <label class="weekday-checkbox">
+                                <input type="checkbox" value="saturday">
+                                <span>Sat</span>
+                            </label>
+                            <label class="weekday-checkbox">
+                                <input type="checkbox" value="sunday">
+                                <span>Sun</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">
+                        <i class="fas fa-comment"></i>
+                        Notes (Optional)
+                    </label>
+                    <textarea class="form-control" id="slotNotes" rows="3" placeholder="Add any notes about this availability slot..."></textarea>
+                </div> -->
+
+                <div class="alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    <span>Availability slots will be visible to patients for booking appointments.</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeAddAvailabilityModal()">Cancel</button>
+                <button class="btn-primary" type="submit">
+                    <i class="fas fa-save"></i>
+                    Save Availability
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Slot Details Modal -->
+<div class="modal-overlay" id="slotDetailsModal">
+    <div class="modal-container modal-small">
+        <div class="modal-header">
+            <h3>
+                <i class="fas fa-info-circle"></i>
+                Slot Details
+            </h3>
+            <button class="modal-close" onclick="closeSlotDetailsModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="slot-details-content">
+                <div class="detail-item">
+                    <label>Date:</label>
+                    <span id="detailDate">October 20, 2025</span>
+                </div>
+                <div class="detail-item">
+                    <label>Time:</label>
+                    <span id="detailTime">08:00 - 09:00 AM</span>
+                </div>
+                <div class="detail-item">
+                    <label>Status:</label>
+                    <span id="detailStatus" class="status-badge available">Available</span>
+                </div>
+                <div class="detail-item" id="patientDetail" style="display: none;">
+                    <label>Patient:</label>
+                    <span id="detailPatient"></span>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="closeSlotDetailsModal()">Close</button>
+            <button class="btn-danger" id="deleteSlotBtn" onclick="deleteSlot()">
+                <i class="fas fa-trash"></i>
+                Delete Slot
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* View Toggle */
+    .view-toggle-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin: 2rem 0 1.5rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .view-toggle {
+        display: flex;
+        background: white;
+        border-radius: 10px;
+        padding: 0.25rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+
+    .toggle-btn {
+        padding: 0.75rem 1.5rem;
+        border: none;
+        background: transparent;
+        color: #666;
+        font-weight: 600;
+        cursor: pointer;
+        border-radius: 8px;
+        transition: all 0.3s;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .toggle-btn.active {
+        background: var(--gradient-green);
+        color: white;
+    }
+
+    .toggle-btn:hover:not(.active) {
+        background: #f0f0f0;
+    }
+
+    .date-navigation {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        background: white;
+        padding: 0.5rem 1rem;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+
+    .nav-btn {
+        background: #f0f0f0;
+        border: none;
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--dark-text);
+    }
+
+    .nav-btn:hover {
+        background: var(--primary-green);
+        color: white;
+    }
+
+    .today-btn {
+        width: auto;
+        padding: 0 1rem;
+        gap: 0.5rem;
+    }
+
+    .current-period {
+        font-weight: 700;
+        color: var(--dark-text);
+        min-width: 200px;
+        text-align: center;
+    }
+
+    /* List View Styles */
+    .list-view-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .date-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        overflow: hidden;
+    }
+
+    .date-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1.25rem 1.5rem;
+        background: #f8f9fa;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .date-title h3 {
+        margin: 0;
+        font-size: 1.2rem;
+        color: var(--dark-text);
+    }
+
+    .slot-count {
+        font-size: 0.9rem;
+        color: #666;
+        margin-top: 0.25rem;
+        display: block;
+    }
+
+    .date-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .btn-icon {
+        background: white;
+        border: 1px solid #e0e0e0;
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--dark-text);
+    }
+
+    .btn-icon:hover {
+        background: var(--primary-green);
+        color: white;
+        border-color: var(--primary-green);
+    }
+
+    .slots-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1rem;
+        padding: 1.5rem;
+    }
+
+    .slot-card {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.3s;
+        border-left: 4px solid;
+    }
+
+    .slot-card.available {
+        background: linear-gradient(135deg, #e8f5e9 0%, #f1f8f4 100%);
+        border-left-color: #4caf50;
+    }
+
+    .slot-card.booked {
+        background: linear-gradient(135deg, #fff3e0 0%, #fff8f0 100%);
+        border-left-color: #ff9800;
+    }
+
+    .slot-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .slot-time {
+        font-weight: 600;
+        color: var(--dark-text);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .slot-info {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .slot-status {
+        font-size: 0.85rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    .slot-card.available .slot-status {
+        color: #2e7d32;
+    }
+
+    .slot-card.booked .slot-status {
+        color: #e65100;
+    }
+
+    .slot-patient {
+        font-size: 0.8rem;
+        color: #666;
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    .slot-actions {
+        display: flex;
+        gap: 0.25rem;
+    }
+
+    .btn-icon.small {
+        width: 32px;
+        height: 32px;
+        font-size: 0.8rem;
+    }
+
+    /* Empty State */
+    .empty-state {
+        text-align: center;
+        padding: 3rem 2rem;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+
+    .empty-icon {
+        font-size: 4rem;
+        color: #e0e0e0;
+        margin-bottom: 1.5rem;
+    }
+
+    .empty-state h3 {
+        margin: 0 0 1rem;
+        color: var(--dark-text);
+    }
+
+    .empty-state p {
+        color: #666;
+        margin-bottom: 2rem;
+    }
+
+    /* Week View Styles */
+    .week-view-container {
+        /* Your existing week view styles */
+    }
+
+    .schedule-container {
+        overflow-x: auto;
+    }
+
+    .schedule-header {
+        display: grid;
+        grid-template-columns: 100px repeat(7, 1fr);
+        gap: 1px;
+        background: #e0e0e0;
+        border-radius: 12px 12px 0 0;
+        overflow: hidden;
+    }
+
+    .time-column-header {
+        background: var(--gradient-green);
+        color: white;
+        padding: 1rem;
+        font-weight: 700;
+        text-align: center;
+    }
+
+    .day-header {
+        background: white;
+        padding: 1rem;
+        text-align: center;
+    }
+
+    .day-name {
+        font-weight: 700;
+        color: var(--dark-text);
+        margin-bottom: 0.25rem;
+    }
+
+    .day-date {
+        font-size: 0.85rem;
+        color: #666;
+    }
+
+    .schedule-grid {
+        display: grid;
+        grid-template-columns: 100px repeat(7, 1fr);
+        gap: 1px;
+        background: #e0e0e0;
+        min-height: 500px;
+    }
+
+    .time-column {
+        background: #f8f9fa;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .time-slot {
+        height: 80px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.85rem;
+        color: #666;
+        font-weight: 600;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .day-column {
+        background: white;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .slot-item {
+        height: 80px;
+        padding: 0.75rem;
+        cursor: pointer;
+        transition: all 0.3s;
+        border-bottom: 1px solid #f0f0f0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        position: relative;
+    }
+
+    .slot-item:hover {
+        transform: scale(1.02);
+        z-index: 10;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .slot-item.available {
+        background: linear-gradient(135deg, #e8f5e9 0%, #f1f8f4 100%);
+        border-left: 4px solid #4caf50;
+    }
+
+    .slot-item.booked {
+        background: linear-gradient(135deg, #fff3e0 0%, #fff8f0 100%);
+        border-left: 4px solid #ff9800;
+    }
+
+    .slot-time {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--dark-text);
+        margin-bottom: 0.25rem;
+    }
+
+    .slot-status {
+        font-size: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-weight: 600;
+    }
+
+    .slot-item.available .slot-status {
+        color: #2e7d32;
+    }
+
+    .slot-item.booked .slot-status {
+        color: #e65100;
+    }
+
+    .slot-patient {
+        font-size: 0.75rem;
+        color: #666;
+        margin-top: 0.25rem;
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    .empty-slot {
+        height: 80px;
+        background: #fafafa;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    /* Legend */
+    .legend-container {
+        display: flex;
+        gap: 2rem;
+        margin-top: 1.5rem;
+        padding: 1rem;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .legend-color {
+        width: 30px;
+        height: 20px;
+        border-radius: 4px;
+    }
+
+    .available-color {
+        background: linear-gradient(135deg, #e8f5e9 0%, #f1f8f4 100%);
+        border-left: 4px solid #4caf50;
+    }
+
+    .booked-color {
+        background: linear-gradient(135deg, #fff3e0 0%, #fff8f0 100%);
+        border-left: 4px solid #ff9800;
+    }
+
+    .empty-color {
+        background: #fafafa;
+        border: 1px solid #e0e0e0;
+    }
+
+    /* Modal Styles */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 2000;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-overlay.show {
+        display: flex;
+    }
+
+    .modal-container {
+        background: white;
+        border-radius: 16px;
+        width: 90%;
+        max-width: 600px;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        animation: modalSlideIn 0.3s ease;
+    }
+
+    .modal-container.modal-small {
+        max-width: 450px;
+    }
+
+    @keyframes modalSlideIn {
+        from {
+            transform: translateY(-50px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    .modal-header {
+        padding: 1.5rem;
+        border-bottom: 1px solid #e0e0e0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-header h3 {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: var(--primary-green);
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin: 0;
+    }
+
+    .modal-close {
+        background: #f0f0f0;
+        border: none;
+        width: 35px;
+        height: 35px;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s;
+        color: #666;
+    }
+
+    .modal-close:hover {
+        background: #e0e0e0;
+        color: #333;
+    }
+
+    .modal-body {
+        padding: 1.5rem;
+    }
+
+    .modal-footer {
+        padding: 1.5rem;
+        border-top: 1px solid #e0e0e0;
+        display: flex;
+        justify-content: flex-end;
+        gap: 1rem;
+    }
+
+    /* Form Styles */
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+
+    .form-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 600;
+        color: var(--dark-text);
+        margin-bottom: 0.5rem;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 0.75rem;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 1rem;
+        transition: border-color 0.3s;
+        font-family: inherit;
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: var(--primary-green);
+    }
+
+    .weekday-selector {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+    }
+
+    .weekday-checkbox {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        cursor: pointer;
+    }
+
+    .weekday-checkbox input[type="checkbox"] {
+        display: none;
+    }
+
+    .weekday-checkbox span {
+        padding: 0.75rem 0.5rem;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        text-align: center;
+        width: 100%;
+        font-weight: 600;
+        transition: all 0.3s;
+        font-size: 0.85rem;
+    }
+
+    .weekday-checkbox input[type="checkbox"]:checked + span {
+        background: var(--gradient-green);
+        color: white;
+        border-color: var(--primary-green);
+    }
+
+    .weekday-checkbox:hover span {
+        border-color: var(--primary-green);
+    }
+
+    .alert-info {
+        background: #e3f2fd;
+        border-left: 4px solid #2196F3;
+        padding: 1rem;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        color: #1565c0;
+        font-size: 0.9rem;
+        margin-top: 1.5rem;
+    }
+
+    .alert-info i {
+        font-size: 1.2rem;
+    }
+
+    /* Slot Details */
+    .slot-details-content {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .detail-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.75rem;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
+
+    .detail-item label {
+        font-weight: 600;
+        color: #666;
+    }
+
+    .detail-item span {
+        font-weight: 600;
+        color: var(--dark-text);
+    }
+
+    /* Buttons */
+    .btn-primary {
+        background: var(--gradient-green);
+        color: white;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(45, 90, 45, 0.3);
+    }
+
+    .btn-secondary {
+        background: #f0f0f0;
+        color: var(--dark-text);
+        border: 2px solid #e0e0e0;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+    .btn-secondary:hover {
+        background: #e0e0e0;
+    }
+
+    .btn-danger {
+        background: #ffebee;
+        color: #c62828;
+        border: 2px solid #ef9a9a;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .btn-danger:hover {
+        background: #ef5350;
+        color: white;
+        border-color: #ef5350;
+    }
+
+    /* Responsive */
+    @media (max-width: 1200px) {
+        .schedule-grid {
+            min-width: 1000px;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .view-toggle-container {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .date-navigation {
+            justify-content: space-between;
+        }
+
+        .current-period {
+            min-width: auto;
+        }
+
+        .slots-container {
+            grid-template-columns: 1fr;
+        }
+
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+
+        .weekday-selector {
+            grid-template-columns: repeat(4, 1fr);
+        }
+
+        .modal-footer {
+            flex-direction: column;
+        }
+
+        .btn-primary,
+        .btn-secondary,
+        .btn-danger {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .legend-container {
+            gap: 1rem;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .stats-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .modal-container {
+            width: 95%;
+            margin: 1rem;
+        }
+
+        .date-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+
+        .date-actions {
+            align-self: flex-end;
+        }
+    }
+</style>
+
+<script>
+    // View Toggle Functionality
+    function switchView(view) {
+        const listView = document.getElementById('listView');
+        const weekView = document.getElementById('weekView');
+        const buttons = document.querySelectorAll('.toggle-btn');
+        
+        buttons.forEach(btn => {
+            if (btn.dataset.view === view) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+
+        if (view === 'list') {
+            listView.style.display = 'flex';
+            weekView.style.display = 'none';
+        } else {
+            listView.style.display = 'none';
+            weekView.style.display = 'block';
+        }
+    }
+
+    // Modal Functions
+    function openAddAvailabilityModal() {
+        document.getElementById('addAvailabilityModal').classList.add('show');
+        document.body.style.overflow = 'hidden';
+        
+        // Set default date to today
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('availabilityDate').value = today;
+    }
+
+    function closeAddAvailabilityModal() {
+        document.getElementById('addAvailabilityModal').classList.remove('show');
+        document.body.style.overflow = 'auto';
+        resetAvailabilityForm();
+    }
+
+    function openSlotDetailsModal() {
+        document.getElementById('slotDetailsModal').classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeSlotDetailsModal() {
+        document.getElementById('slotDetailsModal').classList.remove('show');
+        document.body.style.overflow = 'auto';
+    }
+
+    // Close modals on overlay click
+    document.getElementById('addAvailabilityModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeAddAvailabilityModal();
+        }
+    });
+
+    document.getElementById('slotDetailsModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeSlotDetailsModal();
+        }
+    });
+
+    // Close modals on Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeAddAvailabilityModal();
+            closeSlotDetailsModal();
+        }
+    });
+
+    // Toggle Repeat Options
+    function toggleRepeatOptions() {
+        const repeatPattern = document.getElementById('repeatPattern').value;
+        const repeatOptions = document.getElementById('repeatOptions');
+        const weeklyOptions = document.getElementById('weeklyOptions');
+
+        if (repeatPattern !== 'none') {
+            repeatOptions.style.display = 'block';
+            
+            if (repeatPattern === 'weekly') {
+                weeklyOptions.style.display = 'block';
+            } else {
+                weeklyOptions.style.display = 'none';
+            }
+        } else {
+            repeatOptions.style.display = 'none';
+            weeklyOptions.style.display = 'none';
+        }
+    }
+
+    // Save Availability
+    function saveAvailability() {
+        const date = document.getElementById('availabilityDate').value;
+        const startTime = document.getElementById('startTime').value;
+        const endTime = document.getElementById('endTime').value;
+        const repeatPattern = document.getElementById('repeatPattern').value;
+        const notes = document.getElementById('slotNotes').value;
+
+        // Validation
+        if (!date || !startTime || !endTime) {
+            alert('Please fill in all required fields');
+            return;
+        }
+
+        if (startTime >= endTime) {
+            alert('End time must be after start time');
+            return;
+        }
+
+        // Collect weekly days if repeat is weekly
+        let repeatDays = [];
+        if (repeatPattern === 'weekly') {
+            const checkboxes = document.querySelectorAll('.weekday-checkbox input[type="checkbox"]:checked');
+            repeatDays = Array.from(checkboxes).map(cb => cb.value);
+            
+            if (repeatDays.length === 0) {
+                alert('Please select at least one day for weekly repeat');
+                return;
+            }
+        }
+
+        const repeatUntil = repeatPattern !== 'none' ? document.getElementById('repeatUntil').value : null;
+
+        // In production: Make API call to save availability
+        console.log('Saving availability:', {
+            date: date,
+            startTime: startTime,
+            endTime: endTime,
+            repeatPattern: repeatPattern,
+            repeatUntil: repeatUntil,
+            repeatDays: repeatDays,
+            notes: notes
+        });
+
+        alert('Availability slot(s) created successfully!');
+        closeAddAvailabilityModal();
+
+        // Refresh the schedule view
+        // In production: reload data from backend
+    }
+
+    // Reset Form
+    function resetAvailabilityForm() {
+        document.getElementById('availabilityDate').value = '';
+        document.getElementById('startTime').value = '';
+        document.getElementById('endTime').value = '';
+        document.getElementById('repeatPattern').value = 'none';
+        document.getElementById('slotNotes').value = '';
+        document.getElementById('repeatOptions').style.display = 'none';
+        
+        // Uncheck all weekday checkboxes
+        document.querySelectorAll('.weekday-checkbox input[type="checkbox"]').forEach(cb => {
+            cb.checked = false;
+        });
+    }
+
+    // Add slot for specific date
+    function addSlotForDate(date) {
+        openAddAvailabilityModal();
+        document.getElementById('availabilityDate').value = date;
+    }
+
+    // Modified openSlotDetails function
+    function openSlotDetails(slotElement, slotId) {
+        const slotTime = slotElement.querySelector('.slot-time').textContent;
+        const isBooked = slotElement.classList.contains('booked');
+        const slotDate = slotElement.dataset.date;
+        const slotTimeValue = slotElement.dataset.time;
+
+        // Format date for display
+        const dateObj = new Date(slotDate + 'T' + slotTimeValue);
+        const formattedDate = dateObj.toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
+
+        // Update modal content
+        document.getElementById('detailDate').textContent = formattedDate;
+        document.getElementById('detailTime').textContent = slotTime;
+        
+        if (isBooked) {
+            document.getElementById('detailStatus').className = 'status-badge booked';
+            document.getElementById('detailStatus').innerHTML = '<i class="fas fa-user-check"></i> Booked';
+            document.getElementById('patientDetail').style.display = 'flex';
+            document.getElementById('deleteSlotBtn').disabled = true;
+            document.getElementById('deleteSlotBtn').style.opacity = '0.5';
+            document.getElementById('deleteSlotBtn').style.cursor = 'not-allowed';
+        } else {
+            document.getElementById('detailStatus').className = 'status-badge available';
+            document.getElementById('detailStatus').innerHTML = '<i class="fas fa-check-circle"></i> Available';
+            document.getElementById('patientDetail').style.display = 'none';
+            document.getElementById('deleteSlotBtn').disabled = false;
+            document.getElementById('deleteSlotBtn').style.opacity = '1';
+            document.getElementById('deleteSlotBtn').style.cursor = 'pointer';
+        }
+
+        // Store slot ID for deletion
+        document.getElementById('deleteSlotBtn').dataset.slotId = slotId;
+
+        openSlotDetailsModal();
+    }
+
+    // Delete slot directly from list view
+    function deleteSlot(slotId) {
+        if (!slotId) {
+            slotId = document.getElementById('deleteSlotBtn').dataset.slotId;
+        }
+        
+        if (confirm('Are you sure you want to delete this availability slot?')) {
+            // Make API call to delete slot
+            fetch(`/delete-availability/${slotId}/`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                    'Content-Type': 'application/json',
+                },
+            })
+            .then(response => {
+                if (response.ok) {
+                    alert('Availability slot deleted successfully!');
+                    location.reload(); // Refresh the page
+                } else {
+                    alert('Error deleting slot');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error deleting slot');
+            });
+        }
+    }
+
+    // CSRF token helper function
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    // Navigation
+    function previousPeriod() {
+        console.log('Navigate to previous period');
+        // In production: Update date range and reload data
+        alert('Loading previous week...');
+    }
+
+    function nextPeriod() {
+        console.log('Navigate to next period');
+        // In production: Update date range and reload data
+        alert('Loading next week...');
+    }
+
+    function goToToday() {
+        console.log('Navigate to today');
+        // In production: Reset to current week and reload data
+        alert('Jumping to current week...');
+    }
+
+    // Page load animation
+    window.addEventListener('load', function() {
+        const cards = document.querySelectorAll('.card, .stat-card');
+        cards.forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            setTimeout(() => {
+                card.style.transition = 'all 0.5s ease';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, index * 50);
+        });
+
+        // Animate slot items
+        setTimeout(() => {
+            const slots = document.querySelectorAll('.slot-card, .slot-item');
+            slots.forEach((slot, index) => {
+                slot.style.opacity = '0';
+                setTimeout(() => {
+                    slot.style.transition = 'opacity 0.3s ease';
+                    slot.style.opacity = '1';
+                }, index * 20);
+            });
+        }, 500);
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        // Ctrl/Cmd + N for new availability
+        if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+            e.preventDefault();
+            openAddAvailabilityModal();
+        }
+        
+        // Arrow keys for navigation
+        if (e.key === 'ArrowLeft' && !e.target.matches('input, textarea, select')) {
+            previousPeriod();
+        }
+        if (e.key === 'ArrowRight' && !e.target.matches('input, textarea, select')) {
+            nextPeriod();
+        }
+    });
+
+    // Auto-update current time indicator (optional)
+    function updateCurrentTimeIndicator() {
+        // In production: Add a visual indicator for current time in the schedule
+        console.log('Updating current time indicator');
+    }
+
+    setInterval(updateCurrentTimeIndicator, 60000); // Update every minute
+</script>
+
+{% endblock %}

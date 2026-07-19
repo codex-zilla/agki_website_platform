@@ -1,0 +1,1293 @@
+{% extends 'doctorDashboard/doctor_base.html' %}
+{% load static %}
+{% block content %}
+<!-- Dashboard Content -->
+<div class="dashboard-content">
+    <!-- Appointment Header -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h2 class="card-title">
+                    <i class="fas fa-calendar-check"></i>
+                    Appointment Details
+                </h2>
+                <p style="margin: 0.5rem 0 0 0; color: #666; font-size: 0.9rem;">
+                    Booking ID: <strong>{{ appointment.bookingID }}</strong>
+                </p>
+            </div>
+            <div style="display: flex; gap: 1rem; align-items: center;">
+                <span class="status-badge pending">Pending Approval</span>
+                <button class="card-action" onclick="openApprovalModal()">
+                    <i class="fas fa-check-circle"></i>
+                    Approve Appointment
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Grid -->
+    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; margin-top: 2rem;">
+        <!-- Left Column -->
+        <div>
+            <!-- Patient Information -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-user"></i>
+                        Patient Information
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="patient-info-grid">
+                        <div class="info-row">
+                            <div class="info-item">
+                                <label class="info-label">
+                                    <i class="fas fa-user-circle"></i>
+                                    Full Name
+                                </label>
+                                <p class="info-value">{{ appointment.fullName }}</p>
+                            </div>
+                            <div class="info-item">
+                                <label class="info-label">
+                                    <i class="fas fa-birthday-cake"></i>
+                                    Date of Birth
+                                </label>
+                                <p class="info-value">{{ appointment.birthDate }}</p>
+                            </div>
+                        </div>
+
+                        <div class="info-row">
+                            <div class="info-item">
+                                <label class="info-label">
+                                    <i class="fas fa-venus-mars"></i>
+                                    Gender
+                                </label>
+                                <p class="info-value">{{ appointment.gender }}</p>
+                            </div>
+                            <div class="info-item">
+                                <label class="info-label">
+                                    <i class="fas fa-envelope"></i>
+                                    Email Address
+                                </label>
+                                <p class="info-value">{{ appointment.email }}</p>
+                            </div>
+                        </div>
+
+                        <div class="info-row">
+                            <div class="info-item">
+                                <label class="info-label">
+                                    <i class="fas fa-phone"></i>
+                                    Phone Number
+                                </label>
+                                <p class="info-value">{{ appointment.phone }}</p>
+                            </div>
+                            <div class="info-item">
+                                <label class="info-label">
+                                    <i class="fas fa-calendar-plus"></i>
+                                    Booking Date
+                                </label>
+                                <p class="info-value">{{ appointment.created_at|date:"M d, Y h:i A" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Appointment Details -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-calendar-alt"></i>
+                        Appointment Details
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="patient-info-grid">
+                        <div class="info-row">
+                            <div class="info-item">
+                                <label class="info-label">
+                                    <i class="fas fa-clock"></i>
+                                    Appointment Date & Time
+                                </label>
+                                <p class="info-value">{{ appointment.slot.date }} at {{ appointment.slot.start_time }} - {{ appointment.slot.end_time }}</p>
+                            </div>
+                            <div class="info-item">
+                                <label class="info-label">
+                                    <i class="fas fa-user-tag"></i>
+                                    Visit Type
+                                </label>
+                                <p class="info-value">
+                                    <span class="visit-type-badge">{{ appointment.visitType }}</span>
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="info-row">
+                            <div class="info-item">
+                                <label class="info-label">
+                                    <i class="fas fa-video"></i>
+                                    Appointment Mode
+                                </label>
+                                <p class="info-value">
+                                    <span class="mode-badge">
+                                        {% if appointment.appointmentMode == 'Virtual' %}
+                                        <i class="fas fa-video"></i>
+                                        {% else %}
+                                        <i class="fas fa-hospital"></i>
+                                        {% endif %}
+                                        {{ appointment.appointmentMode }}
+                                    </span>
+                                </p>
+                            </div>
+                            <div class="info-item">
+                                <label class="info-label">
+                                    <i class="fas fa-stethoscope"></i>
+                                    Reason for Visit
+                                </label>
+                                <p class="info-value">{{ appointment.reasonVisit }}</p>
+                            </div>
+                        </div>
+
+                        <div class="info-row full-width">
+                            <div class="info-item">
+                                <label class="info-label">
+                                    <i class="fas fa-notes-medical"></i>
+                                    Symptoms & Concerns
+                                </label>
+                                <div class="symptoms-box">
+                                    {{ appointment.symptoms }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Appointment Notes -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-sticky-note"></i>
+                        Appointment Notes
+                    </h3>
+                    <button class="card-action" onclick="openNoteModal()">
+                        <i class="fas fa-plus"></i>
+                        Add Note
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="notes-container">
+                        <!-- Note Item -->
+                        <div class="note-item">
+                            <div class="note-header">
+                                <div class="note-author">
+                                    <img src="{{user.image.url}}" alt="Doctor" class="note-avatar">
+                                    <div>
+                                        <div class="note-author-name">{{ user.get_full_name }}</div>
+                                        <div class="note-timestamp">{{ note.created_at|date:"M d, Y h:i A" }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="note-content">
+                                {{ note.note_text }}
+                            </div>
+                        </div>
+
+                        <!-- Empty State -->
+                        <div class="empty-state" id="emptyNotesState">
+                            <i class="fas fa-clipboard"></i>
+                            <p>No notes added yet</p>
+                            <button class="btn-secondary" onclick="openNoteModal()">Add First Note</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column - Quick Actions & Timeline -->
+        <div>
+            <!-- Quick Actions -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-bolt"></i>
+                        Quick Actions
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="action-buttons-vertical">
+                        <button class="action-btn primary" onclick="openApprovalModal()">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Approve Appointment</span>
+                        </button>
+                        <button class="action-btn secondary">
+                            <i class="fas fa-times-circle"></i>
+                            <span>Cancel Appointment</span>
+                        </button>
+                        <button class="action-btn info">
+                            <i class="fas fa-edit"></i>
+                            <span>Reschedule</span>
+                        </button>
+                        <button class="action-btn warning">
+                            <i class="fas fa-paper-plane"></i>
+                            <span>Send Message</span>
+                        </button>
+                        <button class="action-btn success">
+                            <i class="fas fa-file-medical"></i>
+                            <span>View Medical History</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Appointment Timeline -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-history"></i>
+                        Timeline
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="timeline">
+                        <div class="timeline-item">
+                            <div class="timeline-marker pending"></div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">Appointment Booked</div>
+                                <div class="timeline-time">{{ appointment.created_at|date:"M d, Y h:i A" }}</div>
+                                <div class="timeline-desc">Patient booked appointment online</div>
+                            </div>
+                        </div>
+
+                        <div class="timeline-item">
+                            <div class="timeline-marker"></div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">Pending Approval</div>
+                                <div class="timeline-time">Current Status</div>
+                                <div class="timeline-desc">Waiting for doctor confirmation</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Doctor Information -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-user-md"></i>
+                        Assigned Doctor
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="doctor-info-card">
+                        <img src="{{user.image.url}}" alt="{{user.username}}" class="doctor-info-avatar">
+                        <div class="doctor-info-details">
+                            <h4>{{ user.get_full_name }}</h4>
+                            <p class="doctor-specialty">{{ user.role }}</p>
+                            <div class="doctor-contact">
+                                <div><i class="fas fa-envelope"></i> {{ user.email }}</div>
+                                <div><i class="fas fa-phone"></i> {{ user.phone }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Approval Modal -->
+<div class="modal-overlay" id="approvalModal">
+    <div class="modal-container">
+        <div class="modal-header">
+            <h3>
+                <i class="fas fa-check-circle"></i>
+                Approve Appointment
+            </h3>
+            <button class="modal-close" onclick="closeApprovalModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="approval-summary">
+                <div class="summary-item">
+                    <span class="summary-label">Patient Name:</span>
+                    <span class="summary-value">{{ appointment.fullName }}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Booking ID:</span>
+                    <span class="summary-value">{{ appointment.bookingID }}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Date & Time:</span>
+                    <span class="summary-value">{{ appointment.slot.date }} at {{ appointment.slot.start_time }}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Visit Type:</span>
+                    <span class="summary-value">{{ appointment.visitType }}</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-comment-dots"></i>
+                    Confirmation Message (Optional)
+                </label>
+                <textarea class="form-control" rows="4" placeholder="Add a message for the patient..."></textarea>
+            </div>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="sendEmail" checked>
+                <label for="sendEmail">Send confirmation email to patient</label>
+            </div>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="sendSMS">
+                <label for="sendSMS">Send SMS notification</label>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="closeApprovalModal()">Cancel</button>
+            <button class="btn-primary" onclick="confirmApproval()">
+                <i class="fas fa-check"></i>
+                Confirm Approval
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Add Note Modal -->
+<div class="modal-overlay" id="noteModal">
+    <div class="modal-container">
+        <div class="modal-header">
+            <h3>
+                <i class="fas fa-sticky-note"></i>
+                Add Appointment Note
+            </h3>
+            <button class="modal-close" onclick="closeNoteModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-edit"></i>
+                    Note Content
+                </label>
+                <textarea class="form-control" id="noteText" rows="6" placeholder="Enter your note here..."></textarea>
+                <small class="form-hint">Add relevant information about the appointment, patient concerns, or follow-up actions.</small>
+            </div>
+
+            <div class="note-templates">
+                <label class="form-label">Quick Templates:</label>
+                <div class="template-buttons">
+                    <button class="template-btn" onclick="insertTemplate('followUp')">
+                        <i class="fas fa-redo"></i>
+                        Follow-up Required
+                    </button>
+                    <button class="template-btn" onclick="insertTemplate('tests')">
+                        <i class="fas fa-vial"></i>
+                        Lab Tests Ordered
+                    </button>
+                    <button class="template-btn" onclick="insertTemplate('medication')">
+                        <i class="fas fa-pills"></i>
+                        Medication Prescribed
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="closeNoteModal()">Cancel</button>
+            <button class="btn-primary" onclick="saveNote()">
+                <i class="fas fa-save"></i>
+                Save Note
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Patient Info Grid */
+    .patient-info-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .info-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+    }
+
+    .info-row.full-width {
+        grid-template-columns: 1fr;
+    }
+
+    .info-item {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .info-label {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #666;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .info-label i {
+        color: var(--primary-green);
+    }
+
+    .info-value {
+        font-size: 1rem;
+        color: var(--dark-text);
+        font-weight: 500;
+        margin: 0;
+    }
+
+    .visit-type-badge {
+        background: #e3f2fd;
+        color: #1976d2;
+        padding: 0.4rem 1rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        display: inline-block;
+    }
+
+    .mode-badge {
+        background: #f3e5f5;
+        color: #7b1fa2;
+        padding: 0.4rem 1rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .symptoms-box {
+        background: #f8f9fa;
+        padding: 1rem;
+        border-radius: 8px;
+        border-left: 4px solid var(--accent-green);
+        line-height: 1.8;
+        color: var(--dark-text);
+    }
+
+    /* Notes */
+    .notes-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .note-item {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 1rem;
+        border-left: 4px solid var(--primary-green);
+    }
+
+    .note-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.75rem;
+    }
+
+    .note-author {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .note-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid var(--accent-green);
+    }
+
+    .note-author-name {
+        font-weight: 600;
+        color: var(--dark-text);
+    }
+
+    .note-timestamp {
+        font-size: 0.85rem;
+        color: #666;
+    }
+
+    .note-content {
+        color: var(--dark-text);
+        line-height: 1.6;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: #999;
+    }
+
+    .empty-state i {
+        font-size: 4rem;
+        color: #ddd;
+        margin-bottom: 1rem;
+    }
+
+    .empty-state p {
+        font-size: 1.1rem;
+        margin-bottom: 1rem;
+    }
+
+    /* Action Buttons Vertical */
+    .action-buttons-vertical {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .action-btn {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1rem;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        text-align: left;
+    }
+
+    .action-btn i {
+        font-size: 1.2rem;
+        width: 24px;
+    }
+
+    .action-btn.primary {
+        background: var(--gradient-green);
+        color: white;
+    }
+
+    .action-btn.primary:hover {
+        transform: translateX(5px);
+        box-shadow: 0 4px 12px rgba(45, 90, 45, 0.3);
+    }
+
+    .action-btn.secondary {
+        background: #f8d7da;
+        color: #721c24;
+    }
+
+    .action-btn.secondary:hover {
+        transform: translateX(5px);
+        background: #f5c6cb;
+    }
+
+    .action-btn.info {
+        background: #d1ecf1;
+        color: #0c5460;
+    }
+
+    .action-btn.info:hover {
+        transform: translateX(5px);
+        background: #bee5eb;
+    }
+
+    .action-btn.warning {
+        background: #fff3cd;
+        color: #856404;
+    }
+
+    .action-btn.warning:hover {
+        transform: translateX(5px);
+        background: #ffeaa7;
+    }
+
+    .action-btn.success {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .action-btn.success:hover {
+        transform: translateX(5px);
+        background: #c3e6cb;
+    }
+
+    /* Timeline */
+    .timeline {
+        position: relative;
+        padding-left: 2rem;
+    }
+
+    .timeline::before {
+        content: '';
+        position: absolute;
+        left: 8px;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: #e0e0e0;
+    }
+
+    .timeline-item {
+        position: relative;
+        margin-bottom: 2rem;
+    }
+
+    .timeline-marker {
+        position: absolute;
+        left: -2rem;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #ddd;
+        border: 3px solid white;
+        box-shadow: 0 0 0 2px #e0e0e0;
+    }
+
+    .timeline-marker.pending {
+        background: var(--accent-green);
+        box-shadow: 0 0 0 2px var(--primary-green);
+    }
+
+    .timeline-content {
+        padding-left: 1rem;
+    }
+
+    .timeline-title {
+        font-weight: 600;
+        color: var(--dark-text);
+        margin-bottom: 0.25rem;
+    }
+
+    .timeline-time {
+        font-size: 0.85rem;
+        color: #666;
+        margin-bottom: 0.5rem;
+    }
+
+    .timeline-desc {
+        font-size: 0.9rem;
+        color: #888;
+    }
+
+    /* Doctor Info Card */
+    .doctor-info-card {
+        text-align: center;
+    }
+
+    .doctor-info-avatar {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 4px solid var(--accent-green);
+        margin-bottom: 1rem;
+    }
+
+    .doctor-info-details h4 {
+        font-weight: 700;
+        color: var(--dark-text);
+        margin-bottom: 0.25rem;
+    }
+
+    .doctor-specialty {
+        color: var(--primary-green);
+        font-weight: 600;
+        margin-bottom: 1rem;
+    }
+
+    .doctor-contact {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+        color: #666;
+    }
+
+    .doctor-contact div {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    /* Modal Styles */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 2000;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-overlay.show {
+        display: flex;
+    }
+
+    .modal-container {
+        background: white;
+        border-radius: 16px;
+        width: 90%;
+        max-width: 600px;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        animation: modalSlideIn 0.3s ease;
+    }
+
+    @keyframes modalSlideIn {
+        from {
+            transform: translateY(-50px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    .modal-header {
+        padding: 1.5rem;
+        border-bottom: 1px solid #e0e0e0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-header h3 {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: var(--primary-green);
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin: 0;
+    }
+
+    .modal-close {
+        background: #f0f0f0;
+        border: none;
+        width: 35px;
+        height: 35px;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s;
+        color: #666;
+    }
+
+    .modal-close:hover {
+        background: #e0e0e0;
+        color: #333;
+    }
+
+    .modal-body {
+        padding: 1.5rem;
+    }
+
+    .modal-footer {
+        padding: 1.5rem;
+        border-top: 1px solid #e0e0e0;
+        display: flex;
+        justify-content: flex-end;
+        gap: 1rem;
+    }
+
+    .approval-summary {
+        background: #f8f9fa;
+        padding: 1.5rem;
+        border-radius: 10px;
+        margin-bottom: 1.5rem;
+    }
+
+    .summary-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .summary-item:last-child {
+        border-bottom: none;
+    }
+
+    .summary-label {
+        font-weight: 600;
+        color: #666;
+    }
+
+    .summary-value {
+        color: var(--dark-text);
+        font-weight: 600;
+    }
+
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+
+    .form-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 600;
+        color: var(--dark-text);
+        margin-bottom: 0.5rem;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 0.75rem;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 1rem;
+        transition: border-color 0.3s;
+        font-family: inherit;
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: var(--primary-green);
+    }
+
+    .form-hint {
+        display: block;
+        font-size: 0.85rem;
+        color: #666;
+        margin-top: 0.5rem;
+    }
+
+    .checkbox-group {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .checkbox-group input[type="checkbox"] {
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+    }
+
+    .checkbox-group label {
+        font-weight: 500;
+        color: var(--dark-text);
+        cursor: pointer;
+    }
+
+    .note-templates {
+        margin-top: 1.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid #e0e0e0;
+    }
+
+    .template-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-top: 0.75rem;
+    }
+
+    .template-btn {
+        background: #f0f0f0;
+        border: 2px solid #e0e0e0;
+        padding: 0.6rem 1rem;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 500;
+        color: var(--dark-text);
+    }
+
+    .template-btn:hover {
+        border-color: var(--primary-green);
+        background: #e8f5e9;
+        color: var(--primary-green);
+    }
+
+    .btn-primary {
+        background: var(--gradient-green);
+        color: white;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(45, 90, 45, 0.3);
+    }
+
+    .btn-secondary {
+        background: #f0f0f0;
+        color: var(--dark-text);
+        border: 2px solid #e0e0e0;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+    .btn-secondary:hover {
+        background: #e0e0e0;
+    }
+
+    /* Responsive */
+    @media (max-width: 992px) {
+        .dashboard-content > div {
+            grid-template-columns: 1fr;
+        }
+
+        .info-row {
+            grid-template-columns: 1fr;
+        }
+
+        .modal-container {
+            width: 95%;
+            margin: 1rem;
+        }
+
+        .template-buttons {
+            flex-direction: column;
+        }
+
+        .template-btn {
+            width: 100%;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .card-header {
+            flex-direction: column;
+            gap: 1rem;
+            align-items: flex-start;
+        }
+
+        .card-action {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .action-buttons-vertical .action-btn {
+            font-size: 0.9rem;
+            padding: 0.75rem;
+        }
+
+        .modal-footer {
+            flex-direction: column;
+        }
+
+        .btn-primary,
+        .btn-secondary {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+</style>
+
+<script>
+    // Modal Functions
+    function openApprovalModal() {
+        document.getElementById('approvalModal').classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeApprovalModal() {
+        document.getElementById('approvalModal').classList.remove('show');
+        document.body.style.overflow = 'auto';
+    }
+
+    function openNoteModal() {
+        document.getElementById('noteModal').classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeNoteModal() {
+        document.getElementById('noteModal').classList.remove('show');
+        document.body.style.overflow = 'auto';
+    }
+
+    // Close modals on overlay click
+    document.getElementById('approvalModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeApprovalModal();
+        }
+    });
+
+    document.getElementById('noteModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeNoteModal();
+        }
+    });
+
+    // Close modals on Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeApprovalModal();
+            closeNoteModal();
+        }
+    });
+
+    // Confirm Approval
+    function confirmApproval() {
+        // In production: Make API call to approve appointment
+        const bookingId = '{{ appointment.bookingID }}';
+        const sendEmail = document.getElementById('sendEmail').checked;
+        const sendSMS = document.getElementById('sendSMS').checked;
+        
+        // Simulate API call
+        console.log('Approving appointment:', {
+            bookingId: bookingId,
+            sendEmail: sendEmail,
+            sendSMS: sendSMS
+        });
+
+        // Show success message
+        alert('Appointment approved successfully!');
+        
+        // Close modal
+        closeApprovalModal();
+        
+        // Update UI
+        const statusBadge = document.querySelector('.status-badge');
+        if (statusBadge) {
+            statusBadge.className = 'status-badge confirmed';
+            statusBadge.textContent = 'Approved';
+        }
+
+        // Add to timeline
+        addTimelineEvent('Appointment Approved', 'Just now', 'Doctor confirmed the appointment');
+    }
+
+    // Save Note
+    function saveNote() {
+        const noteText = document.getElementById('noteText').value.trim();
+        
+        if (!noteText) {
+            alert('Please enter a note before saving.');
+            return;
+        }
+
+        // In production: Make API call to save note
+        console.log('Saving note:', noteText);
+
+        // Hide empty state
+        const emptyState = document.getElementById('emptyNotesState');
+        if (emptyState) {
+            emptyState.style.display = 'none';
+        }
+
+        // Add note to UI
+        addNoteToUI(noteText);
+
+        // Clear textarea
+        document.getElementById('noteText').value = '';
+
+        // Show success message
+        alert('Note saved successfully!');
+
+        // Close modal
+        closeNoteModal();
+    }
+
+    // Add note to UI
+    function addNoteToUI(noteText) {
+        const notesContainer = document.querySelector('.notes-container');
+        const currentDate = new Date().toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        const noteHTML = `
+            <div class="note-item" style="animation: slideIn 0.3s ease;">
+                <div class="note-header">
+                    <div class="note-author">
+                        <img src="{{user.image.url}}" alt="Doctor" class="note-avatar">
+                        <div>
+                            <div class="note-author-name">{{ user.get_full_name }}</div>
+                            <div class="note-timestamp">${currentDate}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="note-content">${noteText}</div>
+            </div>
+        `;
+
+        // Insert at the beginning
+        notesContainer.insertAdjacentHTML('afterbegin', noteHTML);
+    }
+
+    // Insert template text
+    function insertTemplate(templateType) {
+        const noteTextarea = document.getElementById('noteText');
+        let templateText = '';
+
+        switch(templateType) {
+            case 'followUp':
+                templateText = 'Follow-up appointment recommended in 2 weeks. Patient should monitor symptoms and report any changes.';
+                break;
+            case 'tests':
+                templateText = 'Lab tests ordered: [List tests here]. Patient instructed to fast for 12 hours before blood work.';
+                break;
+            case 'medication':
+                templateText = 'Medication prescribed: [Medication name and dosage]. Patient counseled on proper usage and potential side effects.';
+                break;
+        }
+
+        // Append to existing text or replace if empty
+        if (noteTextarea.value.trim()) {
+            noteTextarea.value += '\n\n' + templateText;
+        } else {
+            noteTextarea.value = templateText;
+        }
+
+        // Focus on textarea
+        noteTextarea.focus();
+    }
+
+    // Add timeline event
+    function addTimelineEvent(title, time, description) {
+        const timeline = document.querySelector('.timeline');
+        const eventHTML = `
+            <div class="timeline-item" style="animation: slideIn 0.3s ease;">
+                <div class="timeline-marker pending"></div>
+                <div class="timeline-content">
+                    <div class="timeline-title">${title}</div>
+                    <div class="timeline-time">${time}</div>
+                    <div class="timeline-desc">${description}</div>
+                </div>
+            </div>
+        `;
+
+        timeline.insertAdjacentHTML('afterbegin', eventHTML);
+    }
+
+    // Quick action handlers
+    document.addEventListener('DOMContentLoaded', function() {
+        // Cancel appointment
+        const cancelBtn = document.querySelector('.action-btn.secondary');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', function() {
+                if (confirm('Are you sure you want to cancel this appointment?')) {
+                    // In production: Make API call to cancel
+                    console.log('Cancelling appointment');
+                    alert('Appointment cancelled successfully');
+                    
+                    // Update status badge
+                    const statusBadge = document.querySelector('.status-badge');
+                    if (statusBadge) {
+                        statusBadge.className = 'status-badge cancelled';
+                        statusBadge.textContent = 'Cancelled';
+                    }
+
+                    // Add to timeline
+                    addTimelineEvent('Appointment Cancelled', 'Just now', 'Doctor cancelled the appointment');
+                }
+            });
+        }
+
+        // Reschedule appointment
+        const rescheduleBtn = document.querySelector('.action-btn.info');
+        if (rescheduleBtn) {
+            rescheduleBtn.addEventListener('click', function() {
+                alert('Opening reschedule dialog...');
+                // In production: Open reschedule modal
+            });
+        }
+
+        // Send message
+        const messageBtn = document.querySelector('.action-btn.warning');
+        if (messageBtn) {
+            messageBtn.addEventListener('click', function() {
+                alert('Opening messaging interface...');
+                // In production: Open messaging modal
+            });
+        }
+
+        // View medical history
+        const historyBtn = document.querySelector('.action-btn.success');
+        if (historyBtn) {
+            historyBtn.addEventListener('click', function() {
+                alert('Opening medical history...');
+                // In production: Navigate to medical history page
+            });
+        }
+    });
+
+    // Animation for page load
+    window.addEventListener('load', function() {
+        const cards = document.querySelectorAll('.card');
+        cards.forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            setTimeout(() => {
+                card.style.transition = 'all 0.5s ease';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, index * 100);
+        });
+    });
+
+    // Add CSS animation
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+    `;
+    document.head.appendChild(style);
+
+    // Print functionality
+    function printAppointmentDetails() {
+        window.print();
+    }
+
+    // Add print button functionality if needed
+    document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+            e.preventDefault();
+            printAppointmentDetails();
+        }
+    });
+</script>
+
+{% endblock %}

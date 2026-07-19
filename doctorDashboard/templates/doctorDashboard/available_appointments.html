@@ -1,0 +1,134 @@
+{% extends 'doctorDashboard/doctor_base.html' %}
+{% load static %}
+{% block content %}
+<!-- Dashboard Content -->
+<div class="dashboard-content">
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon blue">
+                <i class="fas fa-calendar-check"></i>
+            </div>
+            <div class="stat-info">
+                <div class="stat-label">Today's Appointments</div>
+                <div class="stat-value">{{today_count}}</div>
+                <div class="stat-change positive">
+                    <i class="fas fa-arrow-up"></i> {{today_comparison}}% from yesterday
+                </div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon orange">
+                <i class="fas fa-user-check"></i>
+            </div>
+            <div class="stat-info">
+                <div class="stat-label">Pending Appointment</div>
+                <div class="stat-value">{{pending_count}}</div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon green">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="stat-info">
+                <div class="stat-label">Total Appointments</div>
+                <div class="stat-value">{{total_patients}}</div>
+                
+            </div>
+        </div>
+
+        <!-- <div class="stat-card">
+            <div class="stat-icon red">
+                <i class="fas fa-dollar-sign"></i>
+            </div>
+            <div class="stat-info">
+                <div class="stat-label">Revenue (This Month)</div>
+                <div class="stat-value">$-</div>
+                <div class="stat-change positive">
+                    <i class="fas fa-arrow-up"></i> -% increase
+                </div>
+            </div>
+        </div> -->
+    </div>
+
+
+    <!-- Today's Appointments -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <i class="fas fa-calendar-day"></i>
+                Appointments
+            </h2>
+            
+        </div>
+        <div class="card-body">
+            <div class="appointments-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Patient</th>
+                            <th>Type</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        
+                        {% if all_appointments %}
+                        {% for i in all_appointments %}
+                        <tr>
+                            <td><strong>{{i.slot.time}}</strong></td>
+                            <td>
+                                <div class="patient-info">
+                                    <!-- <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop" alt="Patient" class="patient-avatar"> -->
+                                    <div>
+                                        <div class="patient-name">{{i.fullName}}</div>
+                                        <div class="patient-id">ID: {{i.bookingID}}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>{{i.reasonVisit}}</td>
+                            <td>
+                                {% if i.appointmentapproval.is_approved %}
+                                    <span class="status-badge confirmed">Confirmed</span>
+                                {% else %}
+                                    <span class="status-badge pending">Pending</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="action-buttons">
+                                    <a href="{% url 'doctor_appointment_details' i.id %}" style="text-decoration: none;">
+                                    <button class="btn-action view" title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    </a>
+                                    <!-- <button class="btn-action edit" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn-action delete" title="Cancel">
+                                        <i class="fas fa-times"></i>
+                                    </button> -->
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% else %}
+                        <tr>
+                            <td colspan="5" style="text-align: center; padding: 2rem; color: #666;">
+                                No appointments scheduled for today.
+                            </td>
+                        </tr>
+                        {% endif %}
+
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

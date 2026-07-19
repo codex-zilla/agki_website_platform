@@ -1,0 +1,179 @@
+{% extends 'doctorDashboard/doctor_base.html' %}
+{% load static %}
+{% block content %}
+
+<div class="dashboard-content">
+
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+
+        <!-- Today's Appointments -->
+        <div class="stat-card">
+            <div class="stat-icon blue">
+                <i class="fas fa-calendar-check"></i>
+            </div>
+            <div class="stat-info">
+                <div class="stat-label">Today's Appointments</div>
+                <div class="stat-value">{{ today_count }}</div>
+                <div class="stat-change {% if today_comparison >= 0 %}positive{% else %}negative{% endif %}">
+                    <i class="fas {% if today_comparison >= 0 %}fa-arrow-up{% else %}fa-arrow-down{% endif %}"></i>
+                    {{ today_comparison|default:0 }} from yesterday
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Patients -->
+        <div class="stat-card">
+            <div class="stat-icon green">
+                <i class="fas fa-user-check"></i>
+            </div>
+            <div class="stat-info">
+                <div class="stat-label">Total Patients</div>
+                <div class="stat-value">{{ total_patients }}</div>
+                <div class="stat-change positive">
+                    <i class="fas fa-arrow-up"></i> {{ new_patients_week }} new this week
+                </div>
+            </div>
+        </div>
+
+        <!-- Pending Appointments -->
+        <div class="stat-card">
+            <div class="stat-icon orange">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="stat-info">
+                <div class="stat-label">Pending Appointments</div>
+                <div class="stat-value">{{ pending_count }}</div>
+                <div class="stat-change">
+                    <i class="fas fa-minus"></i> Requires confirmation
+                </div>
+            </div>
+        </div>
+
+        <!-- Revenue -->
+        <!-- <div class="stat-card">
+            <div class="stat-icon red">
+                <i class="fas fa-dollar-sign"></i>
+            </div>
+            <div class="stat-info">
+                <div class="stat-label">Revenue (This Month)</div>
+                <div class="stat-value">$-</div>
+                <div class="stat-change positive">
+                    <i class="fas fa-arrow-up"></i> % increase
+                </div>
+            </div>
+        </div> -->
+    </div>
+
+
+    <!-- Today's Appointments -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <i class="fas fa-calendar-day"></i>
+                Today's Appointments
+            </h2>
+            <button class="card-action">
+                <i class="fas fa-eye"></i> View All
+            </button>
+        </div>
+        <div class="card-body">
+            <div class="appointments-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Patient</th>
+                            <th>Type</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if today_appointments %}
+                            {% for i in today_appointments %}
+                            
+                            <tr>
+                                <td><strong>{{ i.slot.date|date:"l, F j, Y" }}</strong></td>
+                                <td><strong>{{ i.slot.time|time:"g:i A" }}</strong></td>
+                                <td>
+                                    <div class="patient-info">
+                                        <div>
+                                            <div class="patient-name">{{i.fullName}}</div>
+                                            <div class="patient-id">ID: {{i.bookingID}}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>{{i.reasonVisit}}</td>
+                                <td>
+                                    {% if i.appointmentapproval.is_approved %}
+                                        <span class="status-badge confirmed">Confirmed</span>
+                                    {% else %}
+                                        <span class="status-badge pending">Pending</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <a href="{% url 'doctor_appointment_details' i.id %}" style="text-decoration: none;">
+                                        <button class="btn-action view" title="View Details">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="6" style="text-align:center;">No appointments today</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Weekly Calendar Overview -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <i class="fas fa-calendar-week"></i>
+                This Week's Schedule
+            </h2>
+            <button class="card-action">
+                <i class="fas fa-calendar-alt"></i> Full Calendar
+            </button>
+        </div>
+        <div class="card-body">
+            <div class="calendar-header">
+                <div class="calendar-nav">
+                    <button><i class="fas fa-chevron-left"></i></button>
+                    <div class="calendar-month">{{ current_month }}</div>
+                    <button><i class="fas fa-chevron-right"></i></button>
+                </div>
+            </div>
+
+            <div class="calendar-grid">
+                {% for day in weekly_data %}
+                    <div class="calendar-day {% if day.count > 0 %}has-appointments{% endif %} {% if day.is_today %}today{% endif %}">
+                        <div class="day-number">{{ day.day_number }}</div>
+                        <div class="day-appointments">
+                            {% if day.count > 0 %}
+                                {{ day.count }} appointment{{ day.count|pluralize }}
+                            {% else %}
+                                Available
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
