@@ -1,0 +1,549 @@
+<title>AGKI — Contact & FAQ Redesign Preview</title>
+<style>
+  :root {
+    --primary-green: #2d5a2d;
+    --light-green: #4a7c59;
+    --gradient-green: linear-gradient(145deg, #1f4a1f, #3b6e3b);
+    --accent-green: #7cc576;
+    --light-bg: #f0f7f0;
+    --soft-white: #f9fbf9;
+    --dark-text: #1e2f23;
+    --shadow-sm: 0 12px 28px -8px rgba(0, 40, 0, 0.12);
+    --shadow-hover: 0 25px 40px -12px #2d5a2d55;
+    --page-bg: #eef2ec;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+    background: var(--page-bg);
+    color: var(--dark-text);
+  }
+
+  a { text-decoration: none; color: inherit; }
+
+  h1, h2, h3, h4, h5 { font-weight: 600; letter-spacing: -0.02em; text-wrap: balance; }
+
+  /* ---------- Review chrome (not part of the site) ---------- */
+
+  .review-banner {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 28px 24px 0;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+
+  .review-banner .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--light-green);
+    background: #e3f0e3;
+    border: 1px solid #cfe4cf;
+    border-radius: 100px;
+    padding: 6px 14px;
+    margin-bottom: 14px;
+  }
+
+  .review-banner h1 {
+    font-size: 1.7rem;
+    color: var(--primary-green);
+    margin-bottom: 8px;
+  }
+
+  .review-banner p {
+    color: #445544;
+    max-width: 640px;
+    line-height: 1.6;
+    font-size: 0.98rem;
+  }
+
+  .review-note {
+    max-width: 900px;
+    margin: 20px auto 0;
+    padding: 14px 18px;
+    background: #fff9e8;
+    border: 1px solid #eddfa8;
+    border-radius: 14px;
+    font-size: 0.88rem;
+    color: #6b5a17;
+    line-height: 1.55;
+  }
+
+  .section-label {
+    max-width: 900px;
+    margin: 46px auto 14px;
+    padding: 0 24px;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .section-label span.no {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--light-green);
+    letter-spacing: 0.1em;
+  }
+
+  .section-label span.name {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #6a7d6c;
+  }
+
+  /* ---------- Shared site patterns (mirrors home.css) ---------- */
+
+  .section-title {
+    text-align: center;
+    margin-bottom: 46px;
+  }
+
+  .eyebrow-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #eef7f0;
+    border: 1px solid #cce6d3;
+    border-radius: 100px;
+    color: #12713f;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    padding: 8px 16px;
+    margin-bottom: 18px;
+    text-transform: uppercase;
+  }
+
+  .eyebrow-pill.on-dark {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.28);
+    color: #d9f5d3;
+  }
+
+  .section-title h2 {
+    font-size: 2.5rem;
+    color: var(--primary-green);
+    position: relative;
+    display: inline-block;
+  }
+
+  .section-title h2::after {
+    content: '';
+    display: block;
+    width: 70px;
+    height: 4px;
+    background: var(--accent-green);
+    margin: 15px auto 0;
+    border-radius: 4px;
+  }
+
+  .section-title.on-dark h2 { color: white; }
+
+  .section-title p {
+    color: #3a543a;
+    font-size: 1.08rem;
+    max-width: 620px;
+    margin: 14px auto 0;
+    line-height: 1.6;
+  }
+
+  .section-title.on-dark p { color: rgba(255, 255, 255, 0.85); }
+
+  /* =========================================================
+     CONTACT — background unchanged: var(--gradient-green)
+     ========================================================= */
+
+  .contact-preview {
+    background: var(--gradient-green);
+    color: white;
+    padding: 70px 24px 80px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .contact-preview::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .contact-grid {
+    max-width: 900px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 44px;
+  }
+
+  @media (min-width: 860px) {
+    .contact-grid { grid-template-columns: 0.85fr 1.15fr; }
+  }
+
+  .contact-rail h3 {
+    font-size: 1.3rem;
+    margin-bottom: 10px;
+  }
+
+  .contact-rail > p.lede {
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin-bottom: 26px;
+    max-width: 380px;
+  }
+
+  .info-card {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 20px;
+    padding: 18px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 12px;
+  }
+
+  .info-icon {
+    flex-shrink: 0;
+    width: 46px;
+    height: 46px;
+    background: rgba(255, 255, 255, 0.14);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    color: var(--accent-green);
+  }
+
+  .info-content h5 {
+    font-size: 0.98rem;
+    margin-bottom: 3px;
+  }
+
+  .info-content p {
+    font-size: 0.88rem;
+    color: rgba(255, 255, 255, 0.75);
+    margin: 0;
+  }
+
+  .social-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 22px;
+  }
+
+  .social-row a {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+  }
+
+  .contact-form-card {
+    background: var(--soft-white);
+    border-radius: 28px;
+    padding: 34px;
+    box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.35);
+  }
+
+  .contact-form-card h4 {
+    color: var(--primary-green);
+    font-size: 1.4rem;
+    margin-bottom: 4px;
+  }
+
+  .contact-form-card > p {
+    color: #667a68;
+    font-size: 0.9rem;
+    margin-bottom: 24px;
+  }
+
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+
+  .field {
+    background: white;
+    border: 2px solid #e0f0e0;
+    border-radius: 14px;
+    padding: 12px 14px;
+    font-size: 0.9rem;
+    color: #8a978b;
+  }
+
+  .field.full { grid-column: 1 / -1; }
+
+  .field.textarea { min-height: 84px; }
+
+  .send-btn {
+    width: 100%;
+    margin-top: 6px;
+    padding: 14px;
+    border-radius: 50px;
+    background: var(--gradient-green);
+    color: white;
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.98rem;
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* =========================================================
+     FAQ — background unchanged: page default (white)
+     ========================================================= */
+
+  .faq-preview {
+    background: white;
+    padding: 70px 24px 90px;
+  }
+
+  .faq-list {
+    max-width: 720px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .faq-item {
+    background: white;
+    border: 1px solid #d7e8d7;
+    border-radius: 22px;
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+
+  .faq-item.open {
+    border-color: var(--accent-green);
+  }
+
+  .faq-q {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px 24px;
+    cursor: pointer;
+  }
+
+  .faq-q .q-icon {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: #e6f3e6;
+    color: var(--primary-green);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+  }
+
+  .faq-q .q-text {
+    flex: 1;
+    font-weight: 600;
+    font-size: 1.02rem;
+    color: var(--dark-text);
+  }
+
+  .faq-q .chevron {
+    color: var(--light-green);
+    font-size: 0.85rem;
+    transition: transform 0.25s ease;
+  }
+
+  .faq-item.open .chevron { transform: rotate(180deg); }
+
+  .faq-a {
+    padding: 0 24px 22px 80px;
+    color: #4b5f4d;
+    font-size: 0.94rem;
+    line-height: 1.65;
+  }
+
+  .faq-item:not(.open) .faq-a { display: none; }
+
+  /* ---------- dark-mode support for the review chrome only ---------- */
+
+  @media (prefers-color-scheme: dark) {
+    :root { --page-bg: #10160f; }
+    body { color: #e7f0e5; }
+    .review-banner h1 { color: #bfe6bf; }
+    .review-banner p { color: #a9c2ab; }
+    .review-note { background: #33300f; border-color: #5a5320; color: #eddfa8; }
+    .section-label span.name { color: #8ba28d; }
+    .faq-preview { background: #16201a; }
+    .faq-item { background: #1c2a20; border-color: #2c3f30; }
+    .faq-q .q-text { color: #eaf3e8; }
+    .faq-a { color: #b9cbb9; }
+    .section-title h2 { color: #9fd89f; }
+    .section-title p { color: #b9cbb9; }
+    .eyebrow-pill { background: rgba(159,216,159,0.12); border-color: rgba(159,216,159,0.3); color: #bfe6bf; }
+  }
+
+  :root[data-theme="dark"] {
+    --page-bg: #10160f;
+  }
+  :root[data-theme="dark"] body { color: #e7f0e5; }
+  :root[data-theme="dark"] .review-banner h1 { color: #bfe6bf; }
+  :root[data-theme="dark"] .review-banner p { color: #a9c2ab; }
+  :root[data-theme="dark"] .review-note { background: #33300f; border-color: #5a5320; color: #eddfa8; }
+  :root[data-theme="dark"] .section-label span.name { color: #8ba28d; }
+  :root[data-theme="dark"] .faq-preview { background: #16201a; }
+  :root[data-theme="dark"] .faq-item { background: #1c2a20; border-color: #2c3f30; }
+  :root[data-theme="dark"] .faq-q .q-text { color: #eaf3e8; }
+  :root[data-theme="dark"] .faq-a { color: #b9cbb9; }
+  :root[data-theme="dark"] .section-title h2 { color: #9fd89f; }
+  :root[data-theme="dark"] .section-title p { color: #b9cbb9; }
+  :root[data-theme="dark"] .eyebrow-pill { background: rgba(159,216,159,0.12); border-color: rgba(159,216,159,0.3); color: #bfe6bf; }
+
+  :root[data-theme="light"] { --page-bg: #eef2ec; }
+</style>
+
+<div class="review-banner">
+  <span class="tag">Design review · not live</span>
+  <h1>Contact &amp; FAQ — proposed redesign</h1>
+  <p>Both sections rebuilt to match the card language already used across the AGKI site
+    (rounded 20–28px cards, <code>--shadow-sm</code>, the DM Mono pill-eyebrow used on the
+    About and Problem sections). Backgrounds are unchanged from the live site: Contact keeps
+    the dark <code>--gradient-green</code> panel, FAQ stays on plain white.</p>
+</div>
+<div class="review-note">
+  Space Grotesk / DM Mono are loaded from Google Fonts on the real site but can't be fetched
+  in this sandboxed preview, so text below renders in a fallback sans-serif. Layout, spacing,
+  color, and card treatment are accurate to what will ship.
+</div>
+
+<div class="section-label"><span class="no">01</span><span class="name">Contact — background unchanged</span></div>
+
+<section class="contact-preview">
+  <div class="section-title on-dark">
+    <span class="eyebrow-pill on-dark"><i class="fa-solid fa-comment-dots"></i> Reach the team</span>
+    <h2>Get In Touch</h2>
+    <p>We'd love to hear from you. Reach out for partnerships, inquiries, or support.</p>
+  </div>
+
+  <div class="contact-grid">
+    <div class="contact-rail">
+      <h3>Let's Connect</h3>
+      <p class="lede">Have questions? Our team is ready to assist you with any inquiries about
+        our services, partnerships, or community programs.</p>
+
+      <div class="info-card">
+        <div class="info-icon">📍</div>
+        <div class="info-content">
+          <h5>Head Office</h5>
+          <p>Kibaha Pwani, Tanzania</p>
+        </div>
+      </div>
+      <div class="info-card">
+        <div class="info-icon">📞</div>
+        <div class="info-content">
+          <h5>Phone Number</h5>
+          <p>+255 717 308 796</p>
+        </div>
+      </div>
+      <div class="info-card">
+        <div class="info-icon">✉️</div>
+        <div class="info-content">
+          <h5>Email Address</h5>
+          <p>info@agkimedicallaboratory.co.tz</p>
+        </div>
+      </div>
+      <div class="info-card">
+        <div class="info-icon">🕒</div>
+        <div class="info-content">
+          <h5>Working Hours</h5>
+          <p>Mon–Fri 7am–6pm · Sat 8am–4pm</p>
+        </div>
+      </div>
+
+      <div class="social-row">
+        <a href="#">f</a><a href="#">𝕏</a><a href="#">◎</a><a href="#">in</a><a href="#">☎</a>
+      </div>
+    </div>
+
+    <div class="contact-form-card">
+      <h4>Send us a Message</h4>
+      <p>Fill out the form below and we'll get back to you shortly.</p>
+      <div class="field-row">
+        <div class="field">Your Name</div>
+        <div class="field">Your Email</div>
+      </div>
+      <div class="field-row">
+        <div class="field">Phone Number</div>
+        <div class="field">Subject</div>
+      </div>
+      <div class="field full textarea">Your Message</div>
+      <div class="send-btn">Send Message →</div>
+    </div>
+  </div>
+</section>
+
+<div class="section-label"><span class="no">02</span><span class="name">FAQ — background unchanged</span></div>
+
+<section class="faq-preview">
+  <div class="section-title">
+    <span class="eyebrow-pill"><i class="fa-regular fa-circle-question"></i> Common questions</span>
+    <h2>Frequently Asked Questions</h2>
+  </div>
+
+  <div class="faq-list">
+    <div class="faq-item open">
+      <div class="faq-q">
+        <div class="q-icon">🩺</div>
+        <div class="q-text">What services are offered?</div>
+        <div class="chevron">▾</div>
+      </div>
+      <div class="faq-a">Lab testing, maternal/child health, elder care, and community outreach programs.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">
+        <div class="q-icon">🕒</div>
+        <div class="q-text">What are your hours?</div>
+        <div class="chevron">▾</div>
+      </div>
+      <div class="faq-a">Monday–Friday 7am–6pm, Saturday 8am–4pm. Emergencies are handled 24/7.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">
+        <div class="q-icon">🛡️</div>
+        <div class="q-text">Do you accept insurance?</div>
+        <div class="chevron">▾</div>
+      </div>
+      <div class="faq-a">NHIF and major insurers are accepted; affordable plans are available for the uninsured.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">
+        <div class="q-icon">📅</div>
+        <div class="q-text">How do I book an appointment?</div>
+        <div class="chevron">▾</div>
+      </div>
+      <div class="faq-a">Call, visit, or use the online form. Walk‑ins are welcome.</div>
+    </div>
+  </div>
+</section>
