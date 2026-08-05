@@ -76,6 +76,19 @@ One row per model from the design doc §4. Building and reviewing each individua
 
 **Phase gate:** a superuser can fully author one complete "test" version of every section from the admin alone, no shell/fixtures needed. ✅ **Met** — see 3.7.
 
+### Phase 3 addendum — admin theme
+
+Raised after Phase 3 closed: the *default* Django admin chrome (grey header, no sidebar nav, plain tables) is a poor experience for non-technical AGKI staff even with the branding from 3.6 applied — that only changes text, not the actual look. Also requested: a way to actually see the CKEditor/drag-reorder widgets rendered, not just take the scripted-test results on faith.
+
+| #    | Task | Status | Notes / Remarks |
+| ---- | --- | --- | --- |
+| 3.8  | Start the dev server so the CMS admin can be viewed in a real browser | ✅ | `manage.py runserver 127.0.0.1:8000`. Curl-verified before handoff: `/admin/login/` 200, `/ckeditor5/image_upload/` 405 on GET (correct — POST-only endpoint, proves the URL resolves). Login options given: existing real superusers already in the local DB, or the `content_editor_dev` throwaway account from Phase 4 (scoped exactly like a real content editor would be). |
+| 3.9  | Choose and install an admin theme package | ✅ | Asked rather than assumed, since it's a new dependency + a design call. Options presented: `django-jazzmin` (low integration risk — pure template/CSS skin, doesn't require `ModelAdmin` classes to change) vs `django-unfold` (more modern, more integration risk with third-party mixins like `adminsortable2`) vs skip. **`django-jazzmin==3.0.5`** chosen. Installed, pinned in `requirements.txt`. |
+| 3.10 | Wire `INSTALLED_APPS` + `JAZZMIN_SETTINGS` | ✅ | `'jazzmin'` added **before** `'django.contrib.admin'` in `INSTALLED_APPS` — required so its template overrides take priority; easy to get backwards. `JAZZMIN_SETTINGS`: branding text, `show_ui_builder: False` (its live theme customizer is a dev toy, not something to leave discoverable by content editors), `order_with_respect_to` puts `cms` and its models first in the sidebar (everything else — patient/appointment data, staff accounts — trails behind, matching who this admin is actually for), a `fas fa-*` icon per `cms` model, and `changeform_format: "single"` — deliberately *not* jazzmin's tabbed layout default, since a singleton's inline (e.g. `HeroContent`'s impact stats) needs to stay visible on the same page rather than hidden behind a tab a first-time user might not click. |
+| 3.11 | Regression-check: confirm jazzmin doesn't break `adminsortable2`/CKEditor5/permissions | ✅ | Full scripted re-run of the Phase 3 + Phase 4 verification suites with the theme active: all singleton redirects, blocked-add checks, and list/add-form 200s still pass; `django_ckeditor_5` widget markup confirmed present on `NewsPost`'s add form; `adminsortable2` drag-handle assets confirmed present on `TeamMember`'s changelist; both sortable inlines still render; content-editor scoping (Phase 4) re-verified unchanged. Zero regressions. |
+
+**Addendum gate:** admin theme installed, verified compatible with every other Phase 3 piece, dev server left running for a real human look. **Recommend AGKI actually opens the browser and looks before Phase 5** — this addendum fixes the "doesn't look inviting" complaint, it doesn't replace someone's own judgment on whether it's good enough.
+
 ---
 
 ## Phase 4 — Permissions

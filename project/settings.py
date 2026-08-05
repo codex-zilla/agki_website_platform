@@ -89,6 +89,7 @@ SITE_URL = env_value("SITE_URL", "http://127.0.0.1:8000").rstrip("/")
 # Application definition
 
 INSTALLED_APPS = [
+    'jazzmin',  # must precede django.contrib.admin so its template overrides take priority
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -332,6 +333,64 @@ SECURE_PROXY_SSL_HEADER = (
     if env_bool("DJANGO_TRUST_X_FORWARDED_PROTO", False)
     else None
 )
+
+# django-jazzmin: purely a template/CSS skin over the stock Django admin —
+# no ModelAdmin classes need to change to use it, so it doesn't interact
+# with the SortableAdminMixin/CKEditor5Field wiring above. Added because
+# the default admin chrome is a poor experience for non-technical AGKI
+# staff (see docs/website-cms-implementation-plan.md Phase 3 addendum).
+JAZZMIN_SETTINGS = {
+    "site_title": "AGKI Content Manager",
+    "site_header": "AGKI",
+    "site_brand": "AGKI Content Manager",
+    "welcome_sign": "Welcome to the AGKI content manager",
+    "copyright": "AGKI Medical Laboratory",
+    # The floating theme customizer is a developer toy, not something a
+    # content editor should be able to stumble into and reconfigure.
+    "show_ui_builder": False,
+    "search_model": ["cms.NewsPost", "cms.TeamMember", "cms.FAQItem"],
+    # cms first — that's the whole reason this exists. Everything else
+    # (patient/appointment data, staff accounts) trails behind it rather
+    # than competing for the same visual priority.
+    "order_with_respect_to": [
+        "cms",
+        "cms.SiteSettings", "cms.HeroContent", "cms.AboutContent",
+        "cms.ProblemSectionContent", "cms.ProblemCard", "cms.ProblemStat",
+        "cms.FeatureRow", "cms.AwardLogo", "cms.Testimonial",
+        "cms.CommunityPhoto", "cms.NewsPost", "cms.FAQItem",
+        "cms.TeamMember", "cms.ContactMessage",
+        "auth", "appointments", "useraccount", "doctorDashboard", "ecommerce",
+    ],
+    "icons": {
+        "auth": "fas fa-users-cog",
+        "auth.Group": "fas fa-users",
+        "cms.SiteSettings": "fas fa-cogs",
+        "cms.HeroContent": "fas fa-star",
+        "cms.AboutContent": "fas fa-info-circle",
+        "cms.ProblemSectionContent": "fas fa-exclamation-triangle",
+        "cms.ProblemCard": "fas fa-clipboard-list",
+        "cms.ProblemStat": "fas fa-chart-bar",
+        "cms.FeatureRow": "fas fa-list-ul",
+        "cms.AwardLogo": "fas fa-award",
+        "cms.Testimonial": "fas fa-comment-dots",
+        "cms.CommunityPhoto": "fas fa-images",
+        "cms.NewsPost": "fas fa-newspaper",
+        "cms.FAQItem": "fas fa-question-circle",
+        "cms.TeamMember": "fas fa-user-friends",
+        "cms.ContactMessage": "fas fa-envelope",
+    },
+    "default_icon_parents": "fas fa-folder",
+    "default_icon_children": "fas fa-circle",
+    "related_modal_active": True,
+    # "single" keeps a singleton's fields and its inline (e.g. HeroContent
+    # + its HeroImpactStat rows) on one scrollable page rather than
+    # splitting them across tabs where the inline could go unnoticed.
+    "changeform_format": "single",
+}
+
+JAZZMIN_UI_TWEAKS = {
+    "theme": "flatly",
+}
 
 # django-ckeditor-5: rich text widget used on a handful of cms fields
 # (About story copy, News body, FAQ answers — see docs/website-cms-design.md §2).
