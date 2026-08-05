@@ -18,477 +18,146 @@
     <link rel="shortcut icon" type="image/x-icon" href="{% static 'app/logo.png' %}">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AGKI Medical Lab · accessible healthcare</title>
-    <!-- Bootstrap 5 + icons + fonts (same as original but keep modern) -->
+    <!-- Bootstrap 5 + icons + fonts -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
     <!-- AOS (animate on scroll) -->
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+    <link rel="stylesheet" href="{% static 'app/home.css' %}">
 
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #ffffff;
-            color: #1e2f23;
-            overflow-x: hidden;
-        }
-
-        /* ----- color codes preserved ----- */
-        :root {
-            --primary-green: #2d5a2d;
-            --light-green: #4a7c59;
-            --gradient-green: linear-gradient(145deg, #1f4a1f, #3b6e3b);
-            --accent-green: #7cc576;
-            --light-bg: #f0f7f0;
-            --soft-white: #f9fbf9;
-            --dark-text: #1e2f23;
-            --shadow-sm: 0 12px 28px -8px rgba(0, 40, 0, 0.12);
-            --shadow-hover: 0 25px 40px -12px #2d5a2d55;
-        }
-
-        h1,
-        h2,
-        h3,
-        h4,
-        h5 {
-            font-weight: 600;
-            letter-spacing: -0.02em;
-        }
-
-        a {
-            text-decoration: none;
-        }
-
-        /* navbar glassmorphism */
-        .navbar {
-            background: rgba(35, 75, 35, 0.85) !important;
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            box-shadow: 0 4px 20px rgba(0, 20, 0, 0.15);
-            transition: all 0.3s ease;
-            padding: 12px 0;
-        }
-
-        .navbar.scrolled {
-            background: var(--primary-green) !important;
-            backdrop-filter: blur(8px);
-        }
-
-        .navbar-brand {
-            font-weight: 700;
-            font-size: 1.9rem;
-            color: white !important;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .navbar-brand img {
-            height: 44px;
-            width: auto;
-            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
-        }
-
-        .navbar-nav .nav-link {
-            color: rgba(255, 255, 255, 0.9) !important;
-            font-weight: 500;
-            margin: 0 8px;
-            padding: 8px 0;
-            position: relative;
-            cursor: pointer;
-        }
-
-        .navbar-nav .nav-link::after {
-            content: '';
-            position: absolute;
-            width: 0;
-            height: 2px;
-            bottom: 0;
-            left: 0;
-            background-color: var(--accent-green);
-            transition: width 0.25s;
-        }
-
-        .navbar-nav .nav-link:hover::after {
-            width: 100%;
-        }
-
-        .navbar-nav .nav-link:hover {
-            color: white !important;
-        }
-
-        /* HERO section — more dynamic */
-        .hero {
-            background: radial-gradient(circle at 80% 30%, #4f8a4f, #1f4a1f);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            position: relative;
-            isolation: isolate;
-        }
-
-        .hero::before {
-            content: "";
-            position: absolute;
-            inset: 0;
-            background: url('{% static "app/fpage.jpg" %}') no-repeat center center/cover;
-            opacity: 0.2;
-            z-index: -1;
-        }
-
-        .hero h1 {
-            font-size: clamp(2.8rem, 7vw, 5rem);
-            font-weight: 800;
-            background: linear-gradient(130deg, #fff, #e0f0d0);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-shadow: 0 10px 20px rgba(0, 30, 0, 0.4);
-        }
-
-        .hero p {
-            font-size: 1.5rem;
-            color: rgba(255, 255, 255, 0.95);
-            font-weight: 400;
-        }
-
-        .btn-cta {
-            background: white;
-            color: var(--primary-green);
-            border: none;
-            padding: 14px 38px;
-            border-radius: 60px;
-            font-weight: 600;
-            letter-spacing: 0.3px;
-            box-shadow: 0 15px 25px -8px #1e3a1e;
-            transition: 0.2s;
-        }
-
-        .btn-cta:hover {
-            background: var(--accent-green);
-            color: white;
-            transform: translateY(-4px);
-            box-shadow: 0 25px 30px -8px #174017;
-        }
-
-        .btn-outline-cta {
-            background: transparent;
-            border: 2px solid white;
-            color: white;
-            padding: 14px 34px;
-            border-radius: 60px;
-            font-weight: 600;
-            transition: 0.2s;
-            backdrop-filter: blur(4px);
-        }
-
-        .btn-outline-cta:hover {
-            background: white;
-            color: var(--primary-green);
-            border-color: white;
-            transform: scale(1.03);
-        }
-
-        /* section spacing */
-        .section {
-            padding: 100px 0;
-            scroll-margin-top: 70px;
-        }
-
-        .section-title {
-            text-align: center;
-            margin-bottom: 60px;
-        }
-
-        .section-title h2 {
-            font-size: 2.8rem;
-            font-weight: 700;
-            color: var(--primary-green);
-            position: relative;
-            display: inline-block;
-        }
-
-        .section-title h2:after {
-            content: '';
-            display: block;
-            width: 70px;
-            height: 4px;
-            background: var(--accent-green);
-            margin: 15px auto 0;
-            border-radius: 4px;
-        }
-
-        .section-title p {
-            color: #3a543a;
-            font-size: 1.2rem;
-            max-width: 700px;
-            margin: 0 auto;
-        }
-
-        /* cards */
-        .service-card,
-        .news-card,
-        .testimonial-card,
-        .team-card {
-            background: white;
-            border-radius: 28px;
-            padding: 30px 24px;
-            box-shadow: var(--shadow-sm);
-            transition: all 0.4s cubic-bezier(0.2, 0.9, 0.3, 1);
-            height: 100%;
-            border: 1px solid #cde0cd;
-        }
-
-        .service-card:hover,
-        .news-card:hover,
-        .team-card:hover {
-            transform: translateY(-16px) scale(1.01);
-            box-shadow: var(--shadow-hover);
-            border-color: var(--accent-green);
-        }
-
-        .service-icon {
-            width: 85px;
-            height: 85px;
-            background: var(--gradient-green);
-            border-radius: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 24px;
-            font-size: 2.5rem;
-            color: white;
-            box-shadow: 0 15px 20px -10px #2d5a2d;
-        }
-
-        .feature-item {
-            text-align: center;
-            padding: 30px 20px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 32px;
-            backdrop-filter: blur(6px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-        }
-
-        .feature-icon {
-            width: 90px;
-            height: 90px;
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 50%;
-            margin: 0 auto 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2.6rem;
-            color: var(--accent-green);
-        }
-
-        /* why us override bg */
-        .why-us {
-            background: var(--gradient-green);
-            color: white;
-        }
-
-        .why-us .section-title h2,
-        .why-us .section-title p {
-            color: white;
-        }
-
-        .why-us .section-title h2:after {
-            background: white;
-        }
-
-        /* problem/solution stats */
-        .impact-stats {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 20px;
-            justify-content: center;
-            margin-top: 50px;
-        }
-
-        .stat-item {
-            background: white;
-            border-radius: 32px;
-            padding: 30px 20px;
-            flex: 1 1 180px;
-            box-shadow: 0 10px 20px rgba(0, 30, 0, 0.05);
-            border: 1px solid #d2e3d2;
-            transition: 0.15s;
-        }
-
-        .stat-number {
-            font-size: 3rem;
-            font-weight: 800;
-            color: var(--primary-green);
-            line-height: 1;
-        }
-
-        /* portfolio gallery */
-        .portfolio-item {
-            border-radius: 28px;
-            overflow: hidden;
-            box-shadow: var(--shadow-sm);
-            transition: 0.3s;
-        }
-
-        .portfolio-img {
-            height: 260px;
-            background: #e0f0e0;
-        }
-
-        .portfolio-img img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transition: transform 0.6s;
-        }
-
-        .portfolio-item:hover img {
-            transform: scale(1.07);
-        }
-
-        /* team avatars */
-        .team-avatar {
-            width: 160px;
-            height: 160px;
-            border-radius: 50%;
-            margin: 0 auto 20px;
-            background: var(--gradient-green);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            border: 4px solid white;
-            box-shadow: 0 20px 20px -10px rgba(0, 30, 0, 0.3);
-        }
-
-        .team-avatar img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        /* contact + map */
-        .contact-section {
-            background: var(--gradient-green);
-            color: white;
-        }
-
-        .contact-form {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border-radius: 40px;
-            padding: 45px;
-        }
-
-        .form-control {
-            background: white;
-            border: none;
-            border-radius: 50px;
-            padding: 14px 20px;
-            margin-bottom: 20px;
-        }
-
-        .footer {
-            background: #102310;
-            color: #ddd;
-            padding: 60px 0 30px;
-            border-top: 5px solid var(--accent-green);
-        }
-
-        .footer a {
-            color: #bde0bd;
-            transition: 0.2s;
-        }
-
-        .footer a:hover {
-            color: white;
-            text-decoration: underline;
-        }
-
-        /* responsive + micro-animations */
-        @media (max-width:768px) {
-            .navbar-brand {
-                font-size: 1.5rem;
-            }
-
-            .hero h1 {
-                font-size: 3rem;
-            }
-
-            .btn-cta,
-            .btn-outline-cta {
-                padding: 12px 22px;
-            }
-
-            .no-phone-view {
-                display: none;
-            }
-        }
-
-        /* aos tweak */
-        [data-aos] {
-            pointer-events: none;
-        }
-
-        [data-aos].aos-animate {
-            pointer-events: auto;
-        }
-    </style>
 </head>
 
 <body>
 
-    <!-- navigation - MODIFIED with auto-close functionality -->
-    <nav class="navbar navbar-expand-lg navbar-dark fixed-top" id="mainNav">
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg site-header" id="mainNav">
         <div class="container">
             <a class="navbar-brand" href="#home" id="navbarBrand">
-                <img src="{% static 'app/logo.png' %}" alt="AGKI logo"> AGKI Lab
+                <img src="{% static 'app/logo.png' %}" alt="AGKI Lab logo">
+                <span class="brand-copy">
+                    <strong>AGKI Lab</strong>
+                    <span>AI powered · Solar powered</span>
+                </span>
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
                 aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
+                <span class="menu-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
-                    <li class="nav-item"><a class="nav-link nav-link-custom" href="#home">Home</a></li>
+                    <li class="nav-item"><a class="nav-link nav-link-custom active" href="#home">Home</a></li>
                     <li class="nav-item"><a class="nav-link nav-link-custom" href="#about">About</a></li>
                     <li class="nav-item"><a class="nav-link nav-link-custom" href="#problem">Problem</a></li>
-                    <li class="nav-item"><a class="nav-link nav-link-custom" href="#solution">Solution</a></li>
                     <li class="nav-item"><a class="nav-link nav-link-custom" href="#services">Services</a></li>
-                    <li class="nav-item"><a class="nav-link nav-link-custom" href="#why-us">Why Us</a></li>
-                    <li class="nav-item"><a class="nav-link nav-link-custom" href="#awards">Awards</a></li>
+                    <li class="nav-item"><a class="nav-link nav-link-custom" href="#team">Our Team</a></li>
                     <li class="nav-item"><a class="nav-link nav-link-custom" href="#contact">Contact</a></li>
                 </ul>
+                <a href="{% url 'signin' %}" class="nav-appointment">
+                    <i class="fa-solid fa-mobile-screen-button"></i> Explore platform
+                </a>
             </div>
         </div>
     </nav>
+    <!-- Dimmed scrim behind the mobile/tablet nav overlay. Kept outside
+         .site-header on purpose: that element has backdrop-filter, which
+         would make position:fixed here contain to the header's own box
+         instead of the full viewport. -->
+    <div class="nav-backdrop" id="navBackdrop"></div>
 
-    <!-- HERO (animated) -->
-    <section id="home" class="hero">
-        <div class="container">
-            <div class="row align-items-center g-5">
-                <div class="col-lg-7" data-aos="fade-up" data-aos-duration="1000">
-                    <h1>AFYA MFUKONI</h1>
-                    <p class="mb-4">Empowering communities with accessible, tech‑driven healthcare.</p>
-                    <div class="d-flex flex-wrap gap-3">
-                        <a href="{% url 'appointment_home' %}" class="btn btn-cta"><i
-                                class="fas fa-stethoscope me-2"></i>Book appointment</a>
-                        <a href="{% url 'signin' %}" class="btn btn-outline-cta"><i class="fas fa-robot me-2"></i>Our
-                            platform</a>
-                        <a href="{% url 'ourproduct' %}" class="btn btn-outline-cta"><i class="fas fa-box me-2"></i>Shop
-                            Now</a>
+    <!-- HERO: the AGKI care-delivery network -->
+    <section id="home" class="hero-new">
+        <div class="hero-shell">
+            <div class="hero-copy" data-aos="fade-up" data-aos-duration="800">
+                <span class="hero-kicker"><i class="fa-solid fa-leaf"></i> Afya Mfukoni</span>
+                <h1>
+                    <span>Healthcare That</span>
+                    <span>Reaches Every</span>
+                    <span class="hero-accent">Community</span>
+                </h1>
+                <p class="hero-lede">AGKI combines AI-powered diagnostics, mobile laboratories, telemedicine and
+                    sustainable technology to bring quality healthcare closer to every family.</p>
+                <div class="hero-actions">
+                    <a href="{% url 'appointment_home' %}" class="hero-button-primary">
+                        <i class="fa-regular fa-calendar-check"></i> Book appointment
+                    </a>
+                    <a href="/ecommerce/home" class="hero-button-secondary">
+                        <i class="fa-solid fa-bag-shopping"></i> Shop Now <i
+                            class="fa-solid fa-arrow-right"></i>
+                    </a>
+                </div>
+
+                <div class="hero-impact" aria-label="AGKI impact at a glance">
+                    <div class="hero-impact-item">
+                        <span class="hero-impact-icon"><i class="fa-solid fa-users"></i></span>
+                        <strong class="hero-impact-number" data-count-to="500000" data-suffix="+">500,000+</strong>
+                        <span class="hero-impact-label">Patients served</span>
+                    </div>
+                    <div class="hero-impact-item">
+                        <span class="hero-impact-icon"><i class="fa-solid fa-location-dot"></i></span>
+                        <strong class="hero-impact-number" data-count-to="75" data-suffix="+">75+</strong>
+                        <span class="hero-impact-label">Communities benefited</span>
+                    </div>
+                    <div class="hero-impact-item">
+                        <span class="hero-impact-icon"><i class="fa-solid fa-headset"></i></span>
+                        <strong class="hero-impact-number">24/7</strong>
+                        <span class="hero-impact-label">Digital healthcare access</span>
                     </div>
                 </div>
-                <div class="col-lg-5 text-center" data-aos="fade-left" data-aos-delay="200">
-                    <i class="fas fa-hospital"
-                        style="font-size: 16rem; color: rgba(255,255,255,0.15); filter: drop-shadow(0 20px 20px #0f2f0f);"></i>
+            </div>
+
+            <div class="hero-visual">
+                <div class="hero-phone" aria-label="AGKI digital-health platform preview" data-aos="zoom-in-left"
+                    data-aos-delay="100" data-aos-duration="850">
+                    <div class="phone-screen">
+                        <div class="phone-head">
+                            <div class="phone-status"><span>8:01</span><span><i class="fa-solid fa-signal"></i> <i
+                                        class="fa-solid fa-wifi"></i></span></div>
+                            <small>AGKI digital health</small>
+                            <strong>Hello, Neema <span aria-hidden="true">👋</span><br>How can we help today?</strong>
+                        </div>
+                        <div class="phone-welcome">
+                            <i class="fa-solid fa-heart-pulse"></i>
+                            <span><b>Welcome to AGKI</b>Your health, our priority.</span>
+                        </div>
+                        <div class="phone-options">
+                            <div class="phone-option"><i class="fa-regular fa-calendar-check"></i><span><b>Book
+                                        appointment</b>Schedule a lab test or consultation</span><i
+                                    class="fa-solid fa-chevron-right option-arrow"></i></div>
+                            <div class="phone-option"><i class="fa-solid fa-flask"></i><span><b>Lab results</b>View your
+                                    results securely</span><i class="fa-solid fa-chevron-right option-arrow"></i></div>
+                            <div class="phone-option"><i class="fa-solid fa-robot"></i><span><b>AI health
+                                        assistant</b>Get health insights instantly</span><i
+                                    class="fa-solid fa-chevron-right option-arrow"></i></div>
+                            <div class="phone-option"><i class="fa-solid fa-video"></i><span><b>Video
+                                        consultation</b>Talk to a doctor from anywhere</span><i
+                                    class="fa-solid fa-chevron-right option-arrow"></i></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="hero-float-stack">
+                    <div class="hero-ai-badge"><b>AI</b><span>POWERED<br>DIAGNOSTICS</span></div>
+
+                    <div class="hero-float">
+                        <span class="hero-float-icon"><i class="fa-regular fa-calendar-check"></i></span>
+                        <span><b>Appointment Confirmed</b><span>Your booking was successful</span></span>
+                    </div>
+                    <div class="hero-float gold">
+                        <span class="hero-float-icon"><i class="fa-solid fa-flask"></i></span>
+                        <span><b>Lab Results Ready</b><span>Your results are now available</span></span>
+                    </div>
+                    <div class="hero-float purple">
+                        <span class="hero-float-icon"><i class="fa-solid fa-robot"></i></span>
+                        <span><b>AI Health Assistant</b><span>Ask. Understand. Stay healthy.</span></span>
+                    </div>
+                    <div class="hero-float teal">
+                        <span class="hero-float-icon"><i class="fa-solid fa-truck-medical"></i></span>
+                        <span><b>Mobile Clinic Nearby</b><span>We are coming to your area</span></span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -502,60 +171,43 @@
                 <p>Revolutionizing healthcare delivery in Tanzania & beyond</p>
             </div>
 
-            <!-- Story Card - Hero Style -->
-            <div class="row mb-5">
-                <div class="col-12">
-                    <div class="about-story-card p-5" data-aos="fade-up">
-                        <div class="row align-items-center">
-                            <div class="col-lg-8">
-                                <span class="badge bg-accent mb-3">EST. 2022</span>
-                                <h3 class="display-6 fw-bold mb-4">Bridging the Healthcare Gap with Innovation</h3>
-                                <p class="lead mb-4">
-                                    AGKI delivers integrated healthcare through solar-powered mobile clinics and
-                                    an AI-powered digital health platform that connects patients with doctors,
-                                    laboratories,
-                                    pharmacies, and hospitals for appointments, diagnostics, telemedicine,
-                                    digital prescriptions, and medication access. To date, we have helped over 500,000
-                                    people
-                                    access quality healthcare services. Our diversified revenue model—including
-                                    pay-per-service,
-                                    subscriptions, and strategic partnerships—ensures long-term sustainability and
-                                    scalable impact
-                                </p>
-                                <div class="d-flex gap-3">
-                                    <div class="stat-mini">
-                                        <div class="stat-mini-number">500,000+</div>
-                                        <div class="stat-mini-label">Patients Served</div>
-                                    </div>
-                                    <div class="stat-mini">
-                                        <div class="stat-mini-number">50+</div>
-                                        <div class="stat-mini-label">Communities Benefited</div>
-                                    </div>
-                                    <div class="stat-mini no-phone-view">
-                                        <div class="stat-mini-number">24/7</div>
-                                        <div class="stat-mini-label">Access to Digital Healthcare</div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-lg-4 text-center">
-                                <div class="about-icon-circle">
-                                    <i class="fas fa-heartbeat fa-4x"></i>
-                                </div>
-                            </div>
+            <!-- Story band -->
+            <div class="row align-items-center g-4 about-story" data-aos="fade-up">
+                <div class="col-12 col-lg-7">
+                    <span class="story-badge">Est. 2022</span>
+                    <h3 class="about-story-heading">Bridging the Healthcare Gap with Innovation</h3>
+                    <p class="about-story-copy">
+                        AGKI delivers integrated healthcare through solar-powered mobile clinics and an AI-powered
+                        digital health platform that connects patients with doctors, laboratories, pharmacies, and 
+                        hospitals for appointments, diagnostics, telemedicine, digital prescriptions, and medication 
+                        access. To date, we have helped over 500,000 people access quality healthcare services. 
+                        Our diversified revenue model including pay-per-service, subscriptions, and strategic partnerships 
+                        ensures long-term sustainability and scalable impact.
+                    </p>
+                </div>
+                <div class="col-12 col-lg-5">
+                    <div class="story-visual">
+                        <div class="about-icon-circle">
+                            <i class="fas fa-heartbeat fa-4x"></i>
+                        </div>
+                        <div class="float-badge">
+                            <span class="float-badge-icon"><i class="fas fa-solar-panel"></i></span>
+                            <span class="float-badge-copy"><b>Solar-powered</b><span>Zero-emission
+                                    clinics</span></span>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Mission Vision Cards - Beautiful 3D style -->
-            <div class="row g-4 mb-5">
-                <div class="col-md-6" data-aos="flip-right" data-aos-delay="100">
+            <!-- Mission Vision Cards -->
+            <div class="row g-4 about-mv">
+                <div class="col-12 col-md-6" data-aos="flip-right" data-aos-delay="100">
                     <div class="mission-card h-100">
                         <div class="mission-icon">
                             <i class="fas fa-bullseye"></i>
                         </div>
-                        <h3 class="h2 fw-bold mb-3">Our Mission</h3>
-                        <p class="lead mb-4">
+                        <h3>Our Mission</h3>
+                        <p>
                             To provide accurate, affordable, and timely diagnostic and healthcare services
                             that improve health outcomes for everyone, everywhere.
                         </p>
@@ -566,15 +218,15 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-6" data-aos="flip-left" data-aos-delay="200">
+                <div class="col-12 col-md-6" data-aos="flip-left" data-aos-delay="200">
                     <div class="vision-card h-100">
                         <div class="vision-icon">
                             <i class="fas fa-eye"></i>
                         </div>
-                        <h3 class="h2 fw-bold mb-3">Our Vision</h3>
-                        <p class="lead mb-4">
-                            To revolutionize healthcare delivery in Tanzania and beyond by making quality,
-                            accessible, and affordable healthcare available to everyone through innovative,
+                        <h3>Our Vision</h3>
+                        <p>
+                            To revolutionize healthcare delivery in Tanzania and beyond by making quality, 
+                            accessible, and affordable healthcare available to everyone through innovative, 
                             technology-driven, and environmentally sustainable solutions.
                         </p>
                         <div class="vision-stats">
@@ -583,52 +235,50 @@
                                 <span>Local Impact</span>
                             </div>
                             <div class="progress mt-2">
-                                <div class="progress-bar bg-success" style="width: 85%"></div>
+                                <div class="progress-bar" style="width: 85%"></div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Core Values Grid -->
-            <div class="row g-4">
-                <div class="col-12">
-                    <h3 class="text-center mb-4" data-aos="fade-up">What Drives Us</h3>
-                </div>
+            <!-- Core Values -->
+            <p class="values-label" data-aos="fade-up">What Drives Us</p>
+            <div class="row g-3 g-md-4">
                 <div class="col-md-3 col-6" data-aos="zoom-in" data-aos-delay="0">
                     <div class="value-card">
-                        <i class="fas fa-heart text-danger"></i>
+                        <i class="fas fa-heart"></i>
                         <h5>Compassion</h5>
                     </div>
                 </div>
                 <div class="col-md-3 col-6" data-aos="zoom-in" data-aos-delay="50">
                     <div class="value-card">
-                        <i class="fas fa-flask text-primary"></i>
+                        <i class="fas fa-flask"></i>
                         <h5>Innovation</h5>
                     </div>
                 </div>
                 <div class="col-md-3 col-6" data-aos="zoom-in" data-aos-delay="100">
                     <div class="value-card">
-                        <i class="fas fa-hand-holding-heart text-success"></i>
+                        <i class="fas fa-hand-holding-heart"></i>
                         <h5>Integrity</h5>
                     </div>
                 </div>
                 <div class="col-md-3 col-6" data-aos="zoom-in" data-aos-delay="150">
                     <div class="value-card">
-                        <i class="fas fa-leaf text-success"></i>
+                        <i class="fas fa-leaf"></i>
                         <h5>Sustainability</h5>
                     </div>
                 </div>
             </div>
 
-            <!-- YouTube Video with enhanced presentation -->
+            <!-- YouTube Video -->
             <div class="row mt-5">
                 <div class="col-12" data-aos="fade-up">
-                    <div class="video-wrapper">
-                        <div class="video-label">
-                            <i class="fas fa-play-circle me-2"></i> Watch Our Story
+                    <div class="video-block">
+                        <div class="video-caption">
+                            <i class="fas fa-play"></i> Watch Our Story
                         </div>
-                        <div class="ratio ratio-16x9 rounded-4 overflow-hidden shadow-lg">
+                        <div class="ratio ratio-16x9">
                             <iframe src="https://www.youtube.com/embed/cpnHYjFKyjs?si=FTEfPQryNycoIDjq"
                                 title="YouTube video player" frameborder="0"
                                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -645,18 +295,18 @@
     <section id="problem" class="section problem-section">
         <div class="container">
             <div class="section-title" data-aos="fade-up">
-                <h2>The Challenge Barriers to Quality Healthcare</h2>
-                <p>Millions of people still face interconnected barriers that make essential healthcare difficult to
-                    reach, deliver, and afford.</p>
+                <span class="problem-eyebrow">A Silent Emergency in Tanzania</span>
+                <h2>The Healthcare Gap in Sub-Saharan Countries</h2>
+                <p>Every day, thousands face impossible choices between health and survival simply because healthcare
+                    is too far away.</p>
             </div>
 
             <div class="row g-4 problem-cards">
-                <div class="col-lg-4" data-aos="fade-up" data-aos-delay="0">
+                <div class="col-12 col-md-6 col-lg-4" data-aos="fade-up" data-aos-delay="0">
                     <article class="problem-card">
                         <div class="problem-card-image">
                             <img src="{% get_media_prefix %}problem/problem_1.jpg"
                                 alt="An overcrowded hospital ward with limited space and resources">
-                            <span class="problem-card-index">01</span>
                         </div>
                         <div class="problem-card-body">
                             <div class="problem-card-icon"><i class="fas fa-hospital-alt"></i></div>
@@ -669,12 +319,11 @@
                     </article>
                 </div>
 
-                <div class="col-lg-4" data-aos="fade-up" data-aos-delay="120">
+                <div class="col-12 col-md-6 col-lg-4" data-aos="fade-up" data-aos-delay="120">
                     <article class="problem-card">
                         <div class="problem-card-image">
                             <img src="{% get_media_prefix %}problem/problem_2.jpg"
                                 alt="A healthcare worker standing inside a medical facility">
-                            <span class="problem-card-index">02</span>
                         </div>
                         <div class="problem-card-body">
                             <div class="problem-card-icon"><i class="fas fa-user-md"></i></div>
@@ -687,12 +336,11 @@
                     </article>
                 </div>
 
-                <div class="col-lg-4" data-aos="fade-up" data-aos-delay="240">
+                <div class="col-12 col-md-6 col-lg-4" data-aos="fade-up" data-aos-delay="240">
                     <article class="problem-card">
                         <div class="problem-card-image">
                             <img src="{% get_media_prefix %}problem/problem_3.jpg"
                                 alt="A patient holding money beside medicine and a medical bill">
-                            <span class="problem-card-index">03</span>
                         </div>
                         <div class="problem-card-body">
                             <div class="problem-card-icon"><i class="fas fa-hand-holding-usd"></i></div>
@@ -706,519 +354,42 @@
                 </div>
             </div>
 
+            <!-- <div class="problem-divider" aria-hidden="true"></div> -->
+
             <div class="problem-stats-panel" data-aos="zoom-in" data-aos-delay="100">
-                <div class="problem-stats-heading">
-                    <span>Healthcare access at a glance</span>
-                    <h3>The scale of the challenge</h3>
+                <div class="section-title">
+                    <span class="problem-eyebrow">Healthcare access at a glance</span>
+                    <h2>The Scale of the Challenge</h2>
                 </div>
-                <div class="row g-4">
-                    <div class="col-md-4">
-                        <div class="problem-stat-card">
-                            <div class="problem-stat-icon"><i class="fas fa-route"></i></div>
-                            <div class="problem-number">75%</div>
-                            <h4>Limited Access to Healthcare</h4>
-                            <p>Many people still travel long distances to reach essential medical services.</p>
-                        </div>
+                <div class="scale-stats">
+                    <div class="scale-stat">
+                        <span class="scale-stat-icon"><i class="fas fa-route"></i></span>
+                        <strong class="scale-stat-number">75%</strong>
+                        <span class="scale-stat-label">Limited access to healthcare</span>
+                        <p class="scale-stat-desc">Many people still travel long distances to reach essential medical
+                            services.</p>
                     </div>
-                    <div class="col-md-4">
-                        <div class="problem-stat-card">
-                            <div class="problem-stat-icon"><i class="fas fa-shield-heart"></i></div>
-                            <div class="problem-number">60%+</div>
-                            <h4>Preventable Diseases</h4>
-                            <p>Can be managed through early detection and timely treatment.</p>
-                        </div>
+                    <div class="scale-stat">
+                        <span class="scale-stat-icon"><i class="fas fa-shield-heart"></i></span>
+                        <strong class="scale-stat-number">60%+</strong>
+                        <span class="scale-stat-label">Preventable diseases</span>
+                        <p class="scale-stat-desc">Can be managed through early detection and timely treatment.</p>
                     </div>
-                    <div class="col-md-4">
-                        <div class="problem-stat-card">
-                            <div class="problem-stat-icon"><i class="fas fa-people-group"></i></div>
-                            <div class="problem-number problem-number-word">Millions</div>
-                            <h4>Need Better Healthcare Access</h4>
-                            <p>Digital health solutions are transforming how care is delivered across Tanzania.</p>
-                        </div>
+                    <div class="scale-stat">
+                        <span class="scale-stat-icon"><i class="fas fa-people-group"></i></span>
+                        <strong class="scale-stat-number scale-stat-number-word">Millions</strong>
+                        <span class="scale-stat-label">Need better healthcare access</span>
+                        <p class="scale-stat-desc">Digital health solutions are transforming how care is delivered
+                            across Tanzania.</p>
                     </div>
                 </div>
             </div>
 
             <div class="problem-cta" data-aos="fade-up">
                 <p>These challenges call for healthcare that can reach people wherever they live.</p>
-                <a href="#solution" class="btn btn-cta">
+                <a href="#services" class="btn btn-cta">
                     Explore AGKI's Solution <i class="fas fa-arrow-right ms-2"></i>
                 </a>
-            </div>
-        </div>
-    </section>
-
-    <style>
-        /* Additional styles for About and Problem sections */
-
-        /* About Section Styles */
-        .about-story-card {
-            background: linear-gradient(135deg, #f8fff8 0%, #e8f5e8 100%);
-            border-radius: 30px;
-            box-shadow: 0 20px 40px rgba(45, 90, 45, 0.1);
-            border: 1px solid rgba(124, 197, 118, 0.3);
-        }
-
-        .badge.bg-accent {
-            background: var(--accent-green);
-            color: #1e4a1e;
-            padding: 8px 16px;
-            border-radius: 50px;
-            font-weight: 600;
-        }
-
-        .stat-mini {
-            background: white;
-            padding: 10px 20px;
-            border-radius: 15px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
-        }
-
-        .stat-mini-number {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--primary-green);
-        }
-
-        .stat-mini-label {
-            font-size: 0.9rem;
-            color: #666;
-        }
-
-        .about-icon-circle {
-            width: 150px;
-            height: 150px;
-            background: var(--gradient-green);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            margin: 0 auto;
-            box-shadow: 0 20px 30px rgba(45, 90, 45, 0.3);
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0% {
-                transform: scale(1);
-            }
-
-            50% {
-                transform: scale(1.05);
-            }
-
-            100% {
-                transform: scale(1);
-            }
-        }
-
-        .mission-card,
-        .vision-card {
-            background: white;
-            padding: 40px;
-            border-radius: 30px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
-            transition: all 0.3s ease;
-            border: 1px solid #e0f0e0;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .mission-card:hover,
-        .vision-card:hover {
-            transform: translateY(-10px);
-            box-shadow: 0 30px 60px rgba(45, 90, 45, 0.15);
-        }
-
-        .mission-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 5px;
-            background: linear-gradient(90deg, var(--primary-green), var(--accent-green));
-        }
-
-        .mission-icon,
-        .vision-icon {
-            width: 80px;
-            height: 80px;
-            background: var(--gradient-green);
-            border-radius: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 30px;
-            color: white;
-            font-size: 2rem;
-        }
-
-        .mission-tags .badge {
-            background: var(--light-bg);
-            color: var(--primary-green);
-            padding: 8px 16px;
-            margin-right: 10px;
-            border-radius: 50px;
-            font-weight: 500;
-        }
-
-        .vision-stats {
-            background: #f5faf5;
-            padding: 20px;
-            border-radius: 15px;
-        }
-
-        .value-card {
-            background: white;
-            padding: 25px 15px;
-            border-radius: 20px;
-            text-align: center;
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
-            transition: all 0.3s ease;
-            border: 1px solid #e0f0e0;
-        }
-
-        .value-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 15px 30px rgba(45, 90, 45, 0.1);
-        }
-
-        .value-card i {
-            font-size: 2rem;
-            margin-bottom: 15px;
-        }
-
-        .value-card h5 {
-            font-size: 1rem;
-            margin: 0;
-        }
-
-        .video-wrapper {
-            position: relative;
-        }
-
-        .video-label {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 10px 20px;
-            border-radius: 50px;
-            font-weight: 600;
-            z-index: 10;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-        }
-
-        /* Problem Section Styles */
-        .problem-section {
-            background:
-                radial-gradient(circle at 10% 10%, rgba(124, 197, 118, 0.18), transparent 28%),
-                linear-gradient(145deg, #f7fbf7 0%, #edf6ed 100%);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .problem-section::before {
-            content: '';
-            position: absolute;
-            right: -180px;
-            bottom: -240px;
-            width: 520px;
-            height: 520px;
-            border: 80px solid rgba(45, 90, 45, 0.04);
-            border-radius: 50%;
-            pointer-events: none;
-        }
-
-        .problem-section .container {
-            position: relative;
-            z-index: 1;
-        }
-
-        .problem-eyebrow {
-            display: inline-block;
-            margin-bottom: 12px;
-            color: var(--light-green);
-            font-size: 0.8rem;
-            font-weight: 700;
-            letter-spacing: 0.16em;
-            text-transform: uppercase;
-        }
-
-        .problem-cards {
-            align-items: stretch;
-        }
-
-        .problem-card {
-            background: white;
-            border: 1px solid #d7e8d7;
-            border-radius: 28px;
-            box-shadow: var(--shadow-sm);
-            overflow: hidden;
-            height: 100%;
-            transition: transform 0.35s ease, box-shadow 0.35s ease, border-color 0.35s ease;
-        }
-
-        .problem-card:hover {
-            transform: translateY(-12px);
-            border-color: var(--accent-green);
-            box-shadow: var(--shadow-hover);
-        }
-
-        .problem-card-image {
-            height: 230px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .problem-card-image::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(to top, rgba(16, 35, 16, 0.52), transparent 55%);
-        }
-
-        .problem-card-image img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transition: transform 0.65s ease;
-        }
-
-        .problem-card:hover .problem-card-image img {
-            transform: scale(1.07);
-        }
-
-        .problem-card-index {
-            position: absolute;
-            right: 18px;
-            bottom: 14px;
-            z-index: 1;
-            color: rgba(255, 255, 255, 0.92);
-            font-size: 2.4rem;
-            font-weight: 800;
-            line-height: 1;
-        }
-
-        .problem-card-body {
-            padding: 32px 28px 30px;
-        }
-
-        .problem-card-icon {
-            width: 58px;
-            height: 58px;
-            margin-top: -61px;
-            margin-bottom: 24px;
-            position: relative;
-            z-index: 2;
-            background: var(--gradient-green);
-            border: 4px solid white;
-            border-radius: 18px;
-            box-shadow: 0 12px 24px rgba(31, 74, 31, 0.24);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.35rem;
-        }
-
-        .problem-card h3 {
-            min-height: 3.3em;
-            color: var(--primary-green);
-            font-size: 1.35rem;
-            line-height: 1.3;
-            margin-bottom: 18px;
-        }
-
-        .problem-card p {
-            color: #4b5f4d;
-            font-size: 0.96rem;
-            line-height: 1.7;
-        }
-
-        .problem-card p:last-child {
-            margin-bottom: 0;
-        }
-
-        .problem-stats-panel {
-            margin-top: 65px;
-            padding: 48px;
-            background: var(--gradient-green);
-            border-radius: 36px;
-            box-shadow: 0 28px 50px -22px rgba(24, 64, 24, 0.65);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .problem-stats-panel::after {
-            content: '';
-            position: absolute;
-            top: -120px;
-            right: -100px;
-            width: 300px;
-            height: 300px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.06);
-        }
-
-        .problem-stats-heading {
-            color: white;
-            text-align: center;
-            margin-bottom: 34px;
-            position: relative;
-            z-index: 1;
-        }
-
-        .problem-stats-heading span {
-            color: #c9efc6;
-            font-size: 0.78rem;
-            font-weight: 700;
-            letter-spacing: 0.14em;
-            text-transform: uppercase;
-        }
-
-        .problem-stats-heading h3 {
-            margin: 8px 0 0;
-            font-size: 2rem;
-        }
-
-        .problem-stat-card {
-            height: 100%;
-            padding: 30px 24px;
-            position: relative;
-            z-index: 1;
-            background: rgba(255, 255, 255, 0.96);
-            border: 1px solid rgba(255, 255, 255, 0.45);
-            border-radius: 24px;
-            text-align: center;
-            transition: transform 0.3s ease, background 0.3s ease;
-        }
-
-        .problem-stat-card:hover {
-            transform: translateY(-7px);
-            background: white;
-        }
-
-        .problem-stat-icon {
-            width: 52px;
-            height: 52px;
-            margin: 0 auto 18px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #e6f3e6;
-            color: var(--primary-green);
-            border-radius: 50%;
-            font-size: 1.3rem;
-        }
-
-        .problem-number {
-            color: var(--primary-green);
-            font-size: clamp(2.8rem, 5vw, 4rem);
-            font-weight: 800;
-            letter-spacing: -0.05em;
-            line-height: 1;
-            margin-bottom: 14px;
-        }
-
-        .problem-number-word {
-            font-size: clamp(2.35rem, 4vw, 3.35rem);
-        }
-
-        .problem-stat-card h4 {
-            color: var(--dark-text);
-            font-size: 1.08rem;
-            margin-bottom: 12px;
-        }
-
-        .problem-stat-card p {
-            color: #5e6d60;
-            font-size: 0.92rem;
-            line-height: 1.6;
-            margin-bottom: 0;
-        }
-
-        .problem-cta {
-            max-width: 760px;
-            margin: 46px auto 0;
-            text-align: center;
-        }
-
-        .problem-cta p {
-            color: #3a543a;
-            font-size: 1.15rem;
-            margin-bottom: 22px;
-        }
-
-        .problem-cta .btn-cta {
-            background: var(--primary-green);
-            color: white;
-            box-shadow: 0 15px 25px -10px rgba(31, 74, 31, 0.65);
-        }
-
-        .problem-cta .btn-cta:hover {
-            background: var(--accent-green);
-        }
-
-        /* Responsive adjustments */
-        @media (max-width: 768px) {
-            .about-story-card {
-                padding: 30px !important;
-            }
-
-            .problem-card-image {
-                height: 210px;
-            }
-
-            .problem-card h3 {
-                min-height: 0;
-            }
-
-            .problem-stats-panel {
-                margin-top: 45px;
-                padding: 34px 20px;
-                border-radius: 28px;
-            }
-
-            .mission-card,
-            .vision-card {
-                padding: 30px;
-            }
-        }
-    </style>
-
-    <!-- SOLUTION + STATS (animated counters) -->
-    <section id="solution" class="section" style="background: #e6f3e6;">
-        <div class="container">
-            <div class="section-title" data-aos="fade-up">
-                <h2>Our Innovative Solution</h2>
-            </div>
-            <div class="row justify-content-center mb-5">
-                <div class="col-lg-9" data-aos="fade-up">
-                    <p>By pairing the AI-powered "Afya Mfukoni" digital platform with zero-emission, solar-powered
-                        mobile clinics, AGKI has created a seamless "phygital" ecosystem that has already brought
-                        end-to-end medical care to over 500,000 people.
-                        Backed by a highly scalable revenue model of subscriptions, pay-per-service, and strategic
-                        partnerships, this sustainable solution bypasses traditional infrastructure to deliver quality,
-                        high-impact healthcare directly to the doorstep.
-                    </p>
-                </div>
-            </div>
-            <div class="impact-stats" data-aos="zoom-in" data-aos-duration="800">
-                <div class="stat-item">
-                    <div class="stat-number" data-target="75">0</div>
-                    <p>% live far from facilities</p>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-number" data-target="6">0</div>
-                    <p>million avoidable deaths</p>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-number" data-target="500">0</div>
-                    <p>million $ economic cost</p>
-                </div>
             </div>
         </div>
     </section>
@@ -1230,47 +401,59 @@
                 <h2>Our Solutions</h2>
                 <p>Last‑mile health with sustainability & compassion</p>
             </div>
-            <div class="row g-4">
-                <div class="col-md-6 col-lg-4" data-aos="flip-left" data-aos-delay="0">
-                    <div class="service-card">
-                        <div class="service-icon"><i class="fas fa-solar-panel"></i></div>
-                        <h4>Mobile Clinics (solar bikes & vans)</h4>
-                        <p>Diagnostics, essential meds, health education at low cost.</p>
+            <div class="row g-3">
+                <div class="col-12 col-md-6" data-aos="fade-right" data-aos-delay="0">
+                    <div class="solution-row">
+                        <div class="solution-icon"><i class="fas fa-solar-panel"></i></div>
+                        <div>
+                            <h4>Mobile Clinics (solar bikes & vans)</h4>
+                            <p>Diagnostics, essential meds, health education at low cost.</p>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-6 col-lg-4" data-aos="flip-left" data-aos-delay="100">
-                    <div class="service-card">
-                        <div class="service-icon"><i class="fas fa-robot"></i></div>
-                        <h4>AI health platform (WhatsApp)</h4>
-                        <p>Instant results, scheduling, e‑prescriptions, even offline.</p>
+                <div class="col-12 col-md-6" data-aos="fade-right" data-aos-delay="100">
+                    <div class="solution-row">
+                        <div class="solution-icon"><i class="fas fa-robot"></i></div>
+                        <div>
+                            <h4>AI health platform (WhatsApp)</h4>
+                            <p>Instant results, scheduling, e‑prescriptions, even offline.</p>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-6 col-lg-4" data-aos="flip-left" data-aos-delay="200">
-                    <div class="service-card">
-                        <div class="service-icon"><i class="fas fa-user-md"></i></div>
-                        <h4>Specialist tele‑consultations</h4>
-                        <p>Connect with doctors without travelling.</p>
+                <div class="col-12 col-md-6" data-aos="fade-right" data-aos-delay="200">
+                    <div class="solution-row">
+                        <div class="solution-icon"><i class="fas fa-user-md"></i></div>
+                        <div>
+                            <h4>Specialist tele‑consultations</h4>
+                            <p>Connect with doctors without travelling.</p>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-6 col-lg-4" data-aos="flip-left" data-aos-delay="0">
-                    <div class="service-card">
-                        <div class="service-icon"><i class="fas fa-baby"></i></div>
-                        <h4>Maternal & child health</h4>
-                        <p>Antenatal, nutrition, immunisation outreach.</p>
+                <div class="col-12 col-md-6" data-aos="fade-right" data-aos-delay="300">
+                    <div class="solution-row">
+                        <div class="solution-icon"><i class="fas fa-baby"></i></div>
+                        <div>
+                            <h4>Maternal & child health</h4>
+                            <p>Antenatal, nutrition, immunisation outreach.</p>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-6 col-lg-4" data-aos="flip-left" data-aos-delay="100">
-                    <div class="service-card">
-                        <div class="service-icon"><i class="fas fa-leaf"></i></div>
-                        <h4>Solar‑electric & cost‑effective</h4>
-                        <p>Lower footprint, affordable services.</p>
+                <div class="col-12 col-md-6" data-aos="fade-right" data-aos-delay="400">
+                    <div class="solution-row">
+                        <div class="solution-icon"><i class="fas fa-leaf"></i></div>
+                        <div>
+                            <h4>Solar‑electric & cost‑effective</h4>
+                            <p>Lower footprint, affordable services.</p>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-6 col-lg-4" data-aos="flip-left" data-aos-delay="200">
-                    <div class="service-card">
-                        <div class="service-icon"><i class="fas fa-handshake"></i></div>
-                        <h4>Diversified business model</h4>
-                        <p>Pay‑per‑service + subscriptions + NGO partnerships.</p>
+                <div class="col-12 col-md-6" data-aos="fade-right" data-aos-delay="500">
+                    <div class="solution-row">
+                        <div class="solution-icon"><i class="fas fa-handshake"></i></div>
+                        <div>
+                            <h4>Diversified business model</h4>
+                            <p>Pay‑per‑service + subscriptions + NGO partnerships.</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1284,171 +467,244 @@
                 <h2>Why Choose AGKI?</h2>
                 <p>We transform rural healthcare delivery</p>
             </div>
-            <div class="row g-4">
-                <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="50">
-                    <div class="feature-item">
-                        <div class="feature-icon"><i class="fas fa-map-marker-alt"></i></div>
-                        <h4>Last‑mile reach</h4>
-                        <p>Healthcare at your doorstep.</p>
+            <div class="row g-3">
+                <div class="col-12 col-md-6" data-aos="fade-right" data-aos-delay="0">
+                    <div class="why-row">
+                        <div class="why-row-icon"><i class="fas fa-map-marker-alt"></i></div>
+                        <div>
+                            <h4>Last‑mile reach</h4>
+                            <p>Healthcare at your doorstep.</p>
+                        </div>
                     </div>
                 </div>
-                <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="100">
-                    <div class="feature-item">
-                        <div class="feature-icon"><i class="fas fa-hand-holding-usd"></i></div>
-                        <h4>Affordable services</h4>
-                        <p>Pricing for low‑income families.</p>
+                <div class="col-12 col-md-6" data-aos="fade-right" data-aos-delay="100">
+                    <div class="why-row">
+                        <div class="why-row-icon"><i class="fas fa-hand-holding-usd"></i></div>
+                        <div>
+                            <h4>Affordable services</h4>
+                            <p>Pricing for low‑income families.</p>
+                        </div>
                     </div>
                 </div>
-                <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="150">
-                    <div class="feature-item">
-                        <div class="feature-icon"><i class="fas fa-microchip"></i></div>
-                        <h4>Cutting‑edge AI</h4>
-                        <p>Enhanced diagnostics & management.</p>
+                <div class="col-12 col-md-6" data-aos="fade-right" data-aos-delay="200">
+                    <div class="why-row">
+                        <div class="why-row-icon"><i class="fas fa-microchip"></i></div>
+                        <div>
+                            <h4>Cutting‑edge AI</h4>
+                            <p>Enhanced diagnostics & management.</p>
+                        </div>
                     </div>
                 </div>
-                <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="50">
-                    <div class="feature-item">
-                        <div class="feature-icon"><i class="fas fa-users"></i></div>
-                        <h4>Community empowerment</h4>
-                        <p>Partner with local health workers.</p>
+                <div class="col-12 col-md-6" data-aos="fade-right" data-aos-delay="300">
+                    <div class="why-row">
+                        <div class="why-row-icon"><i class="fas fa-users"></i></div>
+                        <div>
+                            <h4>Community empowerment</h4>
+                            <p>Partner with local health workers.</p>
+                        </div>
                     </div>
                 </div>
-                <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="100">
-                    <div class="feature-item">
-                        <div class="feature-icon"><i class="fas fa-globe-africa"></i></div>
-                        <h4>Eco‑friendly ops</h4>
-                        <p>Solar, electric, sustainable.</p>
+                <div class="col-12 col-md-6" data-aos="fade-right" data-aos-delay="400">
+                    <div class="why-row">
+                        <div class="why-row-icon"><i class="fas fa-globe-africa"></i></div>
+                        <div>
+                            <h4>Eco‑friendly ops</h4>
+                            <p>Solar, electric, sustainable.</p>
+                        </div>
                     </div>
                 </div>
-                <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="150">
-                    <div class="feature-item">
-                        <div class="feature-icon"><i class="fas fa-heartbeat"></i></div>
-                        <h4>Comprehensive care</h4>
-                        <p>End‑to‑end health services.</p>
+                <div class="col-12 col-md-6" data-aos="fade-right" data-aos-delay="500">
+                    <div class="why-row">
+                        <div class="why-row-icon"><i class="fas fa-heartbeat"></i></div>
+                        <div>
+                            <h4>Comprehensive care</h4>
+                            <p>End‑to‑end health services.</p>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- AWARDS (logo strip) -->
-    <section id="awards" class="section">
+    <!-- AWARDS (logo strip; auto-scrolling carousel on mobile, wrapped row from tablet up) -->
+    <section id="awards" class="section" style="background: var(--light-bg);">
         <div class="container">
             <div class="section-title" data-aos="fade-up">
                 <h2>Awards & Recognition</h2>
                 <p>Trusted by global institutions</p>
             </div>
-            <div class="d-flex flex-wrap justify-content-center align-items-center gap-5" data-aos="fade-up">
-                <img src="{% static 'app/sankalplogo.png' %}" style="height:40px; filter:grayscale(0.2);" alt="sankalp">
-                <img src="{% static 'app/undp.png' %}" style="height:40px;" alt="undp">
-                <img src="{% static 'app/unfpa.png' %}" style="height:40px;" alt="unfpa">
-                <img src="{% static 'app/villgro-logo.png' %}" style="height:50px;" alt="villgro">
-                <img src="{% static 'app/w4g.png' %}" style="height:40px;" alt="w4g">
-                <img src="{% static 'app/AFD.png' %}" style="height:60px;" alt="AFD">
-                <img src="{% static 'app/graca.png' %}" style="height:40px;" alt="graca">
-                <img src="{% static 'app/afrishela.jpeg' %}" style="height:40px;" alt="afrishela">
+        </div>
+        <div class="container">
+            <div class="awards-carousel" data-aos="fade-up">
+                <div class="awards-track">
+                    <img src="{% static 'app/sankalplogo.png' %}" class="awards-logo" style="filter:grayscale(0.2);"
+                        alt="Sankalp">
+                    <img src="{% static 'app/undp.png' %}" class="awards-logo" alt="UNDP">
+                    <img src="{% static 'app/unfpa.png' %}" class="awards-logo" alt="UNFPA">
+                    <img src="{% static 'app/villgro-logo.png' %}" class="awards-logo awards-logo-lg" alt="Villgro">
+                    <img src="{% static 'app/w4g.png' %}" class="awards-logo" alt="Women for Girls">
+                    <img src="{% static 'app/AFD.png' %}" class="awards-logo awards-logo-xl" alt="AFD">
+                    <img src="{% static 'app/graca.png' %}" class="awards-logo" alt="Gra&ccedil;a Machel Trust">
+                    <img src="{% static 'app/afrishela.jpeg' %}" class="awards-logo" alt="Afrishela">
+
+                    <!-- duplicate set: seamless mobile loop, hidden from assistive tech and desktop -->
+                    <img src="{% static 'app/sankalplogo.png' %}" class="awards-logo awards-logo-dup"
+                        style="filter:grayscale(0.2);" alt="" aria-hidden="true">
+                    <img src="{% static 'app/undp.png' %}" class="awards-logo awards-logo-dup" alt=""
+                        aria-hidden="true">
+                    <img src="{% static 'app/unfpa.png' %}" class="awards-logo awards-logo-dup" alt=""
+                        aria-hidden="true">
+                    <img src="{% static 'app/villgro-logo.png' %}" class="awards-logo awards-logo-lg awards-logo-dup"
+                        alt="" aria-hidden="true">
+                    <img src="{% static 'app/w4g.png' %}" class="awards-logo awards-logo-dup" alt="" aria-hidden="true">
+                    <img src="{% static 'app/AFD.png' %}" class="awards-logo awards-logo-xl awards-logo-dup" alt=""
+                        aria-hidden="true">
+                    <img src="{% static 'app/graca.png' %}" class="awards-logo awards-logo-dup" alt=""
+                        aria-hidden="true">
+                    <img src="{% static 'app/afrishela.jpeg' %}" class="awards-logo awards-logo-dup" alt=""
+                        aria-hidden="true">
+                </div>
             </div>
         </div>
     </section>
 
     <!-- TESTIMONIALS (videos) -->
-    <section class="section" style="background: var(--light-bg);">
+    <section class="section">
         <div class="container">
             <div class="section-title" data-aos="fade-up">
                 <h2>What our patients say</h2>
+                <p>Real stories from the families and communities AGKI serves.</p>
             </div>
             <div class="row g-4">
-                <div class="col-md-6" data-aos="zoom-in-right">
-                    <div class="testimonial-card p-0 overflow-hidden"><video src="{% static 'app/mama.mp4' %}" controls
-                            class="w-100" style="border-radius:28px;"></video></div>
+                <div class="col-12 col-md-6" data-aos="zoom-in-right">
+                    <div class="testimonial-card">
+                        <div class="testimonial-video">
+                            <video src="{% static 'app/mama.mp4' %}" controls preload="metadata"></video>
+                            <button class="testimonial-play" type="button" aria-label="Play video">
+                                <i class="fas fa-play"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div class="col-md-6" data-aos="zoom-in-left">
-                    <div class="testimonial-card p-0 overflow-hidden"><video src="{% static 'app/testmony2.mp4' %}"
-                            controls class="w-100" style="border-radius:28px;"></video></div>
+                <div class="col-12 col-md-6" data-aos="zoom-in-left">
+                    <div class="testimonial-card">
+                        <div class="testimonial-video">
+                            <video src="{% static 'app/testmony2.mp4' %}" controls preload="metadata"></video>
+                            <button class="testimonial-play" type="button" aria-label="Play video">
+                                <i class="fas fa-play"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </section>
 
     <!-- PORTFOLIO / community events -->
-    <section id="portfolio" class="section">
+    <section id="portfolio" class="section" style="background: var(--light-bg);">
         <div class="container">
             <div class="section-title" data-aos="fade-up">
                 <h2>Community Events</h2>
                 <p>Moments of togetherness</p>
             </div>
-            <div class="row g-4">
-                <div class="col-lg-4 col-md-6" data-aos="fade-up">
-                    <div class="portfolio-item">
-                        <div class="portfolio-img"><img src="{% static 'app/1.jpg' %}" alt="event"></div>
+        </div>
+        <div class="container">
+            <div class="community-carousel" data-aos="fade-up">
+                <button class="community-nav prev" type="button" aria-label="Previous photo">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <div class="community-track">
+                    <div class="community-item">
+                        <div class="community-photo">
+                            <img src="{% static 'app/1.jpg' %}" alt="Mobile clinic outreach event">
+                            <span class="community-caption">Mobile clinic outreach</span>
+                        </div>
+                    </div>
+                    <div class="community-item">
+                        <div class="community-photo">
+                            <img src="{% static 'app/2.jpg' %}" alt="Free health screening day">
+                            <span class="community-caption">Free health screening day</span>
+                        </div>
+                    </div>
+                    <div class="community-item">
+                        <div class="community-photo">
+                            <img src="{% static 'app/3.jpg' %}" alt="Maternal health workshop">
+                            <span class="community-caption">Maternal health workshop</span>
+                        </div>
+                    </div>
+                    <div class="community-item">
+                        <div class="community-photo">
+                            <img src="{% static 'app/4.jpg' %}" alt="Youth wellness drive">
+                            <span class="community-caption">Youth wellness drive</span>
+                        </div>
+                    </div>
+                    <div class="community-item">
+                        <div class="community-photo">
+                            <img src="{% static 'app/5.jpg' %}" alt="Community health fair">
+                            <span class="community-caption">Community health fair</span>
+                        </div>
+                    </div>
+                    <div class="community-item">
+                        <div class="community-photo">
+                            <img src="{% static 'app/6.jpg' %}" alt="Volunteer appreciation day">
+                            <span class="community-caption">Volunteer appreciation day</span>
+                        </div>
                     </div>
                 </div>
-                <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="80">
-                    <div class="portfolio-item">
-                        <div class="portfolio-img"><img src="{% static 'app/2.jpg' %}" alt="event"></div>
-                    </div>
-                </div>
-                <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="160">
-                    <div class="portfolio-item">
-                        <div class="portfolio-img"><img src="{% static 'app/3.jpg' %}" alt="event"></div>
-                    </div>
-                </div>
-                <div class="col-lg-4 col-md-6" data-aos="fade-up">
-                    <div class="portfolio-item">
-                        <div class="portfolio-img"><img src="{% static 'app/4.jpg' %}" alt="event"></div>
-                    </div>
-                </div>
-                <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="80">
-                    <div class="portfolio-item">
-                        <div class="portfolio-img"><img src="{% static 'app/5.jpg' %}" alt="event"></div>
-                    </div>
-                </div>
-                <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="160">
-                    <div class="portfolio-item">
-                        <div class="portfolio-img"><img src="{% static 'app/6.jpg' %}" alt="event"></div>
-                    </div>
-                </div>
+                <button class="community-nav next" type="button" aria-label="Next photo">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
             </div>
         </div>
     </section>
 
     <!-- NEWS cards -->
-    <section class="section" style="background: var(--light-bg);">
+    <section class="section">
         <div class="container">
             <div class="section-title" data-aos="fade-up">
                 <h2>Recent News</h2>
+                <p>Updates from the clinics, the lab, and the communities AGKI serves.</p>
             </div>
             <div class="row g-4">
-                <div class="col-md-4" data-aos="fade-up">
+                <div class="col-12 col-md-4" data-aos="fade-up">
                     <div class="news-card">
-                        <div class="portfolio-img"><img src="{% static 'app/maternity.jpg' %}" alt="news"></div>
-                        <div class="p-4">
+                        <div class="news-photo">
+                            <img src="{% static 'app/maternity.jpg' %}" alt="Maternal health launch">
+                            <span class="news-date">June 15, 2025</span>
+                        </div>
+                        <div class="news-body">
                             <h5>Maternal health launch</h5>
                             <p>AGKI Laboratory introduces comprehensive maternal health services to support expecting
                                 mothers in our community.</p>
-                            <p class="text-muted">June 15, 2025</p>
+                            <a href="#" class="news-read-more">Read more <i class="fas fa-arrow-right"></i></a>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-4" data-aos="fade-up" data-aos-delay="80">
+                <div class="col-12 col-md-4" data-aos="fade-up" data-aos-delay="80">
                     <div class="news-card">
-                        <div class="portfolio-img"><img src="{% static 'app/cmnty.jpg' %}" alt="news"></div>
-                        <div class="p-4">
+                        <div class="news-photo">
+                            <img src="{% static 'app/community.png' %}" alt="Community fair success">
+                            <span class="news-date">June 10, 2025</span>
+                        </div>
+                        <div class="news-body">
                             <h5>Community fair success</h5>
                             <p>Over 500 community members benefited from our free health screening and awareness
                                 programs last month.</p>
-                            <p class="text-muted">June 10, 2025</p>
+                            <a href="#" class="news-read-more">Read more <i class="fas fa-arrow-right"></i></a>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-4" data-aos="fade-up" data-aos-delay="160">
+                <div class="col-12 col-md-4" data-aos="fade-up" data-aos-delay="160">
                     <div class="news-card">
-                        <div class="portfolio-img"><img src="{% static 'app/hspt.jpg' %}" alt="news"></div>
-                        <div class="p-4">
+                        <div class="news-photo">
+                            <img src="{% static 'app/partnership.jpeg' %}" alt="Hospital partnership">
+                            <span class="news-date">June 5, 2025</span>
+                        </div>
+                        <div class="news-body">
                             <h5>Hospital partnership</h5>
                             <p>New collaboration enhances our referral system and ensures continuity of care for complex
                                 cases.</p>
-                            <p class="text-muted">June 5, 2025</p>
+                            <a href="#" class="news-read-more">Read more <i class="fas fa-arrow-right"></i></a>
                         </div>
                     </div>
                 </div>
@@ -1460,39 +716,53 @@
     <section class="section faq-section">
         <div class="container">
             <div class="section-title" data-aos="fade-up">
-                <h2>FAQ</h2>
+                <span class="problem-eyebrow">Common Questions</span>
+                <h2>Frequently Asked Questions</h2>
             </div>
             <div class="row justify-content-center">
-                <div class="col-lg-9">
-                    <div class="accordion" id="faqAccordion">
-                        <div class="accordion-item">
-                            <h2 class="accordion-header"><button class="accordion-button" data-bs-toggle="collapse"
-                                    data-bs-target="#faq1">Services offered?</button></h2>
-                            <div id="faq1" class="accordion-collapse collapse show" data-bs-parent="#faqAccordion">
-                                <div class="accordion-body">Lab testing, maternal/child health, elder care, community
-                                    programs.</div>
+                <div class="col-12 col-lg-9">
+                    <div class="faq-list">
+                        <div class="faq-card" data-aos="fade-up" data-aos-delay="0">
+                            <button class="faq-q" data-bs-toggle="collapse" data-bs-target="#faq1">
+                                <span class="faq-icon"><i class="fas fa-stethoscope"></i></span>
+                                <span class="faq-text">What services are offered?</span>
+                                <span class="faq-chevron"><i class="fas fa-chevron-down"></i></span>
+                            </button>
+                            <div id="faq1" class="collapse show">
+                                <div class="faq-a">Lab testing, maternal/child health, elder care, and community
+                                    outreach programs.</div>
                             </div>
                         </div>
-                        <div class="accordion-item">
-                            <h2 class="accordion-header"><button class="accordion-button collapsed"
-                                    data-bs-toggle="collapse" data-bs-target="#faq2">Hours?</button></h2>
-                            <div id="faq2" class="accordion-collapse collapse">
-                                <div class="accordion-body">Mon-Fri 7am-6pm, Sat 8am-4pm. Emergencies 24/7.</div>
+                        <div class="faq-card" data-aos="fade-up" data-aos-delay="80">
+                            <button class="faq-q collapsed" data-bs-toggle="collapse" data-bs-target="#faq2">
+                                <span class="faq-icon"><i class="fas fa-clock"></i></span>
+                                <span class="faq-text">What are your hours?</span>
+                                <span class="faq-chevron"><i class="fas fa-chevron-down"></i></span>
+                            </button>
+                            <div id="faq2" class="collapse">
+                                <div class="faq-a">Monday–Friday 7am–6pm, Saturday 8am–4pm. Emergencies are handled
+                                    24/7.</div>
                             </div>
                         </div>
-                        <div class="accordion-item">
-                            <h2 class="accordion-header"><button class="accordion-button collapsed"
-                                    data-bs-toggle="collapse" data-bs-target="#faq3">Insurance?</button></h2>
-                            <div id="faq3" class="accordion-collapse collapse">
-                                <div class="accordion-body">NHIF & major insurers accepted; affordable plans for
-                                    uninsured.</div>
+                        <div class="faq-card" data-aos="fade-up" data-aos-delay="160">
+                            <button class="faq-q collapsed" data-bs-toggle="collapse" data-bs-target="#faq3">
+                                <span class="faq-icon"><i class="fas fa-shield-heart"></i></span>
+                                <span class="faq-text">Do you accept insurance?</span>
+                                <span class="faq-chevron"><i class="fas fa-chevron-down"></i></span>
+                            </button>
+                            <div id="faq3" class="collapse">
+                                <div class="faq-a">NHIF and major insurers are accepted; affordable plans are
+                                    available for the uninsured.</div>
                             </div>
                         </div>
-                        <div class="accordion-item">
-                            <h2 class="accordion-header"><button class="accordion-button collapsed"
-                                    data-bs-toggle="collapse" data-bs-target="#faq4">Appointment?</button></h2>
-                            <div id="faq4" class="accordion-collapse collapse">
-                                <div class="accordion-body">Call, visit, or online form. Walk‑ins welcome.</div>
+                        <div class="faq-card" data-aos="fade-up" data-aos-delay="240">
+                            <button class="faq-q collapsed" data-bs-toggle="collapse" data-bs-target="#faq4">
+                                <span class="faq-icon"><i class="fas fa-calendar-check"></i></span>
+                                <span class="faq-text">How do I book an appointment?</span>
+                                <span class="faq-chevron"><i class="fas fa-chevron-down"></i></span>
+                            </button>
+                            <div id="faq4" class="collapse">
+                                <div class="faq-a">Call, visit, or use the online form. Walk‑ins are welcome.</div>
                             </div>
                         </div>
                     </div>
@@ -1501,67 +771,143 @@
         </div>
     </section>
 
-    <!-- TEAM (grid) -->
+    <!-- TEAM (auto-scrolling carousel) -->
     <section id="team" class="section">
         <div class="container">
             <div class="section-title" data-aos="fade-up">
                 <h2>Our medical team</h2>
+                <p>The clinicians, engineers, and advisors building AGKI's mobile-first care network.</p>
             </div>
-            <div class="row justify-content-center g-4">
-                <div class="col-lg-3 col-md-6" data-aos="zoom-in">
-                    <div class="team-card text-center">
-                        <div class="team-avatar"><img src="{% static 'app/TAg.jpg' %}"></div>
+        </div>
+        <div class="team-carousel" data-aos="fade-up" data-aos-delay="100">
+            <div class="team-track">
+                <div class="team-photo-card">
+                    <div class="team-photo"><img src="{% static 'app/TAg.jpg' %}" alt="Agnes Kimweri"></div>
+                    <div class="team-scrim">
                         <h5>Agnes Kimweri</h5>
-                        <p>CEO & Founder</p>
+                        <span class="team-role">CEO & Founder</span>
                     </div>
                 </div>
-                <div class="col-lg-3 col-md-6" data-aos="zoom-in" data-aos-delay="60">
-                    <div class="team-card text-center">
-                        <div class="team-avatar"><img src="{% static 'app/Tmanager.jpg' %}"></div>
+                <div class="team-photo-card">
+                    <div class="team-photo"><img src="{% static 'app/Tgloria.jpeg' %}" alt="Eng. Gloria Jombo"></div>
+                    <div class="team-scrim">
+                        <h5>Eng. Gloria Jombo</h5>
+                        <span class="team-role">CTO</span>
+                    </div>
+                </div>
+                <div class="team-photo-card">
+                    <div class="team-photo"><img src="{% static 'app/Tmanager.jpg' %}" alt="Dr Atieno Uyugi"></div>
+                    <div class="team-scrim">
                         <h5>Dr Atieno Uyugi</h5>
-                        <p>Co‑founder, Ops</p>
+                        <span class="team-role">Co&#8209;founder, Ops</span>
                     </div>
                 </div>
-                <div class="col-lg-3 col-md-6" data-aos="zoom-in" data-aos-delay="120">
-                    <div class="team-card text-center">
-                        <div class="team-avatar"><img src="{% static 'app/Twilson.jpg' %}"></div>
+                <div class="team-photo-card">
+                    <div class="team-photo"><img src="{% static 'app/Twilson.jpg' %}" alt="Hape Wilson"></div>
+                    <div class="team-scrim">
                         <h5>Hape Wilson</h5>
-                        <p>Lab scientist</p>
+                        <span class="team-role">Lab scientist</span>
                     </div>
                 </div>
-                <div class="col-lg-3 col-md-6" data-aos="zoom-in" data-aos-delay="180">
-                    <div class="team-card text-center">
-                        <div class="team-avatar"><i class="fas fa-pills fa-3x" style="color:white;"></i></div>
-                        <h5>Siwema Jeremia</h5>
-                        <p>Nurse Midwife</p>
+                <div class="team-photo-card">
+                    <div class="team-photo"><img src="{% static 'app/Tkulwa.png' %}" alt="Kulwa Cherehani"></div>
+                    <div class="team-scrim">
+                        <h5>Kulwa Cherehani</h5>
+                        <span class="team-role">Lab Manager</span>
                     </div>
                 </div>
-                <div class="col-lg-3 col-md-6" data-aos="zoom-in">
-                    <div class="team-card text-center">
-                        <div class="team-avatar"><img src="{% static 'app/TPau.jpeg' %}"></div>
+                <div class="team-photo-card">
+                    <div class="team-photo"><img src="{% static 'app/TPau.jpeg' %}" alt="Pau Gimeno"></div>
+                    <div class="team-scrim">
                         <h5>Pau Gimeno</h5>
-                        <p>Advisor, fundraising</p>
+                        <span class="team-role">Advisor, fundraising</span>
                     </div>
                 </div>
-                <div class="col-lg-3 col-md-6" data-aos="zoom-in" data-aos-delay="60">
-                    <div class="team-card text-center">
-                        <div class="team-avatar"><img src="{% static 'app/TElisabet.jpg' %}"></div>
+                <div class="team-photo-card">
+                    <div class="team-photo"><img src="{% static 'app/TElisabet.jpg' %}" alt="Elisabet Nyquist"></div>
+                    <div class="team-scrim">
                         <h5>Elisabet Nyquist</h5>
-                        <p>Business advisor</p>
+                        <span class="team-role">Business advisor</span>
                     </div>
                 </div>
-                <div class="col-lg-3 col-md-6" data-aos="zoom-in" data-aos-delay="120">
-                    <div class="team-card text-center">
-                        <div class="team-avatar"><img src="{% static 'app/TDeogratias.jpg' %}"></div>
+                <div class="team-photo-card">
+                    <div class="team-photo"><img src="{% static 'app/TDeogratias.jpg' %}" alt="Dr Deogratias Mbona">
+                    </div>
+                    <div class="team-scrim">
                         <h5>Dr Deogratias Mbona</h5>
-                        <p>Advisor</p>
+                        <span class="team-role">Advisor</span>
                     </div>
                 </div>
-                <div class="col-lg-3 col-md-6" data-aos="zoom-in" data-aos-delay="180">
-                    <div class="team-card text-center">
-                        <div class="team-avatar"><img src="{% static 'app/Tcoln.jpg' %}"></div>
+                <div class="team-photo-card">
+                    <div class="team-photo"><img src="{% static 'app/Tcoln.jpg' %}" alt="Cornel Mtavangu"></div>
+                    <div class="team-scrim">
                         <h5>Cornel Mtavangu</h5>
-                        <p>ICT Officer</p>
+                        <span class="team-role">ICT Officer</span>
+                    </div>
+                </div>
+
+                <!-- duplicate set: seamless loop, hidden from assistive tech -->
+                <div class="team-photo-card" aria-hidden="true">
+                    <div class="team-photo"><img src="{% static 'app/TAg.jpg' %}" alt=""></div>
+                    <div class="team-scrim">
+                        <h5>Agnes Kimweri</h5>
+                        <span class="team-role">CEO & Founder</span>
+                    </div>
+                </div>
+                <div class="team-photo-card" aria-hidden="true">
+                    <div class="team-photo"><img src="{% static 'app/Tgloria.jpeg' %}" alt=""></div>
+                    <div class="team-scrim">
+                        <h5>Eng. Gloria Jombo</h5>
+                        <span class="team-role">CTO</span>
+                    </div>
+                </div>
+                <div class="team-photo-card" aria-hidden="true">
+                    <div class="team-photo"><img src="{% static 'app/Tmanager.jpg' %}" alt=""></div>
+                    <div class="team-scrim">
+                        <h5>Dr Atieno Uyugi</h5>
+                        <span class="team-role">Co&#8209;founder, Ops</span>
+                    </div>
+                </div>
+                <div class="team-photo-card" aria-hidden="true">
+                    <div class="team-photo"><img src="{% static 'app/Twilson.jpg' %}" alt=""></div>
+                    <div class="team-scrim">
+                        <h5>Hape Wilson</h5>
+                        <span class="team-role">Lab scientist</span>
+                    </div>
+                </div>
+                <div class="team-photo-card" aria-hidden="true">
+                    <div class="team-photo"><img src="{% static 'app/Tkulwa.png' %}" alt=""></div>
+                    <div class="team-scrim">
+                        <h5>Kulwa Cherehani</h5>
+                        <span class="team-role">Nurse Midwife</span>
+                    </div>
+                </div>
+                <div class="team-photo-card" aria-hidden="true">
+                    <div class="team-photo"><img src="{% static 'app/TPau.jpeg' %}" alt=""></div>
+                    <div class="team-scrim">
+                        <h5>Pau Gimeno</h5>
+                        <span class="team-role">Advisor, fundraising</span>
+                    </div>
+                </div>
+                <div class="team-photo-card" aria-hidden="true">
+                    <div class="team-photo"><img src="{% static 'app/TElisabet.jpg' %}" alt=""></div>
+                    <div class="team-scrim">
+                        <h5>Elisabet Nyquist</h5>
+                        <span class="team-role">Business advisor</span>
+                    </div>
+                </div>
+                <div class="team-photo-card" aria-hidden="true">
+                    <div class="team-photo"><img src="{% static 'app/TDeogratias.jpg' %}" alt=""></div>
+                    <div class="team-scrim">
+                        <h5>Dr Deogratias Mbona</h5>
+                        <span class="team-role">Advisor</span>
+                    </div>
+                </div>
+                <div class="team-photo-card" aria-hidden="true">
+                    <div class="team-photo"><img src="{% static 'app/Tcoln.jpg' %}" alt=""></div>
+                    <div class="team-scrim">
+                        <h5>Cornel Mtavangu</h5>
+                        <span class="team-role">ICT Officer</span>
                     </div>
                 </div>
             </div>
@@ -1577,146 +923,66 @@
                     inquiries, or support.</p>
             </div>
 
-            <div class="row g-5">
-                <!-- Contact Information Cards -->
-                <div class="col-lg-5" data-aos="fade-right" data-aos-delay="100">
-                    <div class="contact-info-wrapper">
-                        <h3 class="text-white mb-4">Let's Connect</h3>
-                        <p class="text-white-50 mb-4">Have questions? Our team is ready to assist you with any inquiries
-                            about our services, partnerships, or community programs.</p>
-
-                        <!-- Info Cards -->
-                        <div class="info-card mb-3" data-aos="fade-right" data-aos-delay="150">
-                            <div class="info-icon">
-                                <i class="fas fa-map-marker-alt"></i>
-                            </div>
-                            <div class="info-content">
-                                <h5>Head Office</h5>
-                                <p class="mb-0">Kibaha Pwani, Tanzania</p>
-                                <small class="text-white-50">Visit us during working hours</small>
-                            </div>
-                        </div>
-
-                        <div class="info-card mb-3" data-aos="fade-right" data-aos-delay="200">
-                            <div class="info-icon">
-                                <i class="fas fa-phone-alt"></i>
-                            </div>
-                            <div class="info-content">
-                                <h5>Phone Number</h5>
-                                <p class="mb-0">+255 717 308 796</p>
-                                <small class="text-white-50">Mon-Fri, 8am-6pm</small>
-                            </div>
-                        </div>
-
-                        <div class="info-card mb-3" data-aos="fade-right" data-aos-delay="250">
-                            <div class="info-icon">
-                                <i class="fas fa-envelope"></i>
-                            </div>
-                            <div class="info-content">
-                                <h5>Email Address</h5>
-                                <p class="mb-0">info@agkimedicallaboratory.co.tz</p>
-                                <small class="text-white-50">We reply within 24 hours</small>
-                            </div>
-                        </div>
-
-                        <div class="info-card mb-4" data-aos="fade-right" data-aos-delay="300">
-                            <div class="info-icon">
-                                <i class="fas fa-clock"></i>
-                            </div>
-                            <div class="info-content">
-                                <h5>Working Hours</h5>
-                                <p class="mb-0">Monday - Friday: 7:00 AM - 6:00 PM</p>
-                                <p class="mb-0">Saturday: 8:00 AM - 4:00 PM</p>
-                                <small class="text-white-50">Emergency: 24/7</small>
-                            </div>
-                        </div>
-
-                        <!-- Social Media Links with Animation -->
-                        <div class="social-connect" data-aos="fade-up" data-aos-delay="350">
-                            <h5 class="text-white mb-3">Follow Us</h5>
-                            <div class="social-links-modern">
-                                <a href="#" class="social-link" data-tooltip="Facebook">
-                                    <i class="fab fa-facebook-f"></i>
-                                </a>
-                                <a href="#" class="social-link" data-tooltip="Twitter">
-                                    <i class="fab fa-twitter"></i>
-                                </a>
-                                <a href="#" class="social-link" data-tooltip="Instagram">
-                                    <i class="fab fa-instagram"></i>
-                                </a>
-                                <a href="#" class="social-link" data-tooltip="LinkedIn">
-                                    <i class="fab fa-linkedin-in"></i>
-                                </a>
-                                <a href="#" class="social-link" data-tooltip="WhatsApp">
-                                    <i class="fab fa-whatsapp"></i>
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Contact Form - Enhanced Design -->
-                <div class="col-lg-7" data-aos="fade-left" data-aos-delay="200">
+            <!-- Contact info lives in the footer already; this section is just the form -->
+            <div class="row justify-content-center">
+                <div class="col-12 col-lg-8" data-aos="fade-up" data-aos-delay="100">
                     <div class="contact-form-modern">
-                        <div class="form-header">
-                            <h4>Send us a Message</h4>
-                            <p>Fill out the form below and we'll get back to you shortly.</p>
-                        </div>
-
                         <form class="modern-form">
-                            <div class="row g-4">
-                                <div class="col-md-6">
+                            <div class="row g-3">
+                                <div class="col-12 col-md-6">
                                     <div class="form-floating">
                                         <input type="text" class="form-control" id="name" placeholder="Your Name"
                                             required>
                                         <label for="name"><i class="far fa-user me-2"></i>Your Name</label>
                                     </div>
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-12 col-md-6">
                                     <div class="form-floating">
                                         <input type="email" class="form-control" id="email" placeholder="Your Email"
                                             required>
                                         <label for="email"><i class="far fa-envelope me-2"></i>Your Email</label>
                                     </div>
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-12 col-md-6">
                                     <div class="form-floating">
                                         <input type="tel" class="form-control" id="phone" placeholder="Phone Number">
                                         <label for="phone"><i class="fas fa-phone-alt me-2"></i>Phone Number</label>
                                     </div>
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-12 col-md-6 subject-field-col">
                                     <div class="form-floating">
-                                        <select class="form-select" id="subject" aria-label="Subject">
-                                            <option selected>General Inquiry</option>
-                                            <option>Partnership Opportunity</option>
-                                            <option>Support Request</option>
-                                            <option>Feedback</option>
-                                            <option>Other</option>
-                                        </select>
-                                        <label for="subject"><i class="fas fa-tag me-2"></i>Subject</label>
+                                        <div class="custom-select form-select" id="subjectSelect" tabindex="0"
+                                            role="combobox" aria-haspopup="listbox" aria-expanded="false"
+                                            aria-labelledby="subjectLabel" aria-controls="subjectOptions">
+                                            <span class="custom-select-value">General Inquiry</span>
+                                            <ul class="custom-select-options" id="subjectOptions" role="listbox"
+                                                aria-labelledby="subjectLabel">
+                                                <li role="option" aria-selected="true" data-value="General Inquiry">
+                                                    General Inquiry</li>
+                                                <li role="option" aria-selected="false"
+                                                    data-value="Partnership Opportunity">Partnership Opportunity</li>
+                                                <li role="option" aria-selected="false" data-value="Support Request">
+                                                    Support Request</li>
+                                                <li role="option" aria-selected="false" data-value="Feedback">Feedback
+                                                </li>
+                                                <li role="option" aria-selected="false" data-value="Other">Other</li>
+                                            </ul>
+                                        </div>
+                                        <input type="hidden" name="subject" id="subject" value="General Inquiry">
+                                        <label for="subjectSelect" id="subjectLabel"><i
+                                                class="fas fa-tag me-2"></i>Subject</label>
                                     </div>
                                 </div>
                                 <div class="col-12">
                                     <div class="form-floating">
-                                        <textarea class="form-control" id="message" style="height: 150px"
+                                        <textarea class="form-control" id="message" style="height: 110px"
                                             placeholder="Your Message" required></textarea>
                                         <label for="message"><i class="far fa-comment-dots me-2"></i>Your
                                             Message</label>
                                     </div>
                                 </div>
 
-                                <!-- File Attachment Option -->
-                                <div class="col-12">
-                                    <div class="file-attachment">
-                                        <i class="fas fa-paperclip me-2"></i>
-                                        <span>Attach file (optional, max 5MB)</span>
-                                        <input type="file" class="form-control-file" id="attachment"
-                                            style="display: none;">
-                                    </div>
-                                </div>
-
-                                <!-- Submit Button with Animation -->
+                                <!-- Submit -->
                                 <div class="col-12">
                                     <button type="submit" class="btn btn-submit">
                                         <span class="btn-text">Send Message</span>
@@ -1739,459 +1005,40 @@
         </div>
     </section>
 
-    <!-- MAP SECTION - Enhanced with modern design -->
-    <section class="section map-section">
-        <div class="container">
-            <div class="section-title" data-aos="fade-up">
-                <h2>Visit Our Facility</h2>
-                <p>Come see us at our head office in Kibaha, Pwani</p>
-            </div>
-
-            <div class="row">
-                <div class="col-12" data-aos="zoom-in">
-                    <div class="map-container-modern">
-                        <div class="map-overlay-card">
-                            <div class="map-overlay-content">
-                                <i class="fas fa-map-pin fa-2x mb-2" style="color: var(--primary-green);"></i>
-                                <h5>AGKI Medical Laboratory</h5>
-                                <p class="mb-2">Kibaha Pwani, Tanzania</p>
-                                <a href="https://goo.gl/maps/..." target="_blank" class="btn-map">
-                                    <i class="fas fa-directions me-2"></i>Get Directions
-                                </a>
-                            </div>
-                        </div>
-                        <iframe
-                            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3853.555615469414!2d38.856572674894515!3d-6.7834211663387824!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x185c6f00e72ce859%3A0xac0ecd8f3b034606!2sAgki%20medical%20laboratory!5e1!3m2!1sen!2stz"
-                            width="100%" height="450" style="border:0; border-radius: 30px;" allowfullscreen=""
-                            loading="lazy" referrerpolicy="no-referrer-when-downgrade">
-                        </iframe>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <!-- MAP STRIP -->
+    <section class="map-strip" data-aos="fade-up">
+        <iframe
+            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3853.555615469414!2d38.856572674894515!3d-6.7834211663387824!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x185c6f00e72ce859%3A0xac0ecd8f3b034606!2sAgki%20medical%20laboratory!5e1!3m2!1sen!2stz"
+            width="100%" height="450" style="border:0;" allowfullscreen="" loading="lazy"
+            referrerpolicy="no-referrer-when-downgrade">
+        </iframe>
     </section>
 
     <!-- Add this CSS to your existing styles -->
-    <style>
-        /* Contact Section Modern Styles */
-        .contact-section {
-            background: var(--gradient-green);
-            color: white;
-            position: relative;
-            overflow: hidden;
-        }
 
-        .contact-section::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -50%;
-            width: 100%;
-            height: 100%;
-            background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
-            pointer-events: none;
-        }
-
-        .contact-info-wrapper {
-            padding-right: 20px;
-        }
-
-        .info-card {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 20px;
-            padding: 20px;
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            transition: all 0.3s ease;
-            cursor: pointer;
-        }
-
-        .info-card:hover {
-            background: rgba(255, 255, 255, 0.2);
-            transform: translateX(10px);
-            border-color: var(--accent-green);
-        }
-
-        .info-icon {
-            width: 60px;
-            height: 60px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            color: var(--accent-green);
-            transition: all 0.3s ease;
-        }
-
-        .info-card:hover .info-icon {
-            background: var(--accent-green);
-            color: var(--primary-green);
-            transform: rotate(360deg);
-        }
-
-        .info-content h5 {
-            color: white;
-            margin-bottom: 5px;
-            font-size: 1.1rem;
-        }
-
-        .info-content p {
-            color: rgba(255, 255, 255, 0.9);
-            margin-bottom: 2px;
-        }
-
-        /* Social Links Modern */
-        .social-connect {
-            margin-top: 30px;
-        }
-
-        .social-links-modern {
-            display: flex;
-            gap: 15px;
-        }
-
-        .social-link {
-            width: 50px;
-            height: 50px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.2rem;
-            transition: all 0.3s ease;
-            position: relative;
-            text-decoration: none;
-        }
-
-        .social-link:hover {
-            background: var(--accent-green);
-            color: var(--primary-green);
-            transform: translateY(-5px);
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
-        }
-
-        /* Tooltip */
-        .social-link::before {
-            content: attr(data-tooltip);
-            position: absolute;
-            bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            background: var(--primary-green);
-            color: white;
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-size: 0.8rem;
-            white-space: nowrap;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s ease;
-            margin-bottom: 10px;
-        }
-
-        .social-link:hover::before {
-            opacity: 1;
-            visibility: visible;
-        }
-
-        /* Contact Form Modern */
-        .contact-form-modern {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border-radius: 30px;
-            padding: 40px;
-            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-        }
-
-        .form-header {
-            margin-bottom: 30px;
-            text-align: center;
-        }
-
-        .form-header h4 {
-            color: var(--primary-green);
-            font-size: 1.8rem;
-            font-weight: 600;
-            margin-bottom: 10px;
-        }
-
-        .form-header p {
-            color: #666;
-        }
-
-        /* Modern Form Controls */
-        .form-floating {
-            position: relative;
-        }
-
-        .form-floating .form-control,
-        .form-floating .form-select {
-            border: 2px solid #e0f0e0;
-            border-radius: 15px;
-            height: 60px;
-            padding: 1rem 1.25rem;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-        }
-
-        .form-floating textarea.form-control {
-            height: 150px;
-        }
-
-        .form-floating .form-control:focus,
-        .form-floating .form-select:focus {
-            border-color: var(--accent-green);
-            box-shadow: 0 0 0 0.2rem rgba(124, 197, 118, 0.25);
-            transform: scale(1.02);
-        }
-
-        .form-floating label {
-            padding: 1rem 1.25rem;
-            color: #666;
-        }
-
-        .form-floating label i {
-            color: var(--accent-green);
-            width: 20px;
-        }
-
-        /* File Attachment */
-        .file-attachment {
-            border: 2px dashed rgba(124, 197, 118, 0.5);
-            border-radius: 15px;
-            padding: 15px 20px;
-            color: var(--primary-green);
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-align: center;
-        }
-
-        .file-attachment:hover {
-            border-color: var(--accent-green);
-            background: rgba(124, 197, 118, 0.1);
-        }
-
-        /* Submit Button */
-        .btn-submit {
-            width: 100%;
-            padding: 15px 30px;
-            background: var(--gradient-green);
-            border: none;
-            border-radius: 50px;
-            color: white;
-            font-size: 1.1rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .btn-submit::before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 0;
-            height: 0;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.3);
-            transform: translate(-50%, -50%);
-            transition: width 0.6s, height 0.6s;
-        }
-
-        .btn-submit:hover::before {
-            width: 300px;
-            height: 300px;
-        }
-
-        .btn-submit:hover {
-            background: var(--accent-green);
-            transform: translateY(-3px);
-            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
-        }
-
-        .btn-icon {
-            transition: transform 0.3s ease;
-        }
-
-        .btn-submit:hover .btn-icon {
-            transform: translateX(5px);
-        }
-
-        /* Privacy Note */
-        .privacy-note {
-            color: #666;
-            font-size: 0.9rem;
-            text-align: center;
-            margin-top: 10px;
-        }
-
-        .privacy-note i {
-            color: var(--accent-green);
-        }
-
-        /* Map Section Modern */
-        .map-section {
-            background: var(--light-bg);
-        }
-
-        .map-container-modern {
-            position: relative;
-            border-radius: 30px;
-            overflow: hidden;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-        }
-
-        .map-overlay-card {
-            position: absolute;
-            top: 30px;
-            left: 30px;
-            background: white;
-            border-radius: 20px;
-            padding: 20px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-            z-index: 10;
-            max-width: 250px;
-            animation: slideInLeft 1s ease;
-        }
-
-        @keyframes slideInLeft {
-            from {
-                opacity: 0;
-                transform: translateX(-50px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
-
-        .map-overlay-content {
-            text-align: center;
-        }
-
-        .map-overlay-content h5 {
-            color: var(--primary-green);
-            margin-bottom: 5px;
-        }
-
-        .map-overlay-content p {
-            color: #666;
-            font-size: 0.9rem;
-        }
-
-        .btn-map {
-            display: inline-block;
-            padding: 8px 20px;
-            background: var(--gradient-green);
-            color: white;
-            text-decoration: none;
-            border-radius: 50px;
-            font-size: 0.9rem;
-            transition: all 0.3s ease;
-            margin-top: 10px;
-        }
-
-        .btn-map:hover {
-            background: var(--accent-green);
-            color: var(--primary-green);
-            transform: scale(1.05);
-        }
-
-        /* Responsive Adjustments */
-        @media (max-width: 768px) {
-            .contact-form-modern {
-                padding: 25px;
-            }
-
-            .info-card {
-                padding: 15px;
-            }
-
-            .info-icon {
-                width: 50px;
-                height: 50px;
-                font-size: 1.2rem;
-            }
-
-            .map-overlay-card {
-                position: relative;
-                top: 0;
-                left: 0;
-                margin-bottom: 20px;
-                max-width: 100%;
-            }
-
-            .social-links-modern {
-                justify-content: center;
-            }
-        }
-
-        /* Loading Animation for Form Submit */
-        .btn-submit.loading {
-            pointer-events: none;
-            opacity: 0.7;
-        }
-
-        .btn-submit.loading .btn-text::after {
-            content: '...';
-        }
-
-        /* Success Message Animation */
-        @keyframes successPop {
-            0% {
-                transform: scale(0);
-            }
-
-            50% {
-                transform: scale(1.2);
-            }
-
-            100% {
-                transform: scale(1);
-            }
-        }
-
-        .form-success {
-            animation: successPop 0.5s ease;
-        }
-    </style>
 
     <!-- footer -->
     <footer class="footer">
         <div class="container">
             <div class="row">
-                <div class="col-md-4">
+                <div class="col-12 col-md-6 col-lg-4 order-1 order-lg-1">
                     <h5>AGKI Medical Lab</h5>
                     <p>Empowering communities with accessible, affordable healthcare.</p>
                     <div class="h5"><i class="fab fa-facebook me-2"></i><i class="fab fa-twitter me-2"></i><i
                             class="fab fa-instagram me-2"></i><i class="fab fa-linkedin"></i></div>
                 </div>
-                <div class="col-md-2">
+                <div class="col-6 col-lg-2 order-3 order-md-2 order-lg-2">
                     <h5>Quick</h5>
                     <ul class="list-unstyled">
                         <li><a href="#home">Home</a></li>
                         <li><a href="#about">About</a></li>
+                        <li><a href="#problem">Problem</a></li>
                         <li><a href="#services">Services</a></li>
+                        <li><a href="#team">Our Team</a></li>
                         <li><a href="#contact">Contact</a></li>
                     </ul>
                 </div>
-                <div class="col-md-3">
+                <div class="col-6 col-lg-3 order-4 order-md-4 order-lg-3">
                     <h5>Services</h5>
                     <ul class="list-unstyled">
                         <li><a href="#">Mobile clinics</a></li>
@@ -2200,7 +1047,7 @@
                         <li><a href="#">Diagnostics</a></li>
                     </ul>
                 </div>
-                <div class="col-md-3">
+                <div class="col-12 col-md-6 col-lg-3 order-2 order-md-3 order-lg-4">
                     <h5>Kibaha, Pwani</h5>
                     <p>+255 717 308 796<br>info@agkimedicallaboratory.co.tz</p>
                 </div>
@@ -2216,27 +1063,49 @@
     <script>
         AOS.init({ duration: 900, once: true, offset: 40 });
 
+        // Hero impact stats: count up from 0 once scrolled into view
+        (function () {
+            const impact = document.querySelector('.hero-impact');
+            if (!impact) return;
+            const numbers = impact.querySelectorAll('.hero-impact-number[data-count-to]');
+            if (!numbers.length) return;
+
+            const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+            function animateCount(el) {
+                const target = parseInt(el.dataset.countTo, 10);
+                const suffix = el.dataset.suffix || '';
+                if (prefersReducedMotion || !target) {
+                    el.textContent = target.toLocaleString() + suffix;
+                    return;
+                }
+                const duration = 1400;
+                const start = performance.now();
+                function tick(now) {
+                    const progress = Math.min((now - start) / duration, 1);
+                    const eased = 1 - Math.pow(1 - progress, 3);
+                    el.textContent = Math.round(target * eased).toLocaleString() + suffix;
+                    if (progress < 1) requestAnimationFrame(tick);
+                }
+                requestAnimationFrame(tick);
+            }
+
+            const observer = new IntersectionObserver((entries, obs) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        numbers.forEach(animateCount);
+                        obs.disconnect();
+                    }
+                });
+            }, { threshold: 0.4 });
+
+            observer.observe(impact);
+        })();
+
         // navbar scroll effect
         window.addEventListener('scroll', () => {
             document.querySelector('.navbar').classList.toggle('scrolled', window.scrollY > 40);
         });
-
-        // stat counters
-        const counters = document.querySelectorAll('.stat-number');
-        const speed = 200;
-        const startCounting = (el) => {
-            const updateCount = () => {
-                const target = +el.getAttribute('data-target');
-                const current = +el.innerText;
-                const inc = target / 100;
-                if (current < target) { el.innerText = Math.ceil(current + inc); setTimeout(updateCount, 30); }
-                else el.innerText = target;
-            }; updateCount();
-        };
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => { if (entry.isIntersecting) { entry.target.querySelectorAll('.stat-number').forEach(el => { if (el.innerText == '0' || el.innerText == '0') startCounting(el); }); observer.unobserve(entry.target); } });
-        }, { threshold: 0.4 });
-        observer.observe(document.querySelector('.impact-stats'));
 
         // form alert (prevent actual submit)
         document.querySelector('form')?.addEventListener('submit', (e) => {
@@ -2267,6 +1136,29 @@
                 }
             }
 
+            // The mobile/tablet menu now opens as an overlay on top of the
+            // page instead of pushing content down — pair it with a dimmed
+            // backdrop, shown while it's open and closable by clicking
+            // anywhere outside the menu (including the backdrop itself).
+            const navBackdrop = document.getElementById('navBackdrop');
+            if (navbarCollapse && navBackdrop) {
+                navbarCollapse.addEventListener('show.bs.collapse', () => {
+                    navBackdrop.classList.add('show');
+                });
+                navbarCollapse.addEventListener('hidden.bs.collapse', () => {
+                    navBackdrop.classList.remove('show');
+                });
+
+                document.addEventListener('click', (e) => {
+                    if (!navbarCollapse.classList.contains('show')) return;
+                    const clickedInsideMenu = navbarCollapse.contains(e.target);
+                    const clickedToggler = navbarToggler && navbarToggler.contains(e.target);
+                    if (!clickedInsideMenu && !clickedToggler) {
+                        closeNavbar();
+                    }
+                });
+            }
+
             // Function to handle smooth scroll
             function smoothScroll(targetId) {
                 const targetElement = document.querySelector(targetId);
@@ -2282,12 +1174,35 @@
                 }
             }
 
+            // ========== SCROLLSPY: sync active nav link with section in view ==========
+            function setActiveNavLink(hash) {
+                navLinks.forEach(link => {
+                    link.classList.toggle('active', link.getAttribute('href') === hash);
+                });
+            }
+
             // Add click event to each nav link
             navLinks.forEach(link => {
                 link.addEventListener('click', function (e) {
+                    const targetId = this.getAttribute('href');
+
+                    // Links that point off-page (e.g. "Platform" -> the sign-in
+                    // route) aren't in-page anchors: let the browser navigate
+                    // normally instead of hijacking the click for smooth scroll.
+                    if (!targetId || !targetId.startsWith('#')) {
+                        closeNavbar();
+                        return;
+                    }
+
                     e.preventDefault();
 
-                    const targetId = this.getAttribute('href');
+                    // Give immediate feedback before the smooth scroll settles
+                    setActiveNavLink(targetId);
+
+                    // Clicking leaves the link :focus-ed, which shares the same
+                    // underline style as .active (home.css) — that made the
+                    // clicked link and the scrolled-to link both look active.
+                    this.blur();
 
                     // Close navbar first (if open)
                     closeNavbar();
@@ -2298,6 +1213,46 @@
                     }, 150);
                 });
             });
+
+            // Observe each section referenced by the nav and keep the matching
+            // link(s) highlighted as the user scrolls (multiple links can share
+            // a section, e.g. "Services" and "Platform" both point to #services)
+            const sectionHashes = [...new Set(
+                [...navLinks].map(link => link.getAttribute('href')).filter(href => href && href.startsWith('#'))
+            )];
+            const sections = sectionHashes
+                .map(hash => ({ hash, el: document.querySelector(hash) }))
+                .filter(entry => entry.el);
+
+            if (sections.length) {
+                const navbarHeight = document.querySelector('.navbar').offsetHeight;
+                const visibleRatios = new Map();
+
+                const sectionObserver = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        const hash = '#' + entry.target.id;
+                        visibleRatios.set(hash, entry.isIntersecting ? entry.intersectionRatio : 0);
+                    });
+
+                    let bestHash = null;
+                    let bestRatio = 0;
+                    visibleRatios.forEach((ratio, hash) => {
+                        if (ratio > bestRatio) {
+                            bestRatio = ratio;
+                            bestHash = hash;
+                        }
+                    });
+
+                    if (bestHash) {
+                        setActiveNavLink(bestHash);
+                    }
+                }, {
+                    rootMargin: `-${navbarHeight}px 0px -40% 0px`,
+                    threshold: [0, 0.1, 0.25, 0.5, 0.75, 1]
+                });
+
+                sections.forEach(({ el }) => sectionObserver.observe(el));
+            }
 
             // Also handle brand logo click
             const brandLink = document.querySelector('.navbar-brand');
@@ -2332,6 +1287,73 @@
                         }, 150);
                     }
                 });
+            });
+
+            // Testimonials: custom play button swaps in for the branded poster
+            document.querySelectorAll('.testimonial-video').forEach(wrap => {
+                const video = wrap.querySelector('video');
+                const playBtn = wrap.querySelector('.testimonial-play');
+                if (!video || !playBtn) return;
+
+                playBtn.addEventListener('click', () => video.play());
+                video.addEventListener('play', () => wrap.classList.add('is-playing'));
+                video.addEventListener('pause', () => wrap.classList.remove('is-playing'));
+                video.addEventListener('ended', () => wrap.classList.remove('is-playing'));
+            });
+
+            // Community events: prev/next buttons + auto-advance on small screens
+            document.querySelectorAll('.community-carousel').forEach(carousel => {
+                const track = carousel.querySelector('.community-track');
+                const prevBtn = carousel.querySelector('.community-nav.prev');
+                const nextBtn = carousel.querySelector('.community-nav.next');
+                if (!track || !prevBtn || !nextBtn) return;
+
+                function itemStep() {
+                    const item = track.querySelector('.community-item');
+                    if (!item) return 0;
+                    const gap = parseFloat(getComputedStyle(track).columnGap || getComputedStyle(track).gap) || 0;
+                    return item.getBoundingClientRect().width + gap;
+                }
+
+                prevBtn.addEventListener('click', () => track.scrollBy({ left: -itemStep(), behavior: 'smooth' }));
+                nextBtn.addEventListener('click', () => track.scrollBy({ left: itemStep(), behavior: 'smooth' }));
+
+                // Auto-advance is only meaningful in the small-screen carousel layout
+                // (the tablet/desktop grid doesn't scroll, so this is a no-op there).
+                const isMobileCarousel = () => window.matchMedia('(max-width: 767.98px)').matches;
+                const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                let autoTimer = null;
+                let resumeTimer = null;
+                let paused = false;
+
+                function autoAdvance() {
+                    if (paused || !isMobileCarousel()) return;
+                    const atEnd = track.scrollLeft + track.clientWidth >= track.scrollWidth - 4;
+                    track.scrollTo({ left: atEnd ? 0 : track.scrollLeft + itemStep(), behavior: 'smooth' });
+                }
+
+                function startAuto() {
+                    clearInterval(autoTimer);
+                    autoTimer = setInterval(autoAdvance, 3200);
+                }
+
+                // Pause while the visitor is actively touching/hovering/scrolling the
+                // track, then quietly resume a few seconds after they let go.
+                function pauseThenResume() {
+                    paused = true;
+                    clearTimeout(resumeTimer);
+                    resumeTimer = setTimeout(() => { paused = false; }, 4000);
+                }
+
+                ['mouseenter', 'touchstart', 'pointerdown'].forEach(evt => {
+                    track.addEventListener(evt, pauseThenResume, { passive: true });
+                });
+                track.addEventListener('mouseleave', () => { paused = false; });
+
+                if (!reduceMotion) {
+                    startAuto();
+                    window.addEventListener('resize', startAuto);
+                }
             });
         });
 
@@ -2389,11 +1411,6 @@
             }, 2000);
         });
 
-        // File attachment click handler
-        document.querySelector('.file-attachment')?.addEventListener('click', function () {
-            document.getElementById('attachment').click();
-        });
-
         // Real-time form validation styling
         document.querySelectorAll('.form-control, .form-select').forEach(input => {
             input.addEventListener('focus', function () {
@@ -2404,6 +1421,94 @@
                 this.parentElement.classList.remove('focused');
             });
         });
+
+        // Custom "Subject" dropdown (replaces the native <select> popup, which
+        // can't be restyled consistently across browsers). A hidden input
+        // carries the actual value for form submission.
+        (function () {
+            const select = document.getElementById('subjectSelect');
+            const hiddenInput = document.getElementById('subject');
+            if (!select || !hiddenInput) return;
+
+            const valueEl = select.querySelector('.custom-select-value');
+            const options = Array.from(select.querySelectorAll('[role="option"]'));
+            let activeIndex = options.findIndex(o => o.getAttribute('aria-selected') === 'true');
+
+            // Bootstrap's .row is a flex container, so each .col is its own
+            // stacking context — the options list's z-index only wins against
+            // its own siblings, not against a *later* column (like the
+            // message textarea) that sits in a sibling stacking context.
+            // Bumping the whole column's z-index while open fixes that.
+            const fieldCol = select.closest('.subject-field-col');
+
+            function closeList() {
+                select.classList.remove('open');
+                select.setAttribute('aria-expanded', 'false');
+                if (fieldCol) fieldCol.classList.remove('dropdown-open');
+            }
+
+            function openList() {
+                select.classList.add('open');
+                select.setAttribute('aria-expanded', 'true');
+                if (fieldCol) fieldCol.classList.add('dropdown-open');
+            }
+
+            function selectOption(option) {
+                options.forEach(o => {
+                    o.classList.remove('active');
+                    o.setAttribute('aria-selected', 'false');
+                });
+                option.classList.add('active');
+                option.setAttribute('aria-selected', 'true');
+                valueEl.textContent = option.dataset.value;
+                hiddenInput.value = option.dataset.value;
+                activeIndex = options.indexOf(option);
+            }
+
+            select.addEventListener('click', () => {
+                select.classList.contains('open') ? closeList() : openList();
+            });
+
+            // A mousedown on the (non-focusable) options list would otherwise
+            // blur the trigger before its click fires, closing the list first
+            // and swallowing the selection. Keep focus on the trigger instead.
+            select.querySelector('.custom-select-options').addEventListener('mousedown', (e) => {
+                e.preventDefault();
+            });
+
+            options.forEach(option => {
+                option.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    selectOption(option);
+                    closeList();
+                    select.focus();
+                });
+            });
+
+            select.addEventListener('keydown', (e) => {
+                if (['ArrowDown', 'ArrowUp', 'Enter', ' ', 'Escape'].includes(e.key)) {
+                    e.preventDefault();
+                }
+                if (e.key === 'ArrowDown') {
+                    if (!select.classList.contains('open')) { openList(); return; }
+                    activeIndex = Math.min(activeIndex + 1, options.length - 1);
+                    selectOption(options[activeIndex]);
+                } else if (e.key === 'ArrowUp') {
+                    activeIndex = Math.max(activeIndex - 1, 0);
+                    selectOption(options[activeIndex]);
+                } else if (e.key === 'Enter' || e.key === ' ') {
+                    select.classList.contains('open') ? closeList() : openList();
+                } else if (e.key === 'Escape') {
+                    closeList();
+                }
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!select.contains(e.target)) closeList();
+            });
+
+            select.addEventListener('blur', closeList);
+        })();
     </script>
 
 </body>
