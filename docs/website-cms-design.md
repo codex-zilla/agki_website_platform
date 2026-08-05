@@ -161,10 +161,18 @@ class AwardLogo(models.Model):
 
 class Testimonial(models.Model):
     patient_name = models.CharField(max_length=100, blank=True)   # optional attribution
-    youtube_url = models.URLField(help_text="Preferred: unlisted YouTube/Vimeo link — see §6.2")
+    # Both fields are optional individually — `clean()` requires at least one.
+    # (An earlier draft made youtube_url required, which contradicted video_file
+    # being an "escape hatch": a staffer uploading a file instead of a URL would
+    # have been blocked by the required URL field. Caught during implementation.)
+    youtube_url = models.URLField(blank=True, help_text="Preferred: unlisted YouTube/Vimeo link — see §6.2")
     video_file = models.FileField(upload_to="cms/testimonials/", blank=True, null=True)
     is_published = models.BooleanField(default=True)
     order = models.PositiveIntegerField(default=0)
+
+    def clean(self):
+        if not self.youtube_url and not self.video_file:
+            raise ValidationError("Provide either a YouTube/Vimeo URL or an uploaded video file.")
 
 class CommunityPhoto(models.Model):
     image = models.ImageField(upload_to="cms/community/%Y/%m/")
