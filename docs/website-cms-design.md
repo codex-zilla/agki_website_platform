@@ -29,7 +29,7 @@ Both prior audits (`appointments/`, `doctorDashboard/`) found the same failure p
 Three small add-ons make it non-technical-friendly without turning it into a custom build:
 
 - **`django-ckeditor-5`** — rich text widget for the handful of fields that need bold/links/paragraphs (about copy, news body, FAQ answers), so staff aren't hand-writing HTML.
-- **`django-adminsortable2`** — drag-and-drop reordering for the many "list of cards" models (team, services, news, FAQ, testimonials) instead of typing order numbers.
+- **`django-admin-sortable2`** — drag-and-drop reordering for the many "list of cards" models (team, services, news, FAQ, testimonials) instead of typing order numbers.
 - Admin branding (`admin.site.site_header = "AGKI Content Manager"`, custom `index_title`) — five minutes of work that stops it looking like a generic Django admin to non-technical staff.
 
 ---

@@ -27,6 +27,7 @@ urlpatterns = [
     path('doctorDashboard/', include('doctorDashboard.urls')),
     path('ecommerce/', include('ecommerce.urls')),
     path('accounts/', include('allauth.urls')),  # google login ===============
+    path('ckeditor5/', include('django_ckeditor_5.urls')),
 ]
 
 if settings.DEBUG:

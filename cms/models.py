@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError
 from django.db import models
+from django_ckeditor_5.fields import CKEditor5Field
 
 from cms.validators import (
     image_extension_validator,
@@ -110,7 +111,7 @@ class HeroImpactStat(models.Model):
 class AboutContent(SingletonModel):
     story_badge = models.CharField(max_length=40, help_text="e.g. 'Est. 2022'")
     story_heading = models.CharField(max_length=150)
-    story_copy = models.TextField()
+    story_copy = CKEditor5Field(config_name="default")
     mission_text = models.TextField()
     vision_text = models.TextField()
     youtube_embed_url = models.URLField(blank=True)
@@ -288,7 +289,7 @@ class NewsPost(models.Model):
     title = models.CharField(max_length=150)
     slug = models.SlugField(unique=True, help_text="URL-safe identifier — auto-filled from the title in the admin.")
     excerpt = models.CharField(max_length=250)
-    body = models.TextField(blank=True, help_text="Optional — for a future full article page. The homepage card only shows the excerpt.")
+    body = CKEditor5Field(config_name="default", blank=True, help_text="Optional — for a future full article page. The homepage card only shows the excerpt.")
     published_date = models.DateField()
     is_published = models.BooleanField(default=True)
     order = models.PositiveIntegerField(default=0)
@@ -304,7 +305,7 @@ class NewsPost(models.Model):
 class FAQItem(models.Model):
     icon_class = models.CharField(max_length=60)
     question = models.CharField(max_length=150)
-    answer = models.TextField()
+    answer = CKEditor5Field(config_name="default")
     is_published = models.BooleanField(default=True)
     order = models.PositiveIntegerField(default=0)
 

@@ -101,6 +101,8 @@ INSTALLED_APPS = [
     'doctorDashboard',
     'ecommerce',
     'cms',
+    'django_ckeditor_5',
+    'adminsortable2',
     # google login
     'django.contrib.sites',
     'allauth',
@@ -330,3 +332,18 @@ SECURE_PROXY_SSL_HEADER = (
     if env_bool("DJANGO_TRUST_X_FORWARDED_PROTO", False)
     else None
 )
+
+# django-ckeditor-5: rich text widget used on a handful of cms fields
+# (About story copy, News body, FAQ answers — see docs/website-cms-design.md §2).
+# Upload endpoint defaults to staff-only (permissions.py in the package),
+# which matches the Content Editors group being is_staff=True.
+CKEDITOR_5_CONFIGS = {
+    "default": {
+        "toolbar": [
+            "heading", "|",
+            "bold", "italic", "link", "|",
+            "bulletedList", "numberedList", "blockQuote", "|",
+            "undo", "redo",
+        ],
+    },
+}
