@@ -13,11 +13,11 @@ This runs on a live site with a real database and real uploaded media (`passenge
 
 | # | Task | Status | Notes / Remarks |
 |---|---|---|---|
-| 0.1 | Confirm which environment this work happens against first (local `db.sqlite3` vs. a staging copy vs. prod) | 🔲 | |
-| 0.2 | Create a feature branch off `main` (e.g. `feature/website-cms`) — no direct commits to `main` for this body of work | 🔲 | |
-| 0.3 | Back up `db.sqlite3` and `media/` before any migration runs, even locally — cheap insurance | 🔲 | |
-| 0.4 | Confirm `pip install` is allowed in this environment / who approves new dependencies (`django-ckeditor-5`, `django-adminsortable2`) | 🔲 | |
-| 0.5 | Confirm the dead-code cleanup (previous commit) is merged/stable before layering CMS work on top | ✅ | Cleanup staged this session: `app.Appointment` model, `book_appointment`/`appointment_success`/`signin` views+templates removed, migration `0002_delete_appointment` applied locally. |
+| 0.1 | Confirm which environment this work happens against first (local `db.sqlite3` vs. a staging copy vs. prod) | ✅ | Confirmed by AGKI: this is local dev only. The local `db.sqlite3` contains a copy of real-looking data but is **not** the deployed instance — a separate copy is already live in production. Lowers the stakes of local migrate/seed mistakes, but production still gets its own backup + careful rollout at Phase 10 regardless. |
+| 0.2 | Create a feature branch off `main` (e.g. `feature/website-cms`) — no direct commits to `main` for this body of work | ✅ | Branch `feature/website-cms` created off `main` after the dead-code cleanup + docs were committed to `main` directly (that cleanup was standalone and predates this feature). All Phase 1+ work happens on this branch. |
+| 0.3 | Back up `db.sqlite3` and `media/` before any migration runs, even locally — cheap insurance | ✅ | Both copied to a local scratch backup directory (`db.sqlite3` 444K, `media/` 6.4M — trivial size). **Caveat:** that scratch directory is session-temporary, not durable storage — treat this as a same-session safety net only, not a real backup. Production backup at Phase 10 (10.2) needs an actual durable location. |
+| 0.4 | Confirm `pip install` is allowed in this environment / who approves new dependencies (`django-ckeditor-5`, `django-adminsortable2`) | ✅ | Approved by AGKI — both packages added to `requirements.txt` at Phase 3 (not installed yet; no need to pull them in before the app that uses them exists). |
+| 0.5 | Confirm the dead-code cleanup (previous commit) is merged/stable before layering CMS work on top | ✅ | Committed to `main` as `17c4bf7` (code) and `42ced9e` (docs) before branching. `app.Appointment` model, `book_appointment`/`appointment_success`/`signin` views+templates removed, migration `0002_delete_appointment` applied locally. |
 
 ---
 
@@ -194,7 +194,8 @@ Running record of anything decided along the way that isn't already in the desig
 
 | Date | Decision | Made by | Why |
 |---|---|---|---|
-| | | | |
+| 2026-08-05 | Local `db.sqlite3`/`media/` are a disposable dev copy, not the production data source | AGKI | Production runs a separate, already-deployed copy — de-risks local migration/seed experimentation, but does not change the Phase 10 production rollout care (backup, staged migrate) since that still touches the real thing. |
+| 2026-08-05 | Approved adding `django-ckeditor-5` and `django-adminsortable2` as new dependencies | AGKI | Small, actively maintained, narrowly-scoped admin add-ons; avoids hand-building rich text/reordering widgets from scratch. |
 
 ---
 
