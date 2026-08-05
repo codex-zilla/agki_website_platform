@@ -100,6 +100,7 @@ INSTALLED_APPS = [
     'useraccount',
     'doctorDashboard',
     'ecommerce',
+    'cms',
     # google login
     'django.contrib.sites',
     'allauth',

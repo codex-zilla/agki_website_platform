@@ -25,13 +25,13 @@ This runs on a live site with a real database and real uploaded media (`passenge
 
 | # | Task | Status | Notes / Remarks |
 |---|---|---|---|
-| 1.1 | `python manage.py startapp cms` | 🔲 | |
-| 1.2 | Add `'cms'` to `INSTALLED_APPS` in `project/settings.py` | 🔲 | |
-| 1.3 | Set `verbose_name` in `cms/apps.py` (e.g. `"Website Content"`) so it reads well in the admin sidebar | 🔲 | |
-| 1.4 | Empty `models.py`/`admin.py` committed as a clean starting point | 🔲 | |
-| 1.5 | `python manage.py check` passes with the new app registered and empty | 🔲 | |
+| 1.1 | `python manage.py startapp cms` | ✅ | Scaffolded on `feature/website-cms`. |
+| 1.2 | Add `'cms'` to `INSTALLED_APPS` in `project/settings.py` | ✅ | Added after `'ecommerce'`, before the `allauth` block. |
+| 1.3 | Set `verbose_name` in `cms/apps.py` (e.g. `"Website Content"`) so it reads well in the admin sidebar | ✅ | Set to `"Website Content"`. |
+| 1.4 | Empty `models.py`/`admin.py` committed as a clean starting point | ✅ | `startapp` defaults left untouched — nothing to add until Phase 2. |
+| 1.5 | `python manage.py check` passes with the new app registered and empty | ✅ | "System check identified no issues (0 silenced)." |
 
-**Phase gate:** app exists, is registered, project still boots clean before any model is written.
+**Phase gate:** app exists, is registered, project still boots clean before any model is written. ✅ **Met.**
 
 ---
 
