@@ -33,6 +33,13 @@ htmlcov/
 Thumbs.db
 Desktop.ini
 
+# AI tooling: personal/local state, not meant to be shared via git
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+
+# Scratch output from unzipping a .docx to pull its embedded assets
+design/_extract/
+
 # Packaging
 build/
 dist/
