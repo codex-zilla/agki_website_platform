@@ -59,7 +59,7 @@
                                 </div>
                                 <div class="col-sm-6">
                                     <label class="text-muted small mb-1">Role</label>
-                                    <p class="fw-bold text-success mb-0">{{ user.role|default:"Doctor" }}</p>
+                                    <p class="fw-bold text-success mb-0">{{ user.get_role_display|default:"Not assigned" }}</p>
                                 </div>
                             </div>
 
@@ -71,6 +71,13 @@
                                 <div class="col-sm-6">
                                     <label class="text-muted small mb-1">Location</label>
                                     <p class="fw-bold mb-0">{{ profile.location|default:"Not specified" }}</p>
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-sm-6">
+                                    <label class="text-muted small mb-1">Qualifications</label>
+                                    <p class="fw-bold mb-0">{{ user.qualifications|default:"Not specified" }}</p>
                                 </div>
                             </div>
 

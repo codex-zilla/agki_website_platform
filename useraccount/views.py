@@ -90,6 +90,15 @@ def signup(request):
             messages.error(request, 'Passwords do not match. Please try again.')
             return redirect('signup')
 
+        # The <select> in the template only offers doctor/receptionist, but
+        # the request body is still attacker-controlled - validate server
+        # side too. "admin" is deliberately never accepted here; that role
+        # is only ever assigned through the staff admin UI (CustomUserAdmin).
+        allowed_signup_roles = {CustomUser.Role.DOCTOR, CustomUser.Role.RECEPTIONIST}
+        if role not in allowed_signup_roles:
+            messages.error(request, 'Please select a valid role.')
+            return redirect('signup')
+
         # Create user but don't activate yet
         myuser = CustomUser.objects.create_user(username=username, email=email, password=password1)
         myuser.first_name = firstname

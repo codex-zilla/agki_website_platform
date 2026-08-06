@@ -4,10 +4,23 @@ from django.contrib.auth.models import AbstractUser
 
 
 class CustomUser(AbstractUser):
+    class Role(models.TextChoices):
+        ADMIN = "admin", "Admin"
+        DOCTOR = "doctor", "Doctor"
+        RECEPTIONIST = "receptionist", "Receptionist"
+
     email = models.EmailField(unique=True)
     phone = models.CharField(max_length=15, null=True, blank=True, default="null")
     image = models.ImageField(blank=True, null=True)
-    role = models.CharField(max_length=100, null=True, blank=True)
+    # Account type - drives permissions/business logic (e.g. who shows up
+    # as bookable on the public site). Admin-assigned only, not
+    # self-editable - see useraccount/admin.py CustomUserAdmin and the
+    # (now removed) role field on the self-service profile-edit form.
+    role = models.CharField(max_length=20, choices=Role.choices, blank=True)
+    # Free-text professional credentials (e.g. "MD, MBBS, PhD") - split out
+    # from `role` because the two were previously the same field doing two
+    # unrelated jobs, which is how e.g. "4491" ended up as someone's role.
+    qualifications = models.CharField(max_length=255, blank=True)
     signature = models.ImageField(blank=True, null=True)
     # login otp verification
     otp_secret_key = models.CharField(max_length=255, blank=True, null=True)

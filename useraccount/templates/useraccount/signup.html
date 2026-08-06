@@ -477,7 +477,14 @@
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label class="form-label" for="role">Role</label>
-                                    <input type="tel" id="role" name="role" class="form-control" required>
+                                    <!-- "Admin" is deliberately not offered here: public self-signup
+                                         should never let someone advertise themselves as an admin
+                                         account. Admin is assigned only through the staff admin UI. -->
+                                    <select id="role" name="role" class="form-control" required>
+                                        <option value="" disabled selected>Select your role</option>
+                                        <option value="doctor">Doctor</option>
+                                        <option value="receptionist">Receptionist</option>
+                                    </select>
                                     <div class="error-message" id="role-error">Please select your role</div>
                                 </div>
                             </div>

@@ -11,7 +11,7 @@ from datetime import date, timedelta
 from collections import defaultdict
 from datetime import datetime, timedelta
 def search_results(request):
-    doctors = Profile.objects.filter(user__role='doctor').select_related('user')
+    doctors = Profile.objects.filter(user__role=CustomUser.Role.DOCTOR).select_related('user')
     
     # Get the next 5 days starting from today
     today = datetime.now().date()

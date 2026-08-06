@@ -18,7 +18,7 @@ class CustomUserAdmin(UserAdmin):
     list_filter = UserAdmin.list_filter + ("role", "is_approved")
 
     fieldsets = UserAdmin.fieldsets + (
-        ("AGKI profile", {"fields": ("phone", "image", "role", "signature", "is_approved")}),
+        ("AGKI profile", {"fields": ("phone", "image", "role", "qualifications", "signature", "is_approved")}),
     )
     add_fieldsets = (
         (None, {

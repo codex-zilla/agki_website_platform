@@ -135,5 +135,10 @@ class ProfileEditForm(forms.ModelForm):
 class UserEditForm(forms.ModelForm):
     class Meta:
         model = CustomUser
-        fields = ['first_name', 'last_name', 'email','image', 'phone', 'role']
+        # role intentionally excluded - it's the account-type field
+        # (admin/doctor/receptionist) that drives permissions/business
+        # logic, so it's admin-assigned only via CustomUserAdmin, not
+        # self-editable here. qualifications (free-text credentials, e.g.
+        # "MD, MBBS, PhD") is what this form used to mislabel as "role".
+        fields = ['first_name', 'last_name', 'email', 'image', 'phone', 'qualifications']
         
