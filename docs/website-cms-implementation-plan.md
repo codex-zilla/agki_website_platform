@@ -103,6 +103,22 @@ Raised after Phase 3 closed: the *default* Django admin chrome (grey header, no 
 
 **Phase gate:** least-privilege confirmed by actually logging in as the scoped account, not by reading the permission list. ✅ **Met** — see 4.4/4.5.
 
+### Phase 4 addendum — making account creation actually safe
+
+Raised after Phase 4 closed: "how do I create a real content-editor account?" The honest answer required fixing two latent bugs in `useraccount/admin.py` first — without them, the obvious path ("Users → Add user" in the admin) would have quietly produced a broken account.
+
+| #   | Task | Status | Notes / Remarks |
+| --- | --- | --- | --- |
+| 4.6 | Diagnose why "just add a user in the admin" wasn't actually safe | ✅ | Two separate bugs found: (1) `admin.site.register(CustomUser)` had no custom `UserAdmin` — the "Add user" form's password field was a plain text input with no hashing, so a typed password saved as literal plaintext and the account could never log in. (2) `useraccount/signals.py`'s `post_save` handler treats *any* newly created account with a real password as a public self-signup, force-setting `is_active=False` and emailing a one-time code that expires in **2 minutes** — correct for the public `/useraccount/signup/` form, wrong for an account an admin is directly, intentionally creating. |
+| 4.7 | Give `CustomUser` a real `UserAdmin` | ✅ | New `CustomUserAdmin(UserAdmin)` in `useraccount/admin.py`. Subclassing the real `UserAdmin` (not a plain `ModelAdmin`) is what brings proper password hashing back — its `UserCreationForm`/`UserChangeForm` call `set_password()` correctly. Extended `fieldsets` with an "AGKI profile" section (`phone`, `image`, `role`, `signature`, `is_approved`) and widened `add_fieldsets` to also include `email`, `role`, `is_staff`, and `groups` — Django's default `UserAdmin` deliberately keeps staff/group assignment off the *add* form (create bare account, then edit it to grant access); including them here makes "create a fully-configured Content Editor" a single form submission instead of two. |
+| 4.8 | Make admin-created accounts bypass the public-signup OTP gate | ✅ | `save_model()` override: after `UserAdmin`'s own save (which is what triggers the signal), force `is_active=True` + `is_approved=True` and delete any `OtpToken` the signal just created, **only when the row is new**. The signal itself is untouched — public self-signup through `/useraccount/signup/` still requires email verification exactly as before; this only changes what happens for accounts created *through the admin*, where the person creating the account already is the verification. |
+| 4.9 | Verify end-to-end, not just "the form submitted" | ✅ | Scripted: POST to `/admin/useraccount/customuser/add/` with username/email/role/`is_staff`/`groups`(Content Editors)/password in one submission → confirmed `check_password()` matches what was typed (real hash, not plaintext), `is_active`/`is_approved` both `True` immediately, zero leftover `OtpToken` rows, `is_staff` and group membership set in the single step. Then, critically, a **real** `Client().login(username=..., password=...)` (not `force_login`, which bypasses password checking entirely) — proving the stored hash genuinely authenticates through Django's real auth backend, not just that fields look right in the DB. Followed by the same cms-allowed / appointments-blocked check from Phase 4. All passed. Test account deleted after. |
+| 4.10 | Remove the Phase 4 throwaway `content_editor_dev` account | ✅ | No longer needed now that real accounts can be created safely and repeatably through the admin UI — removed to avoid it being mistaken for a real staff account later. |
+
+**Addendum gate:** a superuser can create a fully-working, correctly-scoped Content Editor account through the admin UI in one form submission, with a real (not force-logged-in) password that actually authenticates. ✅ **Met** — see 4.9.
+
+**How to create a real account** (once you're ready): `/admin/useraccount/customuser/add/` → fill in username, email, role, check "Staff status", pick **Content Editors** under Groups, set a password → Save. That's the whole process now.
+
 ---
 
 ## Phase 5 — Seed data (import today's live content)
