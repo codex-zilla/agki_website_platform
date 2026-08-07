@@ -130,7 +130,11 @@ ROOT_URLCONF = 'project.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        # Project-level template overrides (admin/base.html, admin/index.html)
+        # live here. DIRS is always checked before any app's own templates/
+        # dir (including jazzmin's bundled ones), regardless of INSTALLED_APPS
+        # order - that's what makes these overrides actually take effect.
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -345,6 +349,15 @@ JAZZMIN_SETTINGS = {
     "site_brand": "AGKI Content Manager",
     "welcome_sign": "Welcome to the AGKI content manager",
     "copyright": "AGKI Medical Laboratory",
+    # Reuse the same logo/favicon the public site already uses
+    # (app/static/app/logo.png) so the admin doesn't feel like a
+    # separate, unbranded tool bolted onto the site.
+    "site_logo": "app/logo.png",
+    "site_logo_classes": "",
+    "site_icon": "app/logo.png",
+    # AGKI brand palette layered on top of the Flatly bootswatch theme —
+    # see cms/static/cms/admin/agki-admin.css for the full rationale.
+    "custom_css": "cms/admin/agki-admin.css",
     # The floating theme customizer is a developer toy, not something a
     # content editor should be able to stumble into and reconfigure.
     "show_ui_builder": False,

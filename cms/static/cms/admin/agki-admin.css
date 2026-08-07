@@ -1,0 +1,204 @@
+/*
+ * AGKI brand overrides for the admin panel.
+ *
+ * Layered on top of jazzmin + the Flatly bootswatch theme (see
+ * JAZZMIN_SETTINGS["custom_css"] in project/settings.py) rather than
+ * replacing them - jazzmin/AdminLTE still own layout mechanics
+ * (responsive collapse, modals, form widgets); this file only reskins
+ * colors/chrome toward AGKI's actual brand palette (same values as
+ * app/static/app/home.css's :root) and styles the custom dashboard
+ * markup in templates/admin/index.html and the custom sidebar grouping
+ * in templates/admin/base.html.
+ */
+
+:root,
+[data-bs-theme="light"],
+[data-bs-theme="dark"] {
+  --agki-brand-deep: #1f4a1f;
+  --agki-brand: #2d5a2d;
+  --agki-brand-bright: #7cc576;
+  --agki-state-pending: #9a6116;
+  --agki-state-pending-bg: #fbeed9;
+  --agki-state-live: #276029;
+  --agki-state-live-bg: #e3efe2;
+
+  /* Retarget Flatly's teal primary to AGKI green so buttons, active
+     nav states, links and focus rings all follow the brand instead. */
+  --bs-primary: var(--agki-brand);
+  --bs-primary-rgb: 45, 90, 45;
+  --bs-link-color: var(--agki-brand);
+  --bs-link-hover-color: var(--agki-brand-deep);
+}
+
+/* ------------------------------------------------------------------ */
+/* Chrome: sidebar + topbar                                           */
+/* ------------------------------------------------------------------ */
+
+.app-sidebar {
+  background: linear-gradient(178deg, var(--agki-brand) 0%, var(--agki-brand-deep) 80%) !important;
+}
+
+.app-sidebar .sidebar-brand {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.app-sidebar .nav-header {
+  color: #b9d8b5;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding-top: 1rem;
+}
+
+.app-sidebar .nav-link {
+  color: #dbeed8;
+  border-radius: 8px;
+}
+
+.app-sidebar .nav-link:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: #fff;
+}
+
+.app-sidebar .nav-link.active,
+.app-sidebar .nav-treeview .nav-link.active {
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: #fff !important;
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--agki-brand-bright);
+}
+
+.app-sidebar .nav-badge {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-weight: 700;
+}
+
+.app-header.navbar {
+  border-bottom: 1px solid rgba(45, 90, 45, 0.12);
+}
+
+.btn-primary {
+  background-color: var(--agki-brand) !important;
+  border-color: var(--agki-brand) !important;
+}
+.btn-primary:hover {
+  background-color: var(--agki-brand-deep) !important;
+  border-color: var(--agki-brand-deep) !important;
+}
+
+.agki-live-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--agki-brand);
+  text-decoration: none;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid rgba(45, 90, 45, 0.25);
+  border-radius: 8px;
+  margin-right: 0.5rem;
+}
+.agki-live-link:hover {
+  background: var(--agki-state-live-bg);
+  color: var(--agki-brand-deep);
+}
+
+/* ------------------------------------------------------------------ */
+/* Dashboard (templates/admin/index.html)                             */
+/* ------------------------------------------------------------------ */
+
+.agki-greet h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.3rem;
+}
+.agki-greet p {
+  margin: 0;
+  color: #5f6f60;
+  max-width: 62ch;
+}
+
+.agki-stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 0.9rem;
+  margin: 1.4rem 0 1.9rem;
+}
+.agki-stat-card {
+  background: var(--bs-body-bg, #fff);
+  border: 1px solid rgba(45, 90, 45, 0.12);
+  border-left: 3px solid var(--agki-brand);
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+  box-shadow: 0 1px 2px rgba(23, 36, 26, 0.06);
+}
+.agki-stat-card.is-pending { border-left-color: var(--agki-state-pending); }
+.agki-stat-num {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+.agki-stat-label { font-size: 0.78rem; color: #5f6f60; margin-top: 0.15rem; }
+
+.agki-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 1.6rem 0 0.85rem;
+}
+.agki-section-head h3 { font-size: 0.95rem; font-weight: 700; margin: 0; }
+.agki-section-head .agki-hint { font-size: 0.78rem; color: #5f6f60; }
+
+.agki-action-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 0.5rem;
+}
+.agki-action-card {
+  background: var(--bs-body-bg, #fff);
+  border: 1px solid rgba(45, 90, 45, 0.12);
+  border-radius: 12px;
+  padding: 1rem 1.05rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  text-decoration: none;
+  color: inherit;
+  box-shadow: 0 1px 2px rgba(23, 36, 26, 0.06);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+}
+.agki-action-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px -14px rgba(23, 36, 26, 0.3);
+  border-color: var(--agki-brand-bright);
+  color: inherit;
+}
+.agki-action-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--agki-state-live-bg);
+  color: var(--agki-brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.agki-action-title { font-weight: 700; font-size: 0.88rem; }
+.agki-action-desc { font-size: 0.78rem; color: #5f6f60; line-height: 1.4; }
+
+.agki-panel { margin-top: 0.5rem; }
+.agki-panel .card-header { font-weight: 700; font-size: 0.88rem; }
+.agki-tips { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.75rem; }
+.agki-tips li { font-size: 0.82rem; color: #5f6f60; display: flex; gap: 0.55rem; }
+.agki-tips li b { color: inherit; font-weight: 600; }
+.agki-tip-num {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.72rem;
+  color: var(--agki-brand);
+  flex-shrink: 0;
+}

@@ -1,0 +1,174 @@
+{% extends "admin/base_site.html" %}
+{% load i18n log %}
+
+{# ------------------------------------------------------------------ #}
+{# AGKI custom admin dashboard — replaces jazzmin's default app/model  #}
+{# card grid with the stat/quick-action/activity layout reviewed as   #}
+{# a mockup before this was built (see                                #}
+{# docs/website-cms-implementation-plan.md Phase 3 addendum 2).       #}
+{#                                                                     #}
+{# cms_stats.* comes from cms/admin_dashboard.py, wired into           #}
+{# admin.site.index() via cms/apps.py's ready() hook — see that file  #}
+{# for why it's a runtime patch rather than a custom AdminSite class. #}
+{# ------------------------------------------------------------------ #}
+
+{% block bodyclass %}{{ block.super }} dashboard{% endblock %}
+
+{% block content_title %}{% trans 'Dashboard' %}{% endblock %}
+
+{% block breadcrumbs %}
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'admin:index' %}">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item">{% trans 'Dashboard' %}</li>
+    </ol>
+{% endblock %}
+
+{% block content %}
+<div class="col-12">
+
+    <div class="agki-greet">
+        <h2>{% blocktrans with name=request.user.first_name|default:request.user.username %}Good to see you, {{ name }}{% endblocktrans %}</h2>
+        <p>{% trans "Here's what's happening on the AGKI website." %}</p>
+    </div>
+
+    <div class="agki-stat-row">
+        <div class="agki-stat-card">
+            <div class="agki-stat-num">{{ cms_stats.published_news }}</div>
+            <div class="agki-stat-label">{% trans 'Published news posts' %}</div>
+        </div>
+        <div class="agki-stat-card">
+            <div class="agki-stat-num">{{ cms_stats.team_members }}</div>
+            <div class="agki-stat-label">{% trans 'Team members listed' %}</div>
+        </div>
+        <div class="agki-stat-card{% if cms_stats.unread_messages %} is-pending{% endif %}">
+            <div class="agki-stat-num">{{ cms_stats.unread_messages }}</div>
+            <div class="agki-stat-label">{% trans 'Unread contact messages' %}</div>
+        </div>
+        <div class="agki-stat-card">
+            <div class="agki-stat-num">{{ cms_stats.live_testimonials }}</div>
+            <div class="agki-stat-label">{% trans 'Testimonials live' %}</div>
+        </div>
+    </div>
+
+    <div class="agki-section-head">
+        <h3>{% trans 'Quick actions' %}</h3>
+        <span class="agki-hint">{% trans 'Jump straight to the section you need' %}</span>
+    </div>
+    <div class="agki-action-grid">
+        {% if perms.cms.change_herocontent %}
+        <a class="agki-action-card" href="{% url 'admin:cms_herocontent_changelist' %}">
+            <div class="agki-action-icon"><i class="fas fa-star"></i></div>
+            <div class="agki-action-title">{% trans 'Edit hero section' %}</div>
+            <div class="agki-action-desc">{% trans 'Headline, lede and the impact stats.' %}</div>
+        </a>
+        {% endif %}
+
+        {% if perms.cms.change_aboutcontent %}
+        <a class="agki-action-card" href="{% url 'admin:cms_aboutcontent_changelist' %}">
+            <div class="agki-action-icon"><i class="fas fa-info-circle"></i></div>
+            <div class="agki-action-title">{% trans 'Edit about section' %}</div>
+            <div class="agki-action-desc">{% trans 'Our story, mission, vision and core values.' %}</div>
+        </a>
+        {% endif %}
+
+        {% if perms.cms.add_newspost %}
+        <a class="agki-action-card" href="{% url 'admin:cms_newspost_add' %}">
+            <div class="agki-action-icon"><i class="fas fa-newspaper"></i></div>
+            <div class="agki-action-title">{% trans 'Add a news post' %}</div>
+            <div class="agki-action-desc">{% trans 'Publish an update for the homepage.' %}</div>
+        </a>
+        {% endif %}
+
+        {% if perms.cms.view_teammember or perms.cms.change_teammember %}
+        <a class="agki-action-card" href="{% url 'admin:cms_teammember_changelist' %}">
+            <div class="agki-action-icon"><i class="fas fa-user-friends"></i></div>
+            <div class="agki-action-title">{% trans 'Manage team' %}</div>
+            <div class="agki-action-desc">{% trans "Add, reorder or retire a team member's card." %}</div>
+        </a>
+        {% endif %}
+
+        {% if perms.cms.view_testimonial or perms.cms.change_testimonial %}
+        <a class="agki-action-card" href="{% url 'admin:cms_testimonial_changelist' %}">
+            <div class="agki-action-icon"><i class="fas fa-comment-dots"></i></div>
+            <div class="agki-action-title">{% trans 'Manage testimonials' %}</div>
+            <div class="agki-action-desc">{% trans 'Add a patient story via YouTube link or upload.' %}</div>
+        </a>
+        {% endif %}
+
+        {% if perms.cms.view_faqitem or perms.cms.change_faqitem %}
+        <a class="agki-action-card" href="{% url 'admin:cms_faqitem_changelist' %}">
+            <div class="agki-action-icon"><i class="fas fa-question-circle"></i></div>
+            <div class="agki-action-title">{% trans 'Manage FAQ' %}</div>
+            <div class="agki-action-desc">{% trans 'Add, edit or reorder frequently asked questions.' %}</div>
+        </a>
+        {% endif %}
+
+        {% if perms.cms.view_contactmessage %}
+        <a class="agki-action-card" href="{% url 'admin:cms_contactmessage_changelist' %}">
+            <div class="agki-action-icon"><i class="fas fa-envelope"></i></div>
+            <div class="agki-action-title">{% trans 'Contact messages' %}</div>
+            <div class="agki-action-desc">
+                {% blocktrans count counter=cms_stats.unread_messages %}{{ counter }} new message from the website contact form.{% plural %}{{ counter }} new messages from the website contact form.{% endblocktrans %}
+            </div>
+        </a>
+        {% endif %}
+
+        {% if perms.cms.change_sitesettings %}
+        <a class="agki-action-card" href="{% url 'admin:cms_sitesettings_changelist' %}">
+            <div class="agki-action-icon"><i class="fas fa-cogs"></i></div>
+            <div class="agki-action-title">{% trans 'Site settings' %}</div>
+            <div class="agki-action-desc">{% trans 'Phone, email, address and social links in the footer.' %}</div>
+        </a>
+        {% endif %}
+    </div>
+
+    <div class="row mt-3">
+        <div class="col-lg-7 col-12">
+            <div class="card agki-panel">
+                <div class="card-header">{% trans 'Your recent activity' %}</div>
+                <div class="card-body">
+                    {% get_admin_log 6 as admin_log for_user user %}
+                    {% if not admin_log %}
+                        <p class="text-muted mb-0">{% trans "Nothing yet — changes you make will show up here." %}</p>
+                    {% else %}
+                        <ul class="list-unstyled mb-0">
+                            {% for entry in admin_log %}
+                                <li class="d-flex gap-2 py-2 {% if not forloop.last %}border-bottom{% endif %}">
+                                    <span class="agki-tip-num mt-1">
+                                        {% if entry.is_addition %}<i class="fas fa-plus-circle text-success"></i>{% endif %}
+                                        {% if entry.is_change %}<i class="fas fa-pen text-muted"></i>{% endif %}
+                                        {% if entry.is_deletion %}<i class="fas fa-trash text-danger"></i>{% endif %}
+                                    </span>
+                                    <span>
+                                        {% if entry.is_deletion or not entry.get_admin_url %}
+                                            <strong>{{ entry.object_repr }}</strong>
+                                        {% else %}
+                                            <a href="{{ entry.get_admin_url }}"><strong>{{ entry.object_repr }}</strong></a>
+                                        {% endif %}
+                                        {% if entry.model %}<span class="text-muted"> — {{ entry.model|capfirst }}</span>{% endif %}
+                                        <br>
+                                        <span class="agki-hint">{% blocktrans with timesince=entry.action_time|timesince %}{{ timesince }} ago{% endblocktrans %}</span>
+                                    </span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5 col-12">
+            <div class="card agki-panel">
+                <div class="card-header">{% trans 'Good to know' %}</div>
+                <div class="card-body">
+                    <ul class="agki-tips">
+                        <li><span class="agki-tip-num">01</span><span><b>{% trans 'Drag to reorder' %}</b> — {% trans 'team, news, testimonials and FAQ all support drag-and-drop, no order numbers to type.' %}</span></li>
+                        <li><span class="agki-tip-num">02</span><span><b>{% trans "Changes go live in a few minutes" %}</b>, {% trans "not instantly — the homepage is cached briefly for speed." %}</span></li>
+                        <li><span class="agki-tip-num">03</span><span><b>{% trans "Unpublish, don't delete" %}</b> — {% trans 'most sections have a published toggle so you can hide something without losing it.' %}</span></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
