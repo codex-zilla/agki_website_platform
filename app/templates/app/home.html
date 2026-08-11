@@ -1,23 +1,30 @@
-{% load static %}
+{% load static humanize %}
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
 
+    {% if site_settings.google_analytics_id %}
     <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-T256LX3B9J"></script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id={{ site_settings.google_analytics_id }}"></script>
     <script>
         window.dataLayer = window.dataLayer || [];
         function gtag() { dataLayer.push(arguments); }
         gtag('js', new Date());
 
-        gtag('config', 'G-T256LX3B9J');
+        gtag('config', '{{ site_settings.google_analytics_id|escapejs }}');
     </script>
+    {% endif %}
 
     <meta charset="UTF-8">
-    <link rel="shortcut icon" type="image/x-icon" href="{% static 'app/logo.png' %}">
+    {% comment %}
+    Favicon/logo fall back to the bundled static file when no image has been
+    uploaded in the admin, so a fresh install never renders a broken image.
+    {% endcomment %}
+    <link rel="shortcut icon" type="image/x-icon"
+        href="{% if site_settings.favicon %}{{ site_settings.favicon.url }}{% else %}{% static 'app/logo.png' %}{% endif %}">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AGKI Medical Lab · accessible healthcare</title>
+    <title>{{ site_settings.site_name|default:"AGKI Medical Lab" }} · accessible healthcare</title>
     <!-- Bootstrap 5 + icons + fonts -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -37,10 +44,19 @@
     <nav class="navbar navbar-expand-lg site-header" id="mainNav">
         <div class="container">
             <a class="navbar-brand" href="#home" id="navbarBrand">
-                <img src="{% static 'app/logo.png' %}" alt="AGKI Lab logo">
+                <img src="{% if site_settings.logo %}{{ site_settings.logo.url }}{% else %}{% static 'app/logo.png' %}{% endif %}"
+                    alt="AGKI Lab logo">
                 <span class="brand-copy">
+                    {% comment %}
+                    "AGKI Lab" stays hardcoded rather than using site_name: the
+                    navbar uses a shortened form ("AGKI Lab") while the footer
+                    and page title use the full one ("AGKI Medical Lab"), and
+                    there is only one site_name field. Substituting it here
+                    would visibly change the navbar. If AGKI ever wants both
+                    editable, that needs a second "short name" field.
+                    {% endcomment %}
                     <strong>AGKI Lab</strong>
-                    <span>AI powered · Solar powered</span>
+                    {% if site_settings.tagline %}<span>{{ site_settings.tagline }}</span>{% endif %}
                 </span>
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
@@ -72,41 +88,56 @@
     <section id="home" class="hero-new">
         <div class="hero-shell">
             <div class="hero-copy" data-aos="fade-up" data-aos-duration="800">
-                <span class="hero-kicker"><i class="fa-solid fa-leaf"></i> Afya Mfukoni</span>
+                {% comment %}
+                The leaf icon has no model field - it's fixed decoration, not
+                content. Same for the button icons below.
+                {% endcomment %}
+                {% if hero.kicker_text %}
+                <span class="hero-kicker"><i class="fa-solid fa-leaf"></i> {{ hero.kicker_text }}</span>
+                {% endif %}
                 <h1>
-                    <span>Healthcare That</span>
-                    <span>Reaches Every</span>
-                    <span class="hero-accent">Community</span>
+                    <span>{{ hero.headline_line1 }}</span>
+                    <span>{{ hero.headline_line2 }}</span>
+                    <span class="hero-accent">{{ hero.headline_accent }}</span>
                 </h1>
-                <p class="hero-lede">AGKI combines AI-powered diagnostics, mobile laboratories, telemedicine and
-                    sustainable technology to bring quality healthcare closer to every family.</p>
+                <p class="hero-lede">{{ hero.lede }}</p>
                 <div class="hero-actions">
-                    <a href="{% url 'appointment_home' %}" class="hero-button-primary">
-                        <i class="fa-regular fa-calendar-check"></i> Book appointment
+                    {% if hero.primary_cta_text %}
+                    <a href="{{ hero.primary_cta_url }}" class="hero-button-primary">
+                        <i class="fa-regular fa-calendar-check"></i> {{ hero.primary_cta_text }}
                     </a>
-                    <a href="/ecommerce/home" class="hero-button-secondary">
-                        <i class="fa-solid fa-bag-shopping"></i> Shop Now <i
+                    {% endif %}
+                    {% if hero.secondary_cta_text %}
+                    <a href="{{ hero.secondary_cta_url }}" class="hero-button-secondary">
+                        <i class="fa-solid fa-bag-shopping"></i> {{ hero.secondary_cta_text }} <i
                             class="fa-solid fa-arrow-right"></i>
                     </a>
+                    {% endif %}
                 </div>
 
+                {% if hero_stats %}
                 <div class="hero-impact" aria-label="AGKI impact at a glance">
+                    {% for stat in hero_stats %}
                     <div class="hero-impact-item">
-                        <span class="hero-impact-icon"><i class="fa-solid fa-users"></i></span>
-                        <strong class="hero-impact-number" data-count-to="500000" data-suffix="+">500,000+</strong>
-                        <span class="hero-impact-label">Patients served</span>
+                        <span class="hero-impact-icon"><i class="{{ stat.icon_class }}"></i></span>
+                        {% comment %}
+                        data-count-to is emitted only when `number` is actually
+                        numeric (see HeroImpactStat.count_to). For a value like
+                        "24/7" the attribute is omitted entirely, which is how
+                        the counter JS below knows to leave the text alone -
+                        it selects on `.hero-impact-number[data-count-to]`.
+                        The visible text is grouped with intcomma ("500,000")
+                        while data-count-to stays raw ("500000"), because the
+                        JS parseInt()s it and parseInt("500,000") is 500.
+                        {% endcomment %}
+                        <strong class="hero-impact-number"
+                            {% if stat.count_to is not None %}data-count-to="{{ stat.count_to }}"
+                            data-suffix="{{ stat.suffix }}"{% endif %}>{{ stat.number|intcomma }}{{ stat.suffix }}</strong>
+                        <span class="hero-impact-label">{{ stat.label }}</span>
                     </div>
-                    <div class="hero-impact-item">
-                        <span class="hero-impact-icon"><i class="fa-solid fa-location-dot"></i></span>
-                        <strong class="hero-impact-number" data-count-to="75" data-suffix="+">75+</strong>
-                        <span class="hero-impact-label">Communities benefited</span>
-                    </div>
-                    <div class="hero-impact-item">
-                        <span class="hero-impact-icon"><i class="fa-solid fa-headset"></i></span>
-                        <strong class="hero-impact-number">24/7</strong>
-                        <span class="hero-impact-label">Digital healthcare access</span>
-                    </div>
+                    {% endfor %}
                 </div>
+                {% endif %}
             </div>
 
             <div class="hero-visual">
@@ -163,7 +194,14 @@
         </div>
     </section>
 
+    {% comment %}
+    Section-level guards: a singleton row always exists (SingletonModel.load()
+    creates it), so "is this section empty?" means "are all its fields blank?"
+    rather than "does the row exist?". Without this the section would render as
+    an empty shell of headings and cards.
+    {% endcomment %}
     <!-- ABOUT SECTION - Redesigned with beautiful cards -->
+    {% if about.story_heading or about.story_copy or about.mission_text or about.vision_text or core_values or about.youtube_embed_url %}
     <section id="about" class="section">
         <div class="container">
             <div class="section-title" data-aos="zoom-in">
@@ -174,16 +212,18 @@
             <!-- Story band -->
             <div class="row align-items-center g-4 about-story" data-aos="fade-up">
                 <div class="col-12 col-lg-7">
-                    <span class="story-badge">Est. 2022</span>
-                    <h3 class="about-story-heading">Bridging the Healthcare Gap with Innovation</h3>
-                    <p class="about-story-copy">
-                        AGKI delivers integrated healthcare through solar-powered mobile clinics and an AI-powered
-                        digital health platform that connects patients with doctors, laboratories, pharmacies, and 
-                        hospitals for appointments, diagnostics, telemedicine, digital prescriptions, and medication 
-                        access. To date, we have helped over 500,000 people access quality healthcare services. 
-                        Our diversified revenue model including pay-per-service, subscriptions, and strategic partnerships 
-                        ensures long-term sustainability and scalable impact.
-                    </p>
+                    {% if about.story_badge %}<span class="story-badge">{{ about.story_badge }}</span>{% endif %}
+                    <h3 class="about-story-heading">{{ about.story_heading }}</h3>
+                    {% comment %}
+                    story_copy is a CKEditor5Field, so it holds real HTML and
+                    must render unescaped. Authored only by staff with the
+                    Content Editors permission - never by public input - which
+                    is what makes |safe acceptable here. Same applies to the
+                    FAQ answers further down.
+                    The class moves onto a wrapper because the stored value
+                    brings its own <p> tags.
+                    {% endcomment %}
+                    <div class="about-story-copy">{{ about.story_copy|safe }}</div>
                 </div>
                 <div class="col-12 col-lg-5">
                     <div class="story-visual">
@@ -199,6 +239,13 @@
                 </div>
             </div>
 
+            {% comment %}
+            The mission "Accurate / Affordable / Accessible" badges and the
+            vision card's "Global Reach / Local Impact" labels and 85% progress
+            bar have no model fields - they're fixed presentation, not content.
+            Only the two paragraphs are editable. Recorded in the plan doc so
+            "why isn't this editable?" has an answer.
+            {% endcomment %}
             <!-- Mission Vision Cards -->
             <div class="row g-4 about-mv">
                 <div class="col-12 col-md-6" data-aos="flip-right" data-aos-delay="100">
@@ -207,10 +254,7 @@
                             <i class="fas fa-bullseye"></i>
                         </div>
                         <h3>Our Mission</h3>
-                        <p>
-                            To provide accurate, affordable, and timely diagnostic and healthcare services
-                            that improve health outcomes for everyone, everywhere.
-                        </p>
+                        <p>{{ about.mission_text }}</p>
                         <div class="mission-tags">
                             <span class="badge">Accurate</span>
                             <span class="badge">Affordable</span>
@@ -224,11 +268,7 @@
                             <i class="fas fa-eye"></i>
                         </div>
                         <h3>Our Vision</h3>
-                        <p>
-                            To revolutionize healthcare delivery in Tanzania and beyond by making quality, 
-                            accessible, and affordable healthcare available to everyone through innovative, 
-                            technology-driven, and environmentally sustainable solutions.
-                        </p>
+                        <p>{{ about.vision_text }}</p>
                         <div class="vision-stats">
                             <div class="d-flex justify-content-between">
                                 <span>Global Reach</span>
@@ -243,35 +283,29 @@
             </div>
 
             <!-- Core Values -->
+            {% if core_values %}
             <p class="values-label" data-aos="fade-up">What Drives Us</p>
             <div class="row g-3 g-md-4">
-                <div class="col-md-3 col-6" data-aos="zoom-in" data-aos-delay="0">
+                {% for value in core_values %}
+                {% comment %}
+                widthratio is Django's built-in "multiply" - it computes
+                value / max_value * max_width, so `counter0 1 50` is
+                counter0 x 50, reproducing the original 0/50/100/150 stagger
+                for any number of rows.
+                {% endcomment %}
+                <div class="col-md-3 col-6" data-aos="zoom-in"
+                    data-aos-delay="{% widthratio forloop.counter0 1 50 %}">
                     <div class="value-card">
-                        <i class="fas fa-heart"></i>
-                        <h5>Compassion</h5>
+                        <i class="{{ value.icon_class }}"></i>
+                        <h5>{{ value.label }}</h5>
                     </div>
                 </div>
-                <div class="col-md-3 col-6" data-aos="zoom-in" data-aos-delay="50">
-                    <div class="value-card">
-                        <i class="fas fa-flask"></i>
-                        <h5>Innovation</h5>
-                    </div>
-                </div>
-                <div class="col-md-3 col-6" data-aos="zoom-in" data-aos-delay="100">
-                    <div class="value-card">
-                        <i class="fas fa-hand-holding-heart"></i>
-                        <h5>Integrity</h5>
-                    </div>
-                </div>
-                <div class="col-md-3 col-6" data-aos="zoom-in" data-aos-delay="150">
-                    <div class="value-card">
-                        <i class="fas fa-leaf"></i>
-                        <h5>Sustainability</h5>
-                    </div>
-                </div>
+                {% endfor %}
             </div>
+            {% endif %}
 
             <!-- YouTube Video -->
+            {% if about.youtube_embed_url %}
             <div class="row mt-5">
                 <div class="col-12" data-aos="fade-up">
                     <div class="video-block">
@@ -279,7 +313,7 @@
                             <i class="fas fa-play"></i> Watch Our Story
                         </div>
                         <div class="ratio ratio-16x9">
-                            <iframe src="https://www.youtube.com/embed/cpnHYjFKyjs?si=FTEfPQryNycoIDjq"
+                            <iframe src="{{ about.youtube_embed_url }}"
                                 title="YouTube video player" frameborder="0"
                                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                                 referrerpolicy="strict-origin-when-cross-origin" allowfullscreen>
@@ -288,113 +322,100 @@
                     </div>
                 </div>
             </div>
+            {% endif %}
         </div>
     </section>
 
+    {% endif %}
+
     <!-- PROBLEM SECTION -->
+    {% if problem.heading or problem.lede or problem_cards or problem_stats %}
     <section id="problem" class="section problem-section">
         <div class="container">
             <div class="section-title" data-aos="fade-up">
-                <span class="problem-eyebrow">A Silent Emergency in Tanzania</span>
-                <h2>The Healthcare Gap in Sub-Saharan Countries</h2>
-                <p>Every day, thousands face impossible choices between health and survival simply because healthcare
-                    is too far away.</p>
+                {% if problem.eyebrow %}<span class="problem-eyebrow">{{ problem.eyebrow }}</span>{% endif %}
+                <h2>{{ problem.heading }}</h2>
+                <p>{{ problem.lede }}</p>
             </div>
 
+            {% if problem_cards %}
             <div class="row g-4 problem-cards">
-                <div class="col-12 col-md-6 col-lg-4" data-aos="fade-up" data-aos-delay="0">
+                {% for card in problem_cards %}
+                <div class="col-12 col-md-6 col-lg-4" data-aos="fade-up"
+                    data-aos-delay="{% widthratio forloop.counter0 1 120 %}">
                     <article class="problem-card">
                         <div class="problem-card-image">
-                            <img src="{% get_media_prefix %}problem/problem_1.jpg"
-                                alt="An overcrowded hospital ward with limited space and resources">
+                            <img src="{{ card.image.url }}" alt="{{ card.image_alt }}">
                         </div>
                         <div class="problem-card-body">
-                            <div class="problem-card-icon"><i class="fas fa-hospital-alt"></i></div>
-                            <h3>Inadequate Infrastructure and Supply Chains</h3>
-                            <p>Many clinics and hospitals, particularly in rural areas, operate without beds, reliable
-                                electricity, running water, or basic surgical facilities.</p>
-                            <p>Weak supply chains compound the challenge, causing chronic shortages of essential
-                                medications, vaccines, and diagnostic equipment.</p>
+                            <div class="problem-card-icon"><i class="{{ card.icon_class }}"></i></div>
+                            <h3>{{ card.title }}</h3>
+                            {% comment %}
+                            `body` is a plain TextField holding paragraphs
+                            separated by blank lines (not a CKEditor field -
+                            see the plan doc's Phase 5 carry-forward notes), so
+                            `linebreaks` is what turns it back into the two <p>
+                            tags this card originally had. It escapes its input,
+                            so no |safe is involved.
+                            {% endcomment %}
+                            {{ card.body|linebreaks }}
                         </div>
                     </article>
                 </div>
-
-                <div class="col-12 col-md-6 col-lg-4" data-aos="fade-up" data-aos-delay="120">
-                    <article class="problem-card">
-                        <div class="problem-card-image">
-                            <img src="{% get_media_prefix %}problem/problem_2.jpg"
-                                alt="A healthcare worker standing inside a medical facility">
-                        </div>
-                        <div class="problem-card-body">
-                            <div class="problem-card-icon"><i class="fas fa-user-md"></i></div>
-                            <h3>Critical Shortage of Healthcare Workers</h3>
-                            <p>Sub-Saharan Africa bears over 20% of the global disease burden but houses only a tiny
-                                fraction of the world's healthcare workforce.</p>
-                            <p>Limited training capacity and “brain drain” continue to deepen shortages of doctors,
-                                nurses, and midwives across the region.</p>
-                        </div>
-                    </article>
-                </div>
-
-                <div class="col-12 col-md-6 col-lg-4" data-aos="fade-up" data-aos-delay="240">
-                    <article class="problem-card">
-                        <div class="problem-card-image">
-                            <img src="{% get_media_prefix %}problem/problem_3.jpg"
-                                alt="A patient holding money beside medicine and a medical bill">
-                        </div>
-                        <div class="problem-card-body">
-                            <div class="problem-card-icon"><i class="fas fa-hand-holding-usd"></i></div>
-                            <h3>High Out-of-Pocket Costs &amp; Lack of Funding</h3>
-                            <p>Most countries in the region lack comprehensive health insurance systems, leaving
-                                patients to pay directly for medical care.</p>
-                            <p>The resulting financial hardship forces many families to delay or completely skip
-                                lifesaving treatment.</p>
-                        </div>
-                    </article>
-                </div>
+                {% endfor %}
             </div>
+            {% endif %}
 
             <!-- <div class="problem-divider" aria-hidden="true"></div> -->
 
+            {% if problem_stats %}
+            {% comment %}
+            This panel's own eyebrow and heading are fixed labels for the stats
+            block, not editable content - there are no model fields for them.
+            {% endcomment %}
             <div class="problem-stats-panel" data-aos="zoom-in" data-aos-delay="100">
                 <div class="section-title">
                     <span class="problem-eyebrow">Healthcare access at a glance</span>
                     <h2>The Scale of the Challenge</h2>
                 </div>
                 <div class="scale-stats">
+                    {% for stat in problem_stats %}
                     <div class="scale-stat">
-                        <span class="scale-stat-icon"><i class="fas fa-route"></i></span>
-                        <strong class="scale-stat-number">75%</strong>
-                        <span class="scale-stat-label">Limited access to healthcare</span>
-                        <p class="scale-stat-desc">Many people still travel long distances to reach essential medical
-                            services.</p>
+                        <span class="scale-stat-icon"><i class="{{ stat.icon_class }}"></i></span>
+                        {% comment %}
+                        The extra `scale-stat-number-word` class shrinks the
+                        type for a worded value ("Millions" vs "75%"). Derived
+                        from the value itself - see ProblemStat.is_word_value.
+                        {% endcomment %}
+                        <strong
+                            class="scale-stat-number{% if stat.is_word_value %} scale-stat-number-word{% endif %}">{{ stat.number }}</strong>
+                        <span class="scale-stat-label">{{ stat.label }}</span>
+                        <p class="scale-stat-desc">{{ stat.description }}</p>
                     </div>
-                    <div class="scale-stat">
-                        <span class="scale-stat-icon"><i class="fas fa-shield-heart"></i></span>
-                        <strong class="scale-stat-number">60%+</strong>
-                        <span class="scale-stat-label">Preventable diseases</span>
-                        <p class="scale-stat-desc">Can be managed through early detection and timely treatment.</p>
-                    </div>
-                    <div class="scale-stat">
-                        <span class="scale-stat-icon"><i class="fas fa-people-group"></i></span>
-                        <strong class="scale-stat-number scale-stat-number-word">Millions</strong>
-                        <span class="scale-stat-label">Need better healthcare access</span>
-                        <p class="scale-stat-desc">Digital health solutions are transforming how care is delivered
-                            across Tanzania.</p>
-                    </div>
+                    {% endfor %}
                 </div>
             </div>
+            {% endif %}
 
+            {% if problem.cta_text %}
             <div class="problem-cta" data-aos="fade-up">
+                {% comment %}
+                The lead-in sentence is fixed copy with no model field; only the
+                button's label and target are editable.
+                {% endcomment %}
                 <p>These challenges call for healthcare that can reach people wherever they live.</p>
-                <a href="#services" class="btn btn-cta">
-                    Explore AGKI's Solution <i class="fas fa-arrow-right ms-2"></i>
+                <a href="{{ problem.cta_url }}" class="btn btn-cta">
+                    {{ problem.cta_text }} <i class="fas fa-arrow-right ms-2"></i>
                 </a>
             </div>
+            {% endif %}
         </div>
     </section>
 
-    <!-- SERVICES grid (6 cards) -->
+    {% endif %}
+
+    <!-- SERVICES grid -->
+    {% if solutions %}
     <section id="services" class="section">
         <div class="container">
             <div class="section-title" data-aos="fade-up">
@@ -402,65 +423,25 @@
                 <p>Last‑mile health with sustainability & compassion</p>
             </div>
             <div class="row g-3">
-                <div class="col-12 col-md-6" data-aos="fade-right" data-aos-delay="0">
+                {% for row in solutions %}
+                <div class="col-12 col-md-6" data-aos="fade-right"
+                    data-aos-delay="{% widthratio forloop.counter0 1 100 %}">
                     <div class="solution-row">
-                        <div class="solution-icon"><i class="fas fa-solar-panel"></i></div>
+                        <div class="solution-icon"><i class="{{ row.icon_class }}"></i></div>
                         <div>
-                            <h4>Mobile Clinics (solar bikes & vans)</h4>
-                            <p>Diagnostics, essential meds, health education at low cost.</p>
+                            <h4>{{ row.title }}</h4>
+                            <p>{{ row.description }}</p>
                         </div>
                     </div>
                 </div>
-                <div class="col-12 col-md-6" data-aos="fade-right" data-aos-delay="100">
-                    <div class="solution-row">
-                        <div class="solution-icon"><i class="fas fa-robot"></i></div>
-                        <div>
-                            <h4>AI health platform (WhatsApp)</h4>
-                            <p>Instant results, scheduling, e‑prescriptions, even offline.</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-12 col-md-6" data-aos="fade-right" data-aos-delay="200">
-                    <div class="solution-row">
-                        <div class="solution-icon"><i class="fas fa-user-md"></i></div>
-                        <div>
-                            <h4>Specialist tele‑consultations</h4>
-                            <p>Connect with doctors without travelling.</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-12 col-md-6" data-aos="fade-right" data-aos-delay="300">
-                    <div class="solution-row">
-                        <div class="solution-icon"><i class="fas fa-baby"></i></div>
-                        <div>
-                            <h4>Maternal & child health</h4>
-                            <p>Antenatal, nutrition, immunisation outreach.</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-12 col-md-6" data-aos="fade-right" data-aos-delay="400">
-                    <div class="solution-row">
-                        <div class="solution-icon"><i class="fas fa-leaf"></i></div>
-                        <div>
-                            <h4>Solar‑electric & cost‑effective</h4>
-                            <p>Lower footprint, affordable services.</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-12 col-md-6" data-aos="fade-right" data-aos-delay="500">
-                    <div class="solution-row">
-                        <div class="solution-icon"><i class="fas fa-handshake"></i></div>
-                        <div>
-                            <h4>Diversified business model</h4>
-                            <p>Pay‑per‑service + subscriptions + NGO partnerships.</p>
-                        </div>
-                    </div>
-                </div>
+                {% endfor %}
             </div>
         </div>
     </section>
+    {% endif %}
 
     <!-- WHY US (gradient, icons) -->
+    {% if why_us %}
     <section id="why-us" class="section why-us">
         <div class="container">
             <div class="section-title" data-aos="fade-up">
@@ -468,65 +449,25 @@
                 <p>We transform rural healthcare delivery</p>
             </div>
             <div class="row g-3">
-                <div class="col-12 col-md-6" data-aos="fade-right" data-aos-delay="0">
+                {% for row in why_us %}
+                <div class="col-12 col-md-6" data-aos="fade-right"
+                    data-aos-delay="{% widthratio forloop.counter0 1 100 %}">
                     <div class="why-row">
-                        <div class="why-row-icon"><i class="fas fa-map-marker-alt"></i></div>
+                        <div class="why-row-icon"><i class="{{ row.icon_class }}"></i></div>
                         <div>
-                            <h4>Last‑mile reach</h4>
-                            <p>Healthcare at your doorstep.</p>
+                            <h4>{{ row.title }}</h4>
+                            <p>{{ row.description }}</p>
                         </div>
                     </div>
                 </div>
-                <div class="col-12 col-md-6" data-aos="fade-right" data-aos-delay="100">
-                    <div class="why-row">
-                        <div class="why-row-icon"><i class="fas fa-hand-holding-usd"></i></div>
-                        <div>
-                            <h4>Affordable services</h4>
-                            <p>Pricing for low‑income families.</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-12 col-md-6" data-aos="fade-right" data-aos-delay="200">
-                    <div class="why-row">
-                        <div class="why-row-icon"><i class="fas fa-microchip"></i></div>
-                        <div>
-                            <h4>Cutting‑edge AI</h4>
-                            <p>Enhanced diagnostics & management.</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-12 col-md-6" data-aos="fade-right" data-aos-delay="300">
-                    <div class="why-row">
-                        <div class="why-row-icon"><i class="fas fa-users"></i></div>
-                        <div>
-                            <h4>Community empowerment</h4>
-                            <p>Partner with local health workers.</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-12 col-md-6" data-aos="fade-right" data-aos-delay="400">
-                    <div class="why-row">
-                        <div class="why-row-icon"><i class="fas fa-globe-africa"></i></div>
-                        <div>
-                            <h4>Eco‑friendly ops</h4>
-                            <p>Solar, electric, sustainable.</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-12 col-md-6" data-aos="fade-right" data-aos-delay="500">
-                    <div class="why-row">
-                        <div class="why-row-icon"><i class="fas fa-heartbeat"></i></div>
-                        <div>
-                            <h4>Comprehensive care</h4>
-                            <p>End‑to‑end health services.</p>
-                        </div>
-                    </div>
-                </div>
+                {% endfor %}
             </div>
         </div>
     </section>
+    {% endif %}
 
     <!-- AWARDS (logo strip; auto-scrolling carousel on mobile, wrapped row from tablet up) -->
+    {% if awards %}
     <section id="awards" class="section" style="background: var(--light-bg);">
         <div class="container">
             <div class="section-title" data-aos="fade-up">
@@ -537,38 +478,35 @@
         <div class="container">
             <div class="awards-carousel" data-aos="fade-up">
                 <div class="awards-track">
-                    <img src="{% static 'app/sankalplogo.png' %}" class="awards-logo" style="filter:grayscale(0.2);"
-                        alt="Sankalp">
-                    <img src="{% static 'app/undp.png' %}" class="awards-logo" alt="UNDP">
-                    <img src="{% static 'app/unfpa.png' %}" class="awards-logo" alt="UNFPA">
-                    <img src="{% static 'app/villgro-logo.png' %}" class="awards-logo awards-logo-lg" alt="Villgro">
-                    <img src="{% static 'app/w4g.png' %}" class="awards-logo" alt="Women for Girls">
-                    <img src="{% static 'app/AFD.png' %}" class="awards-logo awards-logo-xl" alt="AFD">
-                    <img src="{% static 'app/graca.png' %}" class="awards-logo" alt="Gra&ccedil;a Machel Trust">
-                    <img src="{% static 'app/afrishela.jpeg' %}" class="awards-logo" alt="Afrishela">
+                    {% comment %}
+                    Rendered twice from the same queryset: the mobile CSS
+                    animation scrolls the track and needs a second identical
+                    run of logos to loop seamlessly. The duplicate set is
+                    aria-hidden and hidden on desktop via awards-logo-dup.
+                    Keeping both loops on one source means they can no longer
+                    drift apart, which is what happened to the team carousel
+                    (see the Kulwa Cherehani note in the plan doc).
+                    {% endcomment %}
+                    {% for award in awards %}
+                    <img src="{{ award.image.url }}"
+                        class="awards-logo{% if award.size == 'lg' %} awards-logo-lg{% elif award.size == 'xl' %} awards-logo-xl{% endif %}"
+                        alt="{{ award.alt_text }}">
+                    {% endfor %}
 
                     <!-- duplicate set: seamless mobile loop, hidden from assistive tech and desktop -->
-                    <img src="{% static 'app/sankalplogo.png' %}" class="awards-logo awards-logo-dup"
-                        style="filter:grayscale(0.2);" alt="" aria-hidden="true">
-                    <img src="{% static 'app/undp.png' %}" class="awards-logo awards-logo-dup" alt=""
-                        aria-hidden="true">
-                    <img src="{% static 'app/unfpa.png' %}" class="awards-logo awards-logo-dup" alt=""
-                        aria-hidden="true">
-                    <img src="{% static 'app/villgro-logo.png' %}" class="awards-logo awards-logo-lg awards-logo-dup"
+                    {% for award in awards %}
+                    <img src="{{ award.image.url }}"
+                        class="awards-logo{% if award.size == 'lg' %} awards-logo-lg{% elif award.size == 'xl' %} awards-logo-xl{% endif %} awards-logo-dup"
                         alt="" aria-hidden="true">
-                    <img src="{% static 'app/w4g.png' %}" class="awards-logo awards-logo-dup" alt="" aria-hidden="true">
-                    <img src="{% static 'app/AFD.png' %}" class="awards-logo awards-logo-xl awards-logo-dup" alt=""
-                        aria-hidden="true">
-                    <img src="{% static 'app/graca.png' %}" class="awards-logo awards-logo-dup" alt=""
-                        aria-hidden="true">
-                    <img src="{% static 'app/afrishela.jpeg' %}" class="awards-logo awards-logo-dup" alt=""
-                        aria-hidden="true">
+                    {% endfor %}
                 </div>
             </div>
         </div>
     </section>
+    {% endif %}
 
     <!-- TESTIMONIALS (videos) -->
+    {% if testimonials %}
     <section class="section">
         <div class="container">
             <div class="section-title" data-aos="fade-up">
@@ -576,31 +514,45 @@
                 <p>Real stories from the families and communities AGKI serves.</p>
             </div>
             <div class="row g-4">
-                <div class="col-12 col-md-6" data-aos="zoom-in-right">
+                {% for testimonial in testimonials %}
+                {% comment %}
+                Alternates the entrance animation left/right the way the two
+                hardcoded cards did, for any number of testimonials.
+                A row always has at least one of youtube_url / video_file -
+                Testimonial.clean() enforces it - and the URL wins when both
+                are set, matching the design's steer toward hosted video
+                (design §6.2). The play-button overlay only applies to the
+                <video> element: an embedded iframe brings its own controls.
+                {% endcomment %}
+                <div class="col-12 col-md-6" data-aos="{% cycle 'zoom-in-right' 'zoom-in-left' %}">
                     <div class="testimonial-card">
                         <div class="testimonial-video">
-                            <video src="{% static 'app/mama.mp4' %}" controls preload="metadata"></video>
+                            {% if testimonial.youtube_url %}
+                            <iframe src="{{ testimonial.youtube_url }}"
+                                title="{% if testimonial.patient_name %}{{ testimonial.patient_name }} - patient story{% else %}Patient story{% endif %}"
+                                frameborder="0"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+                            {% else %}
+                            <video src="{{ testimonial.video_file.url }}" controls preload="metadata"></video>
                             <button class="testimonial-play" type="button" aria-label="Play video">
                                 <i class="fas fa-play"></i>
                             </button>
+                            {% endif %}
                         </div>
+                        {% if testimonial.patient_name %}
+                        <p class="testimonial-name">{{ testimonial.patient_name }}</p>
+                        {% endif %}
                     </div>
                 </div>
-                <div class="col-12 col-md-6" data-aos="zoom-in-left">
-                    <div class="testimonial-card">
-                        <div class="testimonial-video">
-                            <video src="{% static 'app/testmony2.mp4' %}" controls preload="metadata"></video>
-                            <button class="testimonial-play" type="button" aria-label="Play video">
-                                <i class="fas fa-play"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                {% endfor %}
             </div>
         </div>
     </section>
+    {% endif %}
 
     <!-- PORTFOLIO / community events -->
+    {% if community_photos %}
     <section id="portfolio" class="section" style="background: var(--light-bg);">
         <div class="container">
             <div class="section-title" data-aos="fade-up">
@@ -614,42 +566,20 @@
                     <i class="fas fa-chevron-left"></i>
                 </button>
                 <div class="community-track">
+                    {% comment %}
+                    CommunityPhoto has one text field, so the caption doubles as
+                    the alt text (the old markup had two near-identical strings,
+                    e.g. alt "Mobile clinic outreach event" vs caption "Mobile
+                    clinic outreach" - not worth a second field).
+                    {% endcomment %}
+                    {% for photo in community_photos %}
                     <div class="community-item">
                         <div class="community-photo">
-                            <img src="{% static 'app/1.jpg' %}" alt="Mobile clinic outreach event">
-                            <span class="community-caption">Mobile clinic outreach</span>
+                            <img src="{{ photo.image.url }}" alt="{{ photo.caption }}">
+                            <span class="community-caption">{{ photo.caption }}</span>
                         </div>
                     </div>
-                    <div class="community-item">
-                        <div class="community-photo">
-                            <img src="{% static 'app/2.jpg' %}" alt="Free health screening day">
-                            <span class="community-caption">Free health screening day</span>
-                        </div>
-                    </div>
-                    <div class="community-item">
-                        <div class="community-photo">
-                            <img src="{% static 'app/3.jpg' %}" alt="Maternal health workshop">
-                            <span class="community-caption">Maternal health workshop</span>
-                        </div>
-                    </div>
-                    <div class="community-item">
-                        <div class="community-photo">
-                            <img src="{% static 'app/4.jpg' %}" alt="Youth wellness drive">
-                            <span class="community-caption">Youth wellness drive</span>
-                        </div>
-                    </div>
-                    <div class="community-item">
-                        <div class="community-photo">
-                            <img src="{% static 'app/5.jpg' %}" alt="Community health fair">
-                            <span class="community-caption">Community health fair</span>
-                        </div>
-                    </div>
-                    <div class="community-item">
-                        <div class="community-photo">
-                            <img src="{% static 'app/6.jpg' %}" alt="Volunteer appreciation day">
-                            <span class="community-caption">Volunteer appreciation day</span>
-                        </div>
-                    </div>
+                    {% endfor %}
                 </div>
                 <button class="community-nav next" type="button" aria-label="Next photo">
                     <i class="fas fa-chevron-right"></i>
@@ -657,8 +587,10 @@
             </div>
         </div>
     </section>
+    {% endif %}
 
     <!-- NEWS cards -->
+    {% if news_posts %}
     <section class="section">
         <div class="container">
             <div class="section-title" data-aos="fade-up">
@@ -666,53 +598,36 @@
                 <p>Updates from the clinics, the lab, and the communities AGKI serves.</p>
             </div>
             <div class="row g-4">
-                <div class="col-12 col-md-4" data-aos="fade-up">
+                {% for post in news_posts %}
+                <div class="col-12 col-md-4" data-aos="fade-up"
+                    data-aos-delay="{% widthratio forloop.counter0 1 80 %}">
                     <div class="news-card">
                         <div class="news-photo">
-                            <img src="{% static 'app/maternity.jpg' %}" alt="Maternal health launch">
-                            <span class="news-date">June 15, 2025</span>
+                            <img src="{{ post.image.url }}" alt="{{ post.title }}">
+                            <span class="news-date">{{ post.published_date|date:"F j, Y" }}</span>
                         </div>
                         <div class="news-body">
-                            <h5>Maternal health launch</h5>
-                            <p>AGKI Laboratory introduces comprehensive maternal health services to support expecting
-                                mothers in our community.</p>
+                            <h5>{{ post.title }}</h5>
+                            <p>{{ post.excerpt }}</p>
+                            {% comment %}
+                            No article page exists yet (the model's `body` field
+                            is there for a future one), so this stays the inert
+                            href="#" it has always been rather than linking
+                            somewhere that 404s. When the detail view is built,
+                            this becomes a {% templatetag openblock %} url {% templatetag closeblock %} on post.slug.
+                            {% endcomment %}
                             <a href="#" class="news-read-more">Read more <i class="fas fa-arrow-right"></i></a>
                         </div>
                     </div>
                 </div>
-                <div class="col-12 col-md-4" data-aos="fade-up" data-aos-delay="80">
-                    <div class="news-card">
-                        <div class="news-photo">
-                            <img src="{% static 'app/community.png' %}" alt="Community fair success">
-                            <span class="news-date">June 10, 2025</span>
-                        </div>
-                        <div class="news-body">
-                            <h5>Community fair success</h5>
-                            <p>Over 500 community members benefited from our free health screening and awareness
-                                programs last month.</p>
-                            <a href="#" class="news-read-more">Read more <i class="fas fa-arrow-right"></i></a>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-12 col-md-4" data-aos="fade-up" data-aos-delay="160">
-                    <div class="news-card">
-                        <div class="news-photo">
-                            <img src="{% static 'app/partnership.jpeg' %}" alt="Hospital partnership">
-                            <span class="news-date">June 5, 2025</span>
-                        </div>
-                        <div class="news-body">
-                            <h5>Hospital partnership</h5>
-                            <p>New collaboration enhances our referral system and ensures continuity of care for complex
-                                cases.</p>
-                            <a href="#" class="news-read-more">Read more <i class="fas fa-arrow-right"></i></a>
-                        </div>
-                    </div>
-                </div>
+                {% endfor %}
             </div>
         </div>
     </section>
+    {% endif %}
 
     <!-- FAQ (accordion) -->
+    {% if faqs %}
     <section class="section faq-section">
         <div class="container">
             <div class="section-title" data-aos="fade-up">
@@ -722,56 +637,39 @@
             <div class="row justify-content-center">
                 <div class="col-12 col-lg-9">
                     <div class="faq-list">
-                        <div class="faq-card" data-aos="fade-up" data-aos-delay="0">
-                            <button class="faq-q" data-bs-toggle="collapse" data-bs-target="#faq1">
-                                <span class="faq-icon"><i class="fas fa-stethoscope"></i></span>
-                                <span class="faq-text">What services are offered?</span>
+                        {% comment %}
+                        The first item renders expanded and the rest collapsed,
+                        matching the original markup. Panel ids are built from
+                        the row's pk so they stay unique and stable no matter
+                        how the list is reordered - forloop.counter would
+                        re-number every panel on each reorder.
+                        `answer` is a CKEditor5Field and holds real HTML, so it
+                        renders through |safe (staff-authored only, same as the
+                        About copy above).
+                        {% endcomment %}
+                        {% for faq in faqs %}
+                        <div class="faq-card" data-aos="fade-up"
+                            data-aos-delay="{% widthratio forloop.counter0 1 80 %}">
+                            <button class="faq-q{% if not forloop.first %} collapsed{% endif %}"
+                                data-bs-toggle="collapse" data-bs-target="#faq{{ faq.pk }}">
+                                <span class="faq-icon"><i class="{{ faq.icon_class }}"></i></span>
+                                <span class="faq-text">{{ faq.question }}</span>
                                 <span class="faq-chevron"><i class="fas fa-chevron-down"></i></span>
                             </button>
-                            <div id="faq1" class="collapse show">
-                                <div class="faq-a">Lab testing, maternal/child health, elder care, and community
-                                    outreach programs.</div>
+                            <div id="faq{{ faq.pk }}" class="collapse{% if forloop.first %} show{% endif %}">
+                                <div class="faq-a">{{ faq.answer|safe }}</div>
                             </div>
                         </div>
-                        <div class="faq-card" data-aos="fade-up" data-aos-delay="80">
-                            <button class="faq-q collapsed" data-bs-toggle="collapse" data-bs-target="#faq2">
-                                <span class="faq-icon"><i class="fas fa-clock"></i></span>
-                                <span class="faq-text">What are your hours?</span>
-                                <span class="faq-chevron"><i class="fas fa-chevron-down"></i></span>
-                            </button>
-                            <div id="faq2" class="collapse">
-                                <div class="faq-a">Monday–Friday 7am–6pm, Saturday 8am–4pm. Emergencies are handled
-                                    24/7.</div>
-                            </div>
-                        </div>
-                        <div class="faq-card" data-aos="fade-up" data-aos-delay="160">
-                            <button class="faq-q collapsed" data-bs-toggle="collapse" data-bs-target="#faq3">
-                                <span class="faq-icon"><i class="fas fa-shield-heart"></i></span>
-                                <span class="faq-text">Do you accept insurance?</span>
-                                <span class="faq-chevron"><i class="fas fa-chevron-down"></i></span>
-                            </button>
-                            <div id="faq3" class="collapse">
-                                <div class="faq-a">NHIF and major insurers are accepted; affordable plans are
-                                    available for the uninsured.</div>
-                            </div>
-                        </div>
-                        <div class="faq-card" data-aos="fade-up" data-aos-delay="240">
-                            <button class="faq-q collapsed" data-bs-toggle="collapse" data-bs-target="#faq4">
-                                <span class="faq-icon"><i class="fas fa-calendar-check"></i></span>
-                                <span class="faq-text">How do I book an appointment?</span>
-                                <span class="faq-chevron"><i class="fas fa-chevron-down"></i></span>
-                            </button>
-                            <div id="faq4" class="collapse">
-                                <div class="faq-a">Call, visit, or use the online form. Walk‑ins are welcome.</div>
-                            </div>
-                        </div>
+                        {% endfor %}
                     </div>
                 </div>
             </div>
         </div>
     </section>
+    {% endif %}
 
     <!-- TEAM (auto-scrolling carousel) -->
+    {% if team_members %}
     <section id="team" class="section">
         <div class="container">
             <div class="section-title" data-aos="fade-up">
@@ -781,138 +679,39 @@
         </div>
         <div class="team-carousel" data-aos="fade-up" data-aos-delay="100">
             <div class="team-track">
+                {% comment %}
+                Rendered twice from the same queryset so the CSS marquee loops
+                seamlessly, exactly like the awards strip above. The old markup
+                had two hand-maintained copies, which had already drifted apart
+                (the duplicate listed Kulwa Cherehani as "Nurse Midwife" while
+                the visible one said "Lab Manager", so the carousel showed the
+                same person with two different roles). Driving both from one
+                row makes that class of bug impossible.
+                {% endcomment %}
+                {% for member in team_members %}
                 <div class="team-photo-card">
-                    <div class="team-photo"><img src="{% static 'app/TAg.jpg' %}" alt="Agnes Kimweri"></div>
+                    <div class="team-photo"><img src="{{ member.photo.url }}" alt="{{ member.name }}"></div>
                     <div class="team-scrim">
-                        <h5>Agnes Kimweri</h5>
-                        <span class="team-role">CEO & Founder</span>
+                        <h5>{{ member.name }}</h5>
+                        <span class="team-role">{{ member.role }}</span>
                     </div>
                 </div>
-                <div class="team-photo-card">
-                    <div class="team-photo"><img src="{% static 'app/Tgloria.jpeg' %}" alt="Eng. Gloria Jombo"></div>
-                    <div class="team-scrim">
-                        <h5>Eng. Gloria Jombo</h5>
-                        <span class="team-role">CTO</span>
-                    </div>
-                </div>
-                <div class="team-photo-card">
-                    <div class="team-photo"><img src="{% static 'app/Tmanager.jpg' %}" alt="Dr Atieno Uyugi"></div>
-                    <div class="team-scrim">
-                        <h5>Dr Atieno Uyugi</h5>
-                        <span class="team-role">Co&#8209;founder, Ops</span>
-                    </div>
-                </div>
-                <div class="team-photo-card">
-                    <div class="team-photo"><img src="{% static 'app/Twilson.jpg' %}" alt="Hape Wilson"></div>
-                    <div class="team-scrim">
-                        <h5>Hape Wilson</h5>
-                        <span class="team-role">Lab scientist</span>
-                    </div>
-                </div>
-                <div class="team-photo-card">
-                    <div class="team-photo"><img src="{% static 'app/Tkulwa.png' %}" alt="Kulwa Cherehani"></div>
-                    <div class="team-scrim">
-                        <h5>Kulwa Cherehani</h5>
-                        <span class="team-role">Lab Manager</span>
-                    </div>
-                </div>
-                <div class="team-photo-card">
-                    <div class="team-photo"><img src="{% static 'app/TPau.jpeg' %}" alt="Pau Gimeno"></div>
-                    <div class="team-scrim">
-                        <h5>Pau Gimeno</h5>
-                        <span class="team-role">Advisor, fundraising</span>
-                    </div>
-                </div>
-                <div class="team-photo-card">
-                    <div class="team-photo"><img src="{% static 'app/TElisabet.jpg' %}" alt="Elisabet Nyquist"></div>
-                    <div class="team-scrim">
-                        <h5>Elisabet Nyquist</h5>
-                        <span class="team-role">Business advisor</span>
-                    </div>
-                </div>
-                <div class="team-photo-card">
-                    <div class="team-photo"><img src="{% static 'app/TDeogratias.jpg' %}" alt="Dr Deogratias Mbona">
-                    </div>
-                    <div class="team-scrim">
-                        <h5>Dr Deogratias Mbona</h5>
-                        <span class="team-role">Advisor</span>
-                    </div>
-                </div>
-                <div class="team-photo-card">
-                    <div class="team-photo"><img src="{% static 'app/Tcoln.jpg' %}" alt="Cornel Mtavangu"></div>
-                    <div class="team-scrim">
-                        <h5>Cornel Mtavangu</h5>
-                        <span class="team-role">ICT Officer</span>
-                    </div>
-                </div>
+                {% endfor %}
 
                 <!-- duplicate set: seamless loop, hidden from assistive tech -->
+                {% for member in team_members %}
                 <div class="team-photo-card" aria-hidden="true">
-                    <div class="team-photo"><img src="{% static 'app/TAg.jpg' %}" alt=""></div>
+                    <div class="team-photo"><img src="{{ member.photo.url }}" alt=""></div>
                     <div class="team-scrim">
-                        <h5>Agnes Kimweri</h5>
-                        <span class="team-role">CEO & Founder</span>
+                        <h5>{{ member.name }}</h5>
+                        <span class="team-role">{{ member.role }}</span>
                     </div>
                 </div>
-                <div class="team-photo-card" aria-hidden="true">
-                    <div class="team-photo"><img src="{% static 'app/Tgloria.jpeg' %}" alt=""></div>
-                    <div class="team-scrim">
-                        <h5>Eng. Gloria Jombo</h5>
-                        <span class="team-role">CTO</span>
-                    </div>
-                </div>
-                <div class="team-photo-card" aria-hidden="true">
-                    <div class="team-photo"><img src="{% static 'app/Tmanager.jpg' %}" alt=""></div>
-                    <div class="team-scrim">
-                        <h5>Dr Atieno Uyugi</h5>
-                        <span class="team-role">Co&#8209;founder, Ops</span>
-                    </div>
-                </div>
-                <div class="team-photo-card" aria-hidden="true">
-                    <div class="team-photo"><img src="{% static 'app/Twilson.jpg' %}" alt=""></div>
-                    <div class="team-scrim">
-                        <h5>Hape Wilson</h5>
-                        <span class="team-role">Lab scientist</span>
-                    </div>
-                </div>
-                <div class="team-photo-card" aria-hidden="true">
-                    <div class="team-photo"><img src="{% static 'app/Tkulwa.png' %}" alt=""></div>
-                    <div class="team-scrim">
-                        <h5>Kulwa Cherehani</h5>
-                        <span class="team-role">Nurse Midwife</span>
-                    </div>
-                </div>
-                <div class="team-photo-card" aria-hidden="true">
-                    <div class="team-photo"><img src="{% static 'app/TPau.jpeg' %}" alt=""></div>
-                    <div class="team-scrim">
-                        <h5>Pau Gimeno</h5>
-                        <span class="team-role">Advisor, fundraising</span>
-                    </div>
-                </div>
-                <div class="team-photo-card" aria-hidden="true">
-                    <div class="team-photo"><img src="{% static 'app/TElisabet.jpg' %}" alt=""></div>
-                    <div class="team-scrim">
-                        <h5>Elisabet Nyquist</h5>
-                        <span class="team-role">Business advisor</span>
-                    </div>
-                </div>
-                <div class="team-photo-card" aria-hidden="true">
-                    <div class="team-photo"><img src="{% static 'app/TDeogratias.jpg' %}" alt=""></div>
-                    <div class="team-scrim">
-                        <h5>Dr Deogratias Mbona</h5>
-                        <span class="team-role">Advisor</span>
-                    </div>
-                </div>
-                <div class="team-photo-card" aria-hidden="true">
-                    <div class="team-photo"><img src="{% static 'app/Tcoln.jpg' %}" alt=""></div>
-                    <div class="team-scrim">
-                        <h5>Cornel Mtavangu</h5>
-                        <span class="team-role">ICT Officer</span>
-                    </div>
-                </div>
+                {% endfor %}
             </div>
         </div>
     </section>
+    {% endif %}
 
     <!-- CONTACT SECTION - Completely Redesigned -->
     <section id="contact" class="section contact-section">
@@ -1006,13 +805,13 @@
     </section>
 
     <!-- MAP STRIP -->
+    {% if site_settings.map_embed_url %}
     <section class="map-strip" data-aos="fade-up">
-        <iframe
-            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3853.555615469414!2d38.856572674894515!3d-6.7834211663387824!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x185c6f00e72ce859%3A0xac0ecd8f3b034606!2sAgki%20medical%20laboratory!5e1!3m2!1sen!2stz"
-            width="100%" height="450" style="border:0;" allowfullscreen="" loading="lazy"
-            referrerpolicy="no-referrer-when-downgrade">
+        <iframe src="{{ site_settings.map_embed_url }}" width="100%" height="450" style="border:0;" allowfullscreen=""
+            loading="lazy" referrerpolicy="no-referrer-when-downgrade">
         </iframe>
     </section>
+    {% endif %}
 
     <!-- Add this CSS to your existing styles -->
 
@@ -1022,10 +821,28 @@
         <div class="container">
             <div class="row">
                 <div class="col-12 col-md-6 col-lg-4 order-1 order-lg-1">
-                    <h5>AGKI Medical Lab</h5>
+                    <h5>{{ site_settings.site_name|default:"AGKI Medical Lab" }}</h5>
                     <p>Empowering communities with accessible, affordable healthcare.</p>
-                    <div class="h5"><i class="fab fa-facebook me-2"></i><i class="fab fa-twitter me-2"></i><i
-                            class="fab fa-instagram me-2"></i><i class="fab fa-linkedin"></i></div>
+                    {% comment %}
+                    These four icons were previously bare <i> tags with no href
+                    at all - decorative, not links. Each is now rendered only
+                    when its URL is filled in, so the footer never shows an
+                    icon that goes nowhere. All four are currently empty (there
+                    were no live URLs to import), which is why this block
+                    renders nothing until AGKI fills them in from the admin.
+                    {% endcomment %}
+                    {% if site_settings.facebook_url or site_settings.twitter_url or site_settings.instagram_url or site_settings.linkedin_url %}
+                    <div class="h5 footer-socials">
+                        {% if site_settings.facebook_url %}<a href="{{ site_settings.facebook_url }}" target="_blank"
+                            rel="noopener" aria-label="Facebook"><i class="fab fa-facebook me-2"></i></a>{% endif %}
+                        {% if site_settings.twitter_url %}<a href="{{ site_settings.twitter_url }}" target="_blank"
+                            rel="noopener" aria-label="Twitter"><i class="fab fa-twitter me-2"></i></a>{% endif %}
+                        {% if site_settings.instagram_url %}<a href="{{ site_settings.instagram_url }}" target="_blank"
+                            rel="noopener" aria-label="Instagram"><i class="fab fa-instagram me-2"></i></a>{% endif %}
+                        {% if site_settings.linkedin_url %}<a href="{{ site_settings.linkedin_url }}" target="_blank"
+                            rel="noopener" aria-label="LinkedIn"><i class="fab fa-linkedin"></i></a>{% endif %}
+                    </div>
+                    {% endif %}
                 </div>
                 <div class="col-6 col-lg-2 order-3 order-md-2 order-lg-2">
                     <h5>Quick</h5>
@@ -1048,12 +865,12 @@
                     </ul>
                 </div>
                 <div class="col-12 col-md-6 col-lg-3 order-2 order-md-3 order-lg-4">
-                    <h5>Kibaha, Pwani</h5>
-                    <p>+255 717 308 796<br>info@agkimedicallaboratory.co.tz</p>
+                    <h5>{{ site_settings.address_line }}</h5>
+                    <p>{{ site_settings.phone }}{% if site_settings.email %}<br>{{ site_settings.email }}{% endif %}</p>
                 </div>
             </div>
             <hr style="border-color:#2d542d;">
-            <p class="text-center mb-0">© 2026 AGKI Medical Laboratory – transforming rural healthcare</p>
+            <p class="text-center mb-0">{{ site_settings.footer_copyright_text }}</p>
         </div>
     </footer>
 

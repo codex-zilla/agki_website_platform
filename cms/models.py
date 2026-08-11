@@ -115,6 +115,23 @@ class HeroImpactStat(models.Model):
     def __str__(self):
         return f"{self.number}{self.suffix} {self.label}"
 
+    @property
+    def count_to(self):
+        """The integer the homepage's count-up animation should animate to,
+        or None when `number` isn't numeric.
+
+        `number` is free text so values like "24/7" are allowed, but the
+        homepage JS does `parseInt()` on the `data-count-to` attribute —
+        and `parseInt("24/7")` returns 24, which would animate the label to
+        a wrong, truncated "24". Returning None lets the template omit the
+        attribute entirely for such values, which is exactly how the JS
+        decides to leave the text alone (it selects on `[data-count-to]`).
+        """
+        try:
+            return int(str(self.number).replace(",", "").strip())
+        except (TypeError, ValueError):
+            return None
+
 
 class AboutContent(SingletonModel):
     story_badge = models.CharField(max_length=40, help_text="e.g. 'Est. 2022'")
@@ -195,6 +212,17 @@ class ProblemStat(models.Model):
 
     def __str__(self):
         return f"{self.number} — {self.label}"
+
+    @property
+    def is_word_value(self):
+        """True when `number` is a word rather than a figure ("Millions").
+
+        The homepage renders those in smaller type via an extra
+        `scale-stat-number-word` class, so that a long word doesn't blow out
+        the layout the way "75%" never would. Derived from the value instead
+        of stored as a flag, so an editor can't get the two out of sync.
+        """
+        return not any(char.isdigit() for char in str(self.number))
 
 
 class FeatureRow(models.Model):

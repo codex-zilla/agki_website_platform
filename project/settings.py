@@ -96,6 +96,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.humanize',  # intcomma, for the homepage's hero impact numbers
     'app',
     'appointments',
     'useraccount',

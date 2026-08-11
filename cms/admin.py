@@ -292,12 +292,33 @@ class CommunityPhotoAdmin(CardFieldsetAdminMixin, SortableAdminMixin, admin.Mode
 
 
 @admin.register(NewsPost)
-class NewsPostAdmin(CardFieldsetAdminMixin, SortableAdminMixin, admin.ModelAdmin):
-    list_display = ("thumbnail", "title", "published_date", "is_published", "order")
+class NewsPostAdmin(CardFieldsetAdminMixin, admin.ModelAdmin):
+    """News is the one list model that is deliberately NOT drag-sortable.
+
+    It used to inherit `SortableAdminMixin` like every other list model here,
+    which was a latent data-corruption bug: adminsortable2 picks its sort
+    field from `ModelAdmin.ordering[0]`, falling back to `Meta.ordering[0]`
+    (see `_get_default_ordering` in adminsortable2/admin.py). `NewsPost` sets
+    neither an admin `ordering` nor a `PositiveIntegerField` first in Meta —
+    its `Meta.ordering` is `["-published_date"]` — so the mixin resolved its
+    sort field to `published_date` and its reorder endpoint would have run
+    `setattr(obj, "published_date", <int>)` + `bulk_update`, writing integers
+    into a DateField and destroying the real publication dates.
+
+    Fixed by dropping the mixin rather than by pointing it at `order`,
+    because news is chronological: the homepage lists it newest-first by
+    `published_date` (design §8), so a drag handle would have been a control
+    that visibly did nothing to the live site. Editors set the date; the order
+    follows from it. The model keeps its unused `order` field — harmless, and
+    the escape hatch if AGKI ever wants manual news ordering instead.
+    """
+
+    list_display = ("thumbnail", "title", "published_date", "is_published")
     list_filter = ("is_published",)
     search_fields = ("title", "excerpt", "body")
     prepopulated_fields = {"slug": ("title",)}
     date_hierarchy = "published_date"
+    ordering = ("-published_date",)
 
     thumbnail = image_thumbnail("image")
 

@@ -3128,3 +3128,52 @@ a {
 .form-success {
     animation: successPop 0.5s ease;
 }
+/* ==========================================================================
+   CMS rendering adjustments (Phase 6)
+   Small rules added when the homepage moved from hardcoded markup to
+   staff-editable content. Each one exists to keep the rendered result
+   identical to the pre-CMS page, or to cover a case the old markup never
+   had. Nothing here restyles anything on its own.
+   ========================================================================== */
+
+/* Rich-text fields (CKEditor) bring their own <p> tags, so the copy is now
+   wrapped in a container rather than being a bare <p class="...">. Without
+   this, the inner paragraph's default 1em margins would stack on top of the
+   wrapper's own spacing and push the layout around. */
+.about-story-copy> :first-child,
+.faq-a> :first-child {
+    margin-top: 0;
+}
+
+.about-story-copy> :last-child,
+.faq-a> :last-child {
+    margin-bottom: 0;
+}
+
+/* The Sankalp logo carried an inline filter:grayscale(0.2) in the old
+   hardcoded markup. AwardLogo has no field for per-logo styling (and adding
+   one to serve a single image would be the wrong trade), so the rule lives
+   here instead, matched on the file name. If an editor replaces that logo the
+   rule simply stops applying - which is the desired failure mode. */
+.awards-logo[src*="sankalplogo"] {
+    filter: grayscale(0.2);
+}
+
+/* Testimonials can now be a hosted embed as well as an uploaded file
+   (design §6.2 steers staff toward YouTube/Vimeo URLs). Only <video> was
+   styled before, so the iframe needs to fill the same 16:9 frame. */
+.testimonial-video iframe {
+    width: 100%;
+    height: 100%;
+    display: block;
+    border: 0;
+}
+
+/* Optional attribution under a testimonial. The two current videos have no
+   name, so this renders only once an editor fills one in. */
+.testimonial-name {
+    margin: 0;
+    padding: 14px 18px 16px;
+    font-weight: 600;
+    color: #2d542d;
+}
