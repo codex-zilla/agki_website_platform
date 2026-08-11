@@ -59,7 +59,15 @@ class SiteSettings(SingletonModel):
     linkedin_url = models.URLField(blank=True)
 
     google_analytics_id = models.CharField(max_length=30, blank=True)
-    map_embed_url = models.URLField(blank=True, help_text="Google Maps 'embed' iframe src URL")
+    # max_length is deliberately well above URLField's 200-char default:
+    # Google Maps "embed" URLs pack the whole viewport (coordinates, zoom,
+    # place ID) into the querystring. The one currently live on the homepage
+    # is already 252 characters, so the default would have rejected it.
+    map_embed_url = models.URLField(
+        max_length=500,
+        blank=True,
+        help_text="Google Maps 'embed' iframe src URL (the src=\"…\" value, not the whole iframe tag)",
+    )
     footer_copyright_text = models.CharField(max_length=200, blank=True)
 
     class Meta:
