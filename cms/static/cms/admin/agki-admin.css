@@ -21,6 +21,8 @@
   --agki-state-pending-bg: #fbeed9;
   --agki-state-live: #276029;
   --agki-state-live-bg: #e3efe2;
+  /* Destructive actions (inline "Remove", required-field asterisk). */
+  --agki-danger: #b3432f;
 
   /* Retarget Flatly's teal primary to AGKI green so buttons, active
      nav states, links and focus rings all follow the brand instead. */
@@ -28,6 +30,28 @@
   --bs-primary-rgb: 45, 90, 45;
   --bs-link-color: var(--agki-brand);
   --bs-link-hover-color: var(--agki-brand-deep);
+
+  /* jazzmin uses .btn-success (Flatly's mint/teal) for every affirmative
+     action - "Add X" on changelists and the dashboard, "Save" on forms -
+     not as a genuine success/confirmation indicator. Retargeted the same
+     way as --bs-primary above so all of those match the brand instead of
+     standing out as a different green. Bootstrap's .alert-success
+     (actual success messages) uses a separate variable, untouched. */
+  --bs-success: var(--agki-brand);
+  --bs-success-rgb: 45, 90, 45;
+
+  /* Dropdown menus (the profile menu, theme chooser, any other Bootstrap
+     dropdown) have their own dedicated active/hover variables, entirely
+     separate from --bs-primary - Flatly hardcodes both to its own dark
+     navy (#2c3e50), which is why clicking a dropdown item still showed
+     an off-brand color even after retargeting --bs-primary/--bs-success
+     above. Retargeted at the variable level (not a component-specific
+     class override) so this is fixed for every dropdown, not just the
+     one this was first noticed on. */
+  --bs-dropdown-link-hover-bg: var(--agki-state-live-bg);
+  --bs-dropdown-link-hover-color: var(--agki-brand-deep);
+  --bs-dropdown-link-active-bg: var(--agki-brand);
+  --bs-dropdown-link-active-color: #fff;
 }
 
 /* ------------------------------------------------------------------ */
@@ -40,6 +64,38 @@
 
 .app-sidebar .sidebar-brand {
   border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 1rem 0.9rem;
+}
+
+.agki-brand-link {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  text-decoration: none;
+  width: 100%;
+}
+.agki-brand-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: contain;
+  flex-shrink: 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+.agki-brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.agki-brand-word {
+  font-weight: 700;
+  font-size: 1.02rem;
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+.agki-brand-sub {
+  font-size: 0.72rem;
+  color: #b9d8b5;
 }
 
 .app-sidebar .nav-header {
@@ -48,7 +104,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  padding-top: 1rem;
+  padding-top: .3125rem;
 }
 
 .app-sidebar .nav-link {
@@ -78,11 +134,111 @@
   border-bottom: 1px solid rgba(45, 90, 45, 0.12);
 }
 
+/* Footer - the "Jazzmin version" notice is removed entirely in
+   templates/admin/base.html (not just hidden), which left the copyright
+   line as the footer's only content; center it now that it's not sharing
+   the row with a floated element on the other side. */
+.app-footer {
+  text-align: center;
+}
+
+/* Header search boxes (jazzmin's per-model search_model forms) — dashboard
+   only. Django still renders them into every page's header (they're part
+   of the shared admin/base.html chrome), so this is a display:none, not
+   a removal - templates/admin/base.html tags each one with
+   .agki-header-search specifically so this rule doesn't have to guess at
+   a selector. body.dashboard is jazzmin's own convention (only set on
+   the index page, see admin/index.html's bodyclass block), same one the
+   .app-content-header hide rule below already relies on.
+
+   !important is required here, not a default reach: the form also
+   carries Bootstrap's .d-flex utility class, and Bootstrap's display
+   utilities (.d-flex, .d-none, etc.) are themselves declared with
+   !important (confirmed in the actual Flatly bundle: ".d-flex{display:
+   flex!important}") specifically so they win over component styles.
+   A plain `display: none` here silently loses to that regardless of
+   selector specificity - this was tested and confirmed to be exactly
+   why the first version of this rule had no visible effect. */
+body:not(.dashboard) .agki-header-search {
+  display: none !important;
+}
+
+/* Default Bootstrap grey/white input-group clashed with the rest of the
+   AGKI themed chrome around it. */
+.app-header .input-group {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(23, 36, 26, 0.05);
+}
+.app-header .form-control-navbar {
+  border: 1px solid rgba(45, 90, 45, 0.22);
+  border-right: none;
+  background: #fff;
+  font-size: 0.82rem;
+  padding: 0.4rem 0.8rem;
+}
+.app-header .form-control-navbar:focus {
+  box-shadow: none;
+  border-color: var(--agki-brand);
+}
+.app-header .form-control-navbar::placeholder {
+  color: #8a9a8b;
+}
+.app-header .btn-navbar {
+  background: var(--agki-brand);
+  border: 1px solid var(--agki-brand);
+  color: #fff;
+  padding: 0.4rem 0.8rem;
+}
+.app-header .btn-navbar:hover {
+  background: var(--agki-brand-deep);
+  border-color: var(--agki-brand-deep);
+}
+.app-header .btn-navbar:focus {
+  box-shadow: 0 0 0 0.2rem rgba(45, 90, 45, 0.25);
+}
+
+/* Dashboard only: jazzmin's generic "Dashboard / Home > Dashboard" title
+   bar is redundant here since the custom greeting below it (see
+   templates/admin/index.html) already serves as the page heading.
+   Scoped to body.dashboard (jazzmin's own convention, only set on the
+   index page) rather than removed from base.html globally — every other
+   admin page (changelists, forms) still needs its own title/breadcrumb. */
+body.dashboard .app-content-header {
+  display: none;
+}
+
+.app-main .app-content-header {
+  padding: 1rem .5rem 0;
+}
+
+.app-content {
+  padding: 1rem .5rem 0;
+  padding: 1rem .5rem 0;
+}
+
 .btn-primary {
   background-color: var(--agki-brand) !important;
   border-color: var(--agki-brand) !important;
 }
 .btn-primary:hover {
+  background-color: var(--agki-brand-deep) !important;
+  border-color: var(--agki-brand-deep) !important;
+}
+
+/* Belt-and-braces alongside the --bs-success retarget above: Bootswatch's
+   compiled CSS doesn't derive every declaration from the custom property
+   at build time, so a direct class override is the reliable way to make
+   sure "Add X" / "Save" buttons actually change color, not just in
+   theory. Excludes #jazzy-actions specifically - that context already
+   has its own more detailed .btn-success treatment (bold, taller
+   padding) from the action-panel hierarchy rules further down; this
+   would otherwise just be redundant with a lower-specificity fight. */
+.btn-success:not(#jazzy-actions .btn-success) {
+  background-color: var(--agki-brand) !important;
+  border-color: var(--agki-brand) !important;
+}
+.btn-success:not(#jazzy-actions .btn-success):hover {
   background-color: var(--agki-brand-deep) !important;
   border-color: var(--agki-brand-deep) !important;
 }
@@ -103,6 +259,51 @@
 .agki-live-link:hover {
   background: var(--agki-state-live-bg);
   color: var(--agki-brand-deep);
+}
+
+/* Header profile dropdown (#jazzy-usermenu) — default Bootstrap dropdown
+   look (square corners, no shadow, generic "Account" label) redesigned
+   to match the rest of the chrome. */
+#jazzy-usermenu {
+  border: 1px solid rgba(45, 90, 45, 0.16);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px -12px rgba(23, 36, 26, 0.28);
+  padding: 0.5rem;
+  overflow: hidden;
+}
+.agki-usermenu-header {
+  padding: 0.5rem 0.75rem 0.35rem;
+}
+.agki-usermenu-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.agki-usermenu-email {
+  font-size: 0.75rem;
+  color: #5f6f60;
+}
+#jazzy-usermenu .dropdown-item {
+  border-radius: 8px;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+}
+#jazzy-usermenu .dropdown-item:hover {
+  background: var(--agki-state-live-bg);
+  color: var(--agki-brand-deep);
+}
+#jazzy-usermenu .dropdown-item i {
+  color: var(--agki-brand);
+  width: 18px;
+  flex-shrink: 0;
+}
+#jazzy-usermenu .dropdown-item:hover i {
+  color: var(--agki-brand-deep);
+}
+#jazzy-usermenu .dropdown-footer {
+  font-weight: 600;
+  color: var(--agki-brand);
 }
 
 /* ------------------------------------------------------------------ */
@@ -201,4 +402,758 @@
   font-size: 0.72rem;
   color: var(--agki-brand);
   flex-shrink: 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* Global card polish — this is what actually reaches changelists and  */
+/* change/add forms: both already wrap their content in Bootstrap      */
+/* .card / .card-header / .card-title (the changelist results table    */
+/* via change_list_results.html, form fieldsets via includes/           */
+/* fieldset.html) — no template changes needed, just restyling what's   */
+/* already there. Also compounds with .agki-panel on the dashboard      */
+/* (same underlying .card element), so this stays one consistent look   */
+/* across every page rather than a dashboard-only style.                */
+/* ------------------------------------------------------------------ */
+
+.card {
+  border-radius: 14px;
+  /* Was rgba(...,0.12) - technically a border, but faint enough to read
+     as "no card at all" against a white page (this is what prompted the
+     Hero section form to look flat/uncarded despite already being
+     wrapped in .card by jazzmin's change_form.html). */
+  border: 1px solid rgba(45, 90, 45, 0.16);
+  box-shadow: 0 2px 10px -4px rgba(23, 36, 26, 0.12);
+}
+.card-header {
+  background: rgba(45, 90, 45, 0.04);
+  border-bottom: 1px solid rgba(45, 90, 45, 0.16);
+}
+/* Change/add form pages: change_form.html wraps the whole form in one
+   "container" .card, and single.html renders each fieldset/inline
+   formset as ITS OWN .card inside that container's .card-body - so
+   every change form actually nests .card > .card-body > .card, packed
+   with zero gap between the inner cards. Confirmed by reading the
+   rendered HTML directly, not assumed. Fix: strip the outer wrapper
+   down to an invisible layout container and let its body space out the
+   real (inner) cards with a gap - this also naturally spaces out
+   multi-fieldset admins like SiteSettings (Contact / Social links /
+   Advanced), not just single-fieldset ones. Scoped to .col-lg-9, the
+   Bootstrap column change_form.html always wraps this specific card in,
+   so it doesn't touch .card usage elsewhere (dashboard panels,
+   changelist results table).
+*/
+.col-lg-9 > .card {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+}
+.col-lg-9 > .card > .card-body {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* Field spacing inside the (now-visible, thanks to CardFieldsetAdminMixin)
+   inner fieldset card. admin/includes/fieldset.html renders <div
+   class="p-5"> (not .card-body - our fieldset name is "", falsy, and
+   that class is conditional on a truthy name) wrapping each .form-group,
+   and each .form-group carries its own default margin from AdminLTE's
+   stylesheet. That default margin compounding with the 3rem .p-5 padding
+   is what produced the oversized gaps between fields - same root cause
+   as the outer/inner card issue above: let the wrapper's flex gap own
+   the spacing instead of trusting each field's own margin. */
+.card > .p-5 {
+  display: flex;
+  flex-direction: column;
+  gap: .325rem;
+  padding: 1.25rem !important;
+}
+.card > .p-5 > .form-group {
+  margin-bottom: 0;
+}
+
+.card-title {
+  color: var(--agki-brand-deep);
+  font-weight: 700;
+}
+
+/* ------------------------------------------------------------------ */
+/* Changelist pages: search/filter bar, results table, pagination      */
+/* ------------------------------------------------------------------ */
+
+/* The search input, submit button and Select2 filter dropdown each get
+   their height from a different source by default (Bootstrap's
+   .form-control padding, Bootstrap's .btn padding, Select2's own
+   min-height) — close but not identical, which is what read as
+   "misaligned" even though everything sits on the same flex row. Pin
+   all three to one explicit height so they line up exactly regardless
+   of what each framework component would otherwise compute on its own. */
+#change-list-filters #searchbar,
+#change-list-filters button[type="submit"],
+#change-list-filters .select2-selection {
+  height: 38px;
+  box-sizing: border-box;
+  display: flex;
+}
+#change-list-filters #searchbar {
+  border: 1px solid rgba(45, 90, 45, 0.22);
+  border-radius: 8px;
+}
+#change-list-filters #searchbar:focus {
+  border-color: var(--agki-brand);
+  box-shadow: 0 0 0 0.15rem rgba(45, 90, 45, 0.15);
+  outline: none;
+}
+#change-list-filters button[type="submit"] {
+  background: var(--agki-brand);
+  border-color: var(--agki-brand);
+}
+#change-list-filters button[type="submit"]:hover {
+  background: var(--agki-brand-deep);
+  border-color: var(--agki-brand-deep);
+}
+/* Select2-enhanced dropdowns (changelist filters AND choice fields on
+   add/change forms both get upgraded from a plain <select> to Select2 by
+   jazzmin's JS) — see the general, unscoped rule further down. Used to
+   be two separate, inconsistent rule sets here (this one) and further
+   down under .form-group, which is why filters and form selects looked
+   different from each other. Consolidated into one.
+*/
+
+#result_list thead th {
+  background: rgba(45, 90, 45, 0.045);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #4a5a4b;
+  white-space: nowrap;
+}
+#result_list tbody tr:hover {
+  background: rgba(45, 90, 45, 0.035);
+}
+#result_list td, #result_list th {
+  vertical-align: middle;
+  padding-top: 0.65rem;
+  padding-bottom: 0.65rem;
+}
+
+/* Drag-to-reorder handle (adminsortable2's ".drag.handle" column) — the
+   default is a small, easy-to-miss background icon on a bare cell. Give
+   it a visible, inviting affordance so it reads as "grab me", not as
+   empty table padding. */
+#result_list td:has(.drag) {
+  width: 2.25rem;
+}
+#result_list .drag {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background-color: rgba(45, 90, 45, 0.08);
+  background-image: url("../icons/drag.png");
+  background-repeat: no-repeat;
+  background-position: center;
+  cursor: grab;
+}
+#result_list .drag.handle:hover {
+  background-color: var(--agki-state-live-bg);
+}
+
+.pagination .page-link,
+.pagination a {
+  color: var(--agki-brand);
+  border-radius: 6px;
+  margin: 0 0.1rem;
+}
+.pagination .active .page-link,
+.pagination li.active a {
+  background: var(--agki-brand);
+  border-color: var(--agki-brand);
+  color: #fff;
+}
+
+/* Friendlier empty state than Django's bare "0 results" line — every cms
+   list is genuinely empty right now, pre-Phase-5, so this is what most
+   changelists actually look like today. */
+.dataTables_info {
+  font-size: 0.85rem;
+  color: #5f6f60;
+}
+
+/* ------------------------------------------------------------------ */
+/* Change / Add form pages: fieldsets, labels, CKEditor, inlines        */
+/* ------------------------------------------------------------------ */
+
+.form-group label {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #33422f;
+}
+.form-group .help-block {
+  font-size: 0.78rem;
+  color: #5f6f60;
+}
+.form-group .form-control:focus,
+.form-group .form-select:focus {
+  border-color: var(--agki-brand);
+  box-shadow: 0 0 0 0.15rem rgba(45, 90, 45, 0.15);
+}
+
+/* Password fields (password-change form) — django.contrib.auth's
+   PasswordChangeForm doesn't add a .form-control class to its widgets
+   (Django admin's own CSS styles them by element type, not class),
+   so they render with none of the theming every other text input gets.
+   Matched by type instead, same technique as the file input below. */
+.form-group input[type="password"] {
+  border: 1px solid rgba(45, 90, 45, 0.22);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.88rem;
+  width: 100%;
+  max-width: 22rem;
+}
+.form-group input[type="password"]:focus {
+  outline: none;
+  border-color: var(--agki-brand);
+  box-shadow: 0 0 0 0.15rem rgba(45, 90, 45, 0.15);
+}
+
+/* File inputs (photo/image/video fields) — Django's ClearableFileInput
+   renders a bare, unwrapped <input type="file">, no classes to hook into,
+   so it was rendering as the browser's native unstyled control sitting
+   next to our themed text inputs. ::file-selector-button is the standard
+   modern way to restyle just the button portion without JS/markup
+   changes - the input itself still gets the same border treatment as
+   every other field. */
+.form-group input[type="file"] {
+  display: inline-block;
+  border: 1px solid rgba(45, 90, 45, 0.22);
+  border-radius: 8px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.82rem;
+  background: #fff;
+  color: #5f6f60;
+}
+.form-group input[type="file"]::file-selector-button {
+  background: var(--agki-brand);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-right: 0.75rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.form-group input[type="file"]::file-selector-button:hover {
+  background: var(--agki-brand-deep);
+}
+/* ClearableFileInput's "Currently: <a>…</a>" / "Clear" checkbox line for
+   fields that already have a file - plain unwrapped text otherwise. */
+.form-group .fieldBox > a {
+  color: var(--agki-brand);
+  font-weight: 600;
+}
+.form-group .fieldBox > label {
+  font-weight: 400;
+  font-size: 0.82rem;
+  color: #5f6f60;
+  margin-left: 0.3rem;
+}
+
+/* Choice fields everywhere Select2 appears - changelist filters
+   (#change-list-filters .search-filter) AND choice fields on add/change
+   forms (.form-group selects) both get upgraded from a plain <select> to
+   Select2 by jazzmin's JS. One unscoped rule set instead of two narrower,
+   drifted-apart ones (a filters-only version with just a border, and a
+   form-only version with the full height/padding treatment) - that drift
+   is exactly why filters looked like a bare default dropdown next to a
+   fully-styled Search button.
+
+   Truncation root cause: jazzmin's change_list.js initializes filter
+   dropdowns with `$this.select2({ minimumInputLength: ... })` - no width
+   option. Select2's default width behavior tries to read the width of
+   the ORIGINAL <select>, which Select2 itself has just set to
+   `display: none` - measuring a hidden element's width is unreliable,
+   so it falls back to a small computed pixel value baked into an INLINE
+   style="width: ...px" on .select2-container. A plain class selector
+   can't win against an inline style without !important, which is why
+   this needs it here (not usually a first resort, but correct for
+   overriding JS-set inline styles specifically).
+*/
+.select2-container {
+  width: auto !important;
+  min-width: 8rem;
+}
+.select2-container .select2-selection {
+  border: 1px solid rgba(45, 90, 45, 0.22) !important;
+  border-radius: 8px !important;
+  min-height: calc(1.5em + 0.7rem + 2px);
+  padding: 0.35rem 0.5rem;
+  display: flex;
+  align-items: center;
+}
+.select2-container--open .select2-selection,
+.select2-container .select2-selection:focus {
+  border-color: var(--agki-brand) !important;
+  box-shadow: 0 0 0 0.15rem rgba(45, 90, 45, 0.15);
+}
+.select2-selection__rendered {
+  line-height: normal !important;
+  font-size: 0.88rem;
+  padding-left: 0 !important;
+}
+.select2-selection__arrow {
+  height: 100% !important;
+}
+
+/* The dropdown panel that opens on click — Select2 renders this as a
+   separate floating element (appended near <body>, not inside
+   .select2-container), so it needs its own rule set entirely separate
+   from the closed-state selection box above. Default is a square white
+   panel with Select2's stock blue for hover/selected instead of any
+   AGKI theming at all. */
+.select2-dropdown {
+  border: 1px solid rgba(45, 90, 45, 0.22) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 10px 30px -12px rgba(23, 36, 26, 0.28);
+  overflow: hidden;
+}
+.select2-search--dropdown {
+  padding: 0.6rem !important;
+}
+.select2-search--dropdown .select2-search__field {
+  border: 1px solid rgba(45, 90, 45, 0.22) !important;
+  border-radius: 6px !important;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.85rem;
+}
+.select2-search--dropdown .select2-search__field:focus {
+  border-color: var(--agki-brand) !important;
+  outline: none;
+}
+.select2-results__option {
+  padding: 0.5rem 0.75rem !important;
+  font-size: 0.88rem;
+}
+.select2-results__option--highlighted {
+  background-color: var(--agki-state-live-bg) !important;
+  color: var(--agki-brand-deep) !important;
+}
+.select2-results__option--selected {
+  background-color: var(--agki-brand) !important;
+  color: #fff !important;
+  font-weight: 600;
+}
+.select2-results__option--selected.select2-results__option--highlighted {
+  background-color: var(--agki-brand-deep) !important;
+}
+
+/* Fallback for the rare case Select2's JS hasn't run yet/failed - a
+   plain native <select> should still look consistent, not raw. */
+.form-group select.form-select,
+.form-group select:not([multiple]) {
+  border: 1px solid rgba(45, 90, 45, 0.22);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.88rem;
+  background-color: #fff;
+}
+
+/* CKEditor5 widget border - default is a plain grey box that reads as
+   "broken" or unfinished sitting inside an otherwise themed card. */
+.django_ckeditor_5 .ck.ck-editor__main > .ck-editor__editable,
+.django_ckeditor_5 .ck.ck-toolbar {
+  border-color: rgba(45, 90, 45, 0.25) !important;
+}
+.django_ckeditor_5 .ck.ck-toolbar {
+  background: rgba(45, 90, 45, 0.04) !important;
+}
+.django_ckeditor_5 .ck.ck-editor__editable.ck-focused {
+  border-color: var(--agki-brand) !important;
+  box-shadow: 0 0 0 0.15rem rgba(45, 90, 45, 0.15) !important;
+}
+
+/* Inline formsets (HeroImpactStat on Hero, CoreValue on About) */
+.inline-group .tabular thead th {
+  background: rgba(45, 90, 45, 0.045);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.inline-related.dynamic-form {
+  border-radius: 8px;
+}
+
+/* "Drag rows to reorder" hint injected by templates/jazzmin/includes/
+   single.html next to every inline's card-header title. */
+.agki-inline-hint {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #5f6f60;
+}
+
+/* ------------------------------------------------------------------ */
+/* cms change forms: label-above-input, two-up field rows              */
+/*                                                                     */
+/* jazzmin's admin/includes/fieldset.html renders each fieldset line   */
+/* as .row > [label, valueDiv] per field, laid out as Bootstrap flex   */
+/* columns — i.e. label *beside* input. A paired line (a tuple in      */
+/* ModelAdmin.fieldsets, e.g. ("kicker_text", "headline_accent"))      */
+/* therefore emits label/input/label/input across one flex row, whose  */
+/* widths overflow 100% and wrap the second input underneath the       */
+/* first — the misalignment visible on the Hero form. The approved     */
+/* design stacks each label directly above its own input in two equal  */
+/* columns, so re-lay the line out as a 2x2 grid instead of patching   */
+/* the flex widths.                                                    */
+/*                                                                     */
+/* Paired vs. single-field lines are only distinguishable in the DOM   */
+/* by .fieldBox (fieldset.html marks value divs with it for pairs, and */
+/* uses .col-sm-9 for singles), hence :has() — already relied on above */
+/* for #result_list td:has(.drag), so no new browser-support risk.     */
+/*                                                                     */
+/* Scoped to body.app-cms.change-form: cms content forms only. Other   */
+/* apps' admin forms (appointments, useraccount, ecommerce) keep       */
+/* jazzmin's default label-beside-input layout untouched.              */
+/* ------------------------------------------------------------------ */
+
+body.app-cms.change-form .form-group > .row {
+  display: grid;
+  grid-template-columns: 1fr;
+  column-gap: 1.75rem;
+  margin: 0;
+}
+/* Neutralise the Bootstrap column widths/gutters the grid replaces —
+   .col-sm-3/.col-sm-9 still pin a percentage width inside a grid item. */
+body.app-cms.change-form .form-group > .row > label,
+body.app-cms.change-form .form-group > .row > div {
+  width: auto;
+  max-width: none;
+  flex: none;
+  padding-left: 0;
+  padding-right: 0;
+}
+body.app-cms.change-form .form-group > .row > label {
+  margin-bottom: 0.3rem;
+  /* Bottom-align, so a label that wraps to two lines still leaves its
+     input on the same baseline as its partner's across the pair. */
+  align-self: end;
+}
+
+/* Paired line: 2x2 grid — label/input in column 1, label/input in
+   column 2. Children arrive as label1, input1, label2, input2. */
+body.app-cms.change-form .form-group > .row:has(> .fieldBox) {
+  grid-template-columns: 1fr 1fr;
+}
+body.app-cms.change-form .form-group > .row:has(> .fieldBox) > *:nth-child(1) { grid-area: 1 / 1; }
+body.app-cms.change-form .form-group > .row:has(> .fieldBox) > *:nth-child(2) { grid-area: 2 / 1; }
+body.app-cms.change-form .form-group > .row:has(> .fieldBox) > *:nth-child(3) { grid-area: 1 / 2; }
+body.app-cms.change-form .form-group > .row:has(> .fieldBox) > *:nth-child(4) { grid-area: 2 / 2; }
+
+/* Widgets fill their column — Django's own admin CSS pins .vTextField
+   to 20em and .vLargeTextField to 25em, which otherwise leaves every
+   input floating short of the column edge. */
+body.app-cms.change-form .form-group > .row input[type="text"],
+body.app-cms.change-form .form-group > .row input[type="url"],
+body.app-cms.change-form .form-group > .row input[type="email"],
+body.app-cms.change-form .form-group > .row input[type="number"],
+body.app-cms.change-form .form-group > .row input[type="password"],
+body.app-cms.change-form .form-group > .row select,
+body.app-cms.change-form .form-group > .row textarea {
+  width: 100%;
+  max-width: 100%;
+  padding: 0.6rem 0.85rem;
+  border-radius: 8px;
+}
+
+body.app-cms.change-form .form-group {
+  margin-bottom: 0;
+}
+body.app-cms.change-form .form-group:last-child {
+  margin-bottom: 0;
+}
+body.app-cms.change-form .form-group .help-block {
+  margin-top: 0.25rem;
+  margin-bottom: 0;
+}
+.help-block, .helptext {
+  font-size: 0.625rem;
+}
+
+/* Rule between the Hero form's copy fields and its call-to-action pairs,
+   per the design. Django fieldsets can't express a divider *within* one
+   fieldset (a second fieldset would render as a second card, not a rule
+   inside this one — see jazzmin/includes/single.html), so it hangs off
+   the field class that fieldset.html already emits on the row that opens
+   the CTA block. `primary_cta_text` is HeroContent-only — the other CTA-
+   bearing model, ProblemSectionContent, names its fields plain
+   `cta_text`/`cta_url` — so this can't leak onto another form. */
+body.app-cms.change-form .form-group.field-primary_cta_text {
+  border-top: 1px solid rgba(45, 90, 45, 0.16);
+  margin-top: 1.9rem;
+  padding-top: 1.7rem;
+}
+
+/* ------------------------------------------------------------------ */
+/* Login page                                                          */
+/* ------------------------------------------------------------------ */
+
+.login-box .card {
+  border-radius: 14px;
+  box-shadow: 0 10px 30px -14px rgba(23, 36, 26, 0.3);
+}
+.login-logo img {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: contain;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+/* ------------------------------------------------------------------ */
+/* Page title + breadcrumb (admin/base.html's shared .app-content-header, */
+/* every non-dashboard page — dashboard hides this block entirely, see  */
+/* the body.dashboard rule above). Default renders as a heavy, oversized */
+/* h3 competing with the actual page content for visual weight; the      */
+/* approved form-page mockup used a modest 1.5rem heading with a small,  */
+/* quiet breadcrumb above it, not a second headline.                     */
+/* ------------------------------------------------------------------ */
+
+.app-content-header h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.app-content-header .breadcrumb {
+  font-size: 0.78rem;
+  color: #5f6f60;
+  margin-bottom: 0.2rem;
+}
+.app-content-header .breadcrumb-item a {
+  color: var(--agki-brand);
+  text-decoration: none;
+}
+.app-content-header .breadcrumb-item.active {
+  color: #5f6f60;
+}
+.app-content-header .breadcrumb-item + .breadcrumb-item::before {
+  opacity: 0.5;
+}
+
+/* fieldset.html marks required fields with <span class="text-red">*</span> —
+   Bootstrap's .text-red isn't a real utility class (nothing sets its
+   color), so it was rendering as plain black text indistinguishable
+   from the label itself. */
+.form-group label .text-red {
+  color: #b3432f;
+  font-weight: 700;
+}
+
+.form-group {
+  margin-bottom: 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* Change/add form: action panel (Save / Save-and-continue / History)  */
+/* jazzmin renders all three as equally-weighted solid .btn blocks     */
+/* stacked in a narrow column — no visual hierarchy for which one is   */
+/* the actual primary action. Scoped to #jazzy-actions specifically so */
+/* it doesn't touch same-named Bootstrap classes elsewhere (e.g.       */
+/* changelist action buttons).                                        */
+/* ------------------------------------------------------------------ */
+
+#jazzy-actions {
+  background: var(--bs-body-bg, #fff);
+  border: 1px solid rgba(45, 90, 45, 0.16);
+  border-radius: 14px;
+  box-shadow: 0 2px 10px -4px rgba(23, 36, 26, 0.12);
+  padding: 1rem;
+  position: sticky;
+  top: 5.5rem;
+}
+#jazzy-actions .btn-success {
+  background: var(--agki-brand) !important;
+  border-color: var(--agki-brand) !important;
+  font-weight: 700;
+  padding-top: 0.6rem;
+  padding-bottom: 0.6rem;
+}
+#jazzy-actions .btn-success:hover {
+  background: var(--agki-brand-deep) !important;
+  border-color: var(--agki-brand-deep) !important;
+}
+#jazzy-actions .btn-info {
+  background: var(--agki-state-live-bg) !important;
+  border-color: rgba(45, 90, 45, 0.2) !important;
+  color: var(--agki-brand-deep) !important;
+}
+#jazzy-actions .btn-info:hover {
+  background: #d5e8d3 !important;
+}
+#jazzy-actions .object-tools {
+  margin-top: 0.4rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid rgba(45, 90, 45, 0.12);
+}
+#jazzy-actions .btn-secondary {
+  background: transparent !important;
+  border-color: transparent !important;
+  color: #5f6f60 !important;
+  font-weight: 500;
+}
+#jazzy-actions .btn-secondary:hover {
+  color: var(--agki-brand) !important;
+  background: rgba(45, 90, 45, 0.05) !important;
+}
+#jazzy-actions .btn-danger {
+  margin-top: 0.4rem;
+}
+
+/* ------------------------------------------------------------------ */
+/* Sortable tabular inlines (Hero impact stats, Core values) — see     */
+/* templates/adminsortable2/edit_inline/tabular-django-4.2.html for    */
+/* the markup this targets.                                            */
+/* ------------------------------------------------------------------ */
+
+.agki-inline-table thead th {
+  background: rgba(45, 90, 45, 0.045);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #4a5a4b;
+}
+.agki-drag-col {
+  width: 2.5rem;
+}
+.agki-del-col {
+  width: 5rem;
+}
+/* The drag handle fights adminsortable2's own sortable.css, which ships:
+     fieldset.sortable :is(.inline-related, td.original) span.sort
+         { float: right; margin: 2px 10px 0 0 }
+     fieldset.sortable :is(...) span.sort i
+         { width: 0; height: 0; border-style: solid; ... }
+   The first floated the handle out of its 40px cell entirely (it was
+   landing in the page margin, on top of the sidebar); the second is a
+   CSS-triangle trick that drew the two black arrowheads AND collapsed
+   the Font Awesome grip to 0x0. Both rules are ~(0,3,3) specific, so
+   these overrides are deliberately written long enough to outrank them
+   rather than reaching for !important. */
+fieldset.sortable td.original span.sort.agki-drag-handle {
+  float: none;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  cursor: grab;
+  color: #8a9a8b;
+}
+fieldset.sortable td.original span.sort.agki-drag-handle:hover {
+  color: var(--agki-brand);
+}
+/* Undo the 0x0 triangle sizing for the real (Font Awesome) grip icon. */
+fieldset.sortable td.original span.sort.agki-drag-handle i.agki-drag-icon {
+  width: auto;
+  height: auto;
+  margin: 0;
+  border: 0;
+  font-size: 0.95rem;
+  color: inherit;
+}
+/* The design shows that grip as the row's only reorder affordance,
+   matching the "Drag rows to reorder" hint. adminsortable2's JS binds
+   click handlers to these move-to-first/move-to-last <i> tags, so they
+   stay in the DOM (removing them from the template would break that
+   binding) and are hidden visually only. */
+fieldset.sortable td.original span.sort.agki-drag-handle i.move-begin,
+fieldset.sortable td.original span.sort.agki-drag-handle i.move-end {
+  display: none;
+}
+
+/* Inline row widgets: match the shape of the main form's inputs, and
+   fill their column rather than sitting at Django's fixed .vTextField
+   width (20em), which overflowed the narrower inline columns and clipped
+   values like "fa-solid fa-location-dot". */
+.agki-inline-table input[type="text"],
+.agki-inline-table input[type="url"],
+.agki-inline-table input[type="number"],
+.agki-inline-table select,
+.agki-inline-table textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+}
+/* Let the four value columns share the row evenly instead of being
+   sized by their widest content. */
+.agki-inline-table {
+  table-layout: fixed;
+  width: 100%;
+}
+.agki-inline-table td,
+.agki-inline-table th {
+  vertical-align: middle;
+}
+
+/* "Remove" reads as destructive, not as a normal link (it inherited the
+   brand/link colour before). */
+.inline-deletelink {
+  color: var(--agki-danger);
+  font-weight: 600;
+  text-decoration: none;
+}
+.inline-deletelink:hover {
+  color: var(--agki-danger);
+  text-decoration: underline;
+}
+/* Saved rows keep their real DELETE checkbox in the DOM (it still has to
+   submit) but present the "Remove" link instead — see
+   cms/static/cms/admin/agki-inline-remove.js. A display:none checkbox
+   still posts its value when checked. */
+.agki-delete-checkbox {
+  display: none;
+}
+/* Long-hand because jazzmin ships `.table tr.form-row { display: table-row }`,
+   which outranks a lone class selector and left removed rows visible. */
+.agki-row-removed,
+.table tr.form-row.agki-row-removed {
+  display: none;
+}
+
+/* Django's inlines.js injects "Add another X" as a <tr class="add-row">
+   with a full-width <td> for tabular inlines (and a plain <div> for
+   stacked ones) — hence both selectors. */
+.add-row,
+.add-row td {
+  padding: 0.75rem 0.9rem;
+  text-align: left;
+}
+/* jazzmin decorates that link with Bootstrap's .float-end utility, which
+   is declared `float: right !important` — so pulling the button back to
+   the left per the design can only be done with !important in turn. */
+.add-row a.float-end {
+  float: none !important;
+}
+.add-row a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1.5px dashed rgba(45, 90, 45, 0.3);
+  color: var(--agki-brand);
+  border-radius: 8px;
+  padding: 0.45rem 0.8rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.add-row a::before {
+  content: "\f067";
+  font-family: "Font Awesome 5 Free";
+  font-weight: 900;
+  font-size: 0.72rem;
+}
+.add-row a:hover {
+  border-color: var(--agki-brand-bright);
+  background: var(--agki-state-live-bg);
 }

@@ -1,5 +1,7 @@
 from adminsortable2.admin import SortableAdminBase, SortableAdminMixin, SortableTabularInline
+from django import forms
 from django.contrib import admin
+from django.db import models
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.html import format_html
@@ -54,7 +56,35 @@ def image_thumbnail(field_name, height=50):
     return _thumbnail
 
 
-class SingletonModelAdmin(admin.ModelAdmin):
+class CardFieldsetAdminMixin:
+    """Wraps a change/add form's fields in jazzmin's bordered `.card` look.
+
+    jazzmin only renders that border when the admin has more than one
+    fieldset, OR a single fieldset with a non-None name — see
+    jazzmin/includes/single.html's `has_fieldsets` check. Django's own
+    default `get_fieldsets()` for an admin with no explicit `fieldsets`
+    returns exactly the case jazzmin treats as "none": one fieldset named
+    `None`. Left as Django's default, a change/add form renders as bare
+    fields directly on the page background — no visible card at all.
+
+    First caught and hand-fixed on HeroContentAdmin alone; turned out to
+    affect every other admin in this file that doesn't define its own
+    `fieldsets` (About, Problem, ProblemCard, ProblemStat, FeatureRow,
+    AwardLogo, Testimonial, CommunityPhoto, NewsPost, FAQItem, TeamMember,
+    ContactMessage) — fixed once, here, rather than patched per-admin as
+    each one gets noticed. Only takes over when `fieldsets` isn't already
+    set explicitly, so SiteSettings' multi-section layout and Hero's
+    paired-field layout (both intentionally customized already) are
+    untouched.
+    """
+
+    def get_fieldsets(self, request, obj=None):
+        if self.fieldsets:
+            return self.fieldsets
+        return [("", {"fields": self.get_fields(request, obj)})]
+
+
+class SingletonModelAdmin(CardFieldsetAdminMixin, admin.ModelAdmin):
     """For models with exactly one row (SiteSettings, HeroContent,
     AboutContent, ProblemSectionContent). No changelist, no add, no
     delete — clicking the section in the sidebar jumps straight to
@@ -96,10 +126,30 @@ class SiteSettingsAdmin(SingletonModelAdmin):
 # ---------------------------------------------------------------------------
 
 
-class HeroImpactStatInline(SortableTabularInline):
+class AgkiSortableTabularInline(SortableTabularInline):
+    """Shared base for this project's sortable tabular inlines.
+
+    Only carries the media for the "Remove" affordance — see
+    cms/static/cms/admin/agki-inline-remove.js for why saved rows need
+    it. Kept as a base class rather than repeated `Media` declarations so
+    a future inline picks the behaviour up by inheriting, and so the
+    script is declared once.
+    """
+
+    class Media:
+        js = ("cms/admin/agki-inline-remove.js",)
+
+
+class HeroImpactStatInline(AgkiSortableTabularInline):
     model = HeroImpactStat
     extra = 1
     fields = ("icon_class", "number", "suffix", "label", "order")
+    # Decoupled from Meta.verbose_name/verbose_name_plural ("Hero impact
+    # stat(s)") so the inline's own "Add another …" link reads "Add
+    # another impact stat" while the card heading above the table (which
+    # reads verbose_name_plural) keeps the "Hero" prefix.
+    verbose_name = "impact stat"
+    verbose_name_plural = "Hero impact stats"
 
 
 @admin.register(HeroContent)
@@ -109,6 +159,34 @@ class HeroContentAdmin(SortableAdminBase, SingletonModelAdmin):
     # admin's own changelist is redirected away by SingletonModelAdmin, so
     # there's no drag-reorder on HeroContent itself, only on the inline.
     inlines = [HeroImpactStatInline]
+    # A named (non-None) fieldset is what makes jazzmin wrap the form in a
+    # bordered .card — see jazzmin/includes/single.html's has_fieldsets
+    # check, which treats a single fieldset named None as "no fieldsets"
+    # and skips the card. Name is "" (not None) so has_fieldsets is True
+    # but the card-header block (guarded on `fieldset.name`) still renders
+    # nothing — one plain card, no redundant header bar.
+    # Django's default admin Textarea is 10 rows — far taller than the
+    # two-or-three-sentence lede actually holds, which left a large dead
+    # box in the middle of the form. `lede` is HeroContent's only
+    # TextField, so this override is unambiguous.
+    formfield_overrides = {
+        models.TextField: {"widget": forms.Textarea(attrs={"rows": 4})},
+    }
+    # Paired tuples render two fields side by side on one row.
+    fieldsets = (
+        (
+            "",
+            {
+                "fields": (
+                    ("kicker_text", "headline_accent"),
+                    ("headline_line1", "headline_line2"),
+                    "lede",
+                    ("primary_cta_text", "primary_cta_url"),
+                    ("secondary_cta_text", "secondary_cta_url"),
+                )
+            },
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -116,7 +194,7 @@ class HeroContentAdmin(SortableAdminBase, SingletonModelAdmin):
 # ---------------------------------------------------------------------------
 
 
-class CoreValueInline(SortableTabularInline):
+class CoreValueInline(AgkiSortableTabularInline):
     model = CoreValue
     extra = 1
     fields = ("icon_class", "label", "order")
@@ -138,7 +216,7 @@ class ProblemSectionContentAdmin(SingletonModelAdmin):
 
 
 @admin.register(ProblemCard)
-class ProblemCardAdmin(SortableAdminMixin, admin.ModelAdmin):
+class ProblemCardAdmin(CardFieldsetAdminMixin, SortableAdminMixin, admin.ModelAdmin):
     list_display = ("thumbnail", "title", "order")
     search_fields = ("title", "body")
 
@@ -146,7 +224,7 @@ class ProblemCardAdmin(SortableAdminMixin, admin.ModelAdmin):
 
 
 @admin.register(ProblemStat)
-class ProblemStatAdmin(SortableAdminMixin, admin.ModelAdmin):
+class ProblemStatAdmin(CardFieldsetAdminMixin, SortableAdminMixin, admin.ModelAdmin):
     list_display = ("number", "label", "order")
     search_fields = ("label", "description")
 
@@ -160,7 +238,7 @@ class ProblemStatAdmin(SortableAdminMixin, admin.ModelAdmin):
 
 
 @admin.register(FeatureRow)
-class FeatureRowAdmin(SortableAdminMixin, admin.ModelAdmin):
+class FeatureRowAdmin(CardFieldsetAdminMixin, SortableAdminMixin, admin.ModelAdmin):
     list_display = ("title", "category", "order")
     list_filter = ("category",)
     search_fields = ("title", "description")
@@ -178,7 +256,7 @@ class FeatureRowAdmin(SortableAdminMixin, admin.ModelAdmin):
 
 
 @admin.register(AwardLogo)
-class AwardLogoAdmin(SortableAdminMixin, admin.ModelAdmin):
+class AwardLogoAdmin(CardFieldsetAdminMixin, SortableAdminMixin, admin.ModelAdmin):
     list_display = ("thumbnail", "alt_text", "size", "order")
 
     thumbnail = image_thumbnail("image")
@@ -190,7 +268,7 @@ class AwardLogoAdmin(SortableAdminMixin, admin.ModelAdmin):
 
 
 @admin.register(Testimonial)
-class TestimonialAdmin(SortableAdminMixin, admin.ModelAdmin):
+class TestimonialAdmin(CardFieldsetAdminMixin, SortableAdminMixin, admin.ModelAdmin):
     list_display = ("patient_name", "youtube_url", "is_published", "order")
     list_filter = ("is_published",)
 
@@ -201,7 +279,7 @@ class TestimonialAdmin(SortableAdminMixin, admin.ModelAdmin):
 
 
 @admin.register(CommunityPhoto)
-class CommunityPhotoAdmin(SortableAdminMixin, admin.ModelAdmin):
+class CommunityPhotoAdmin(CardFieldsetAdminMixin, SortableAdminMixin, admin.ModelAdmin):
     list_display = ("thumbnail", "caption", "is_published", "order")
     list_filter = ("is_published",)
 
@@ -214,7 +292,7 @@ class CommunityPhotoAdmin(SortableAdminMixin, admin.ModelAdmin):
 
 
 @admin.register(NewsPost)
-class NewsPostAdmin(SortableAdminMixin, admin.ModelAdmin):
+class NewsPostAdmin(CardFieldsetAdminMixin, SortableAdminMixin, admin.ModelAdmin):
     list_display = ("thumbnail", "title", "published_date", "is_published", "order")
     list_filter = ("is_published",)
     search_fields = ("title", "excerpt", "body")
@@ -230,7 +308,7 @@ class NewsPostAdmin(SortableAdminMixin, admin.ModelAdmin):
 
 
 @admin.register(FAQItem)
-class FAQItemAdmin(SortableAdminMixin, admin.ModelAdmin):
+class FAQItemAdmin(CardFieldsetAdminMixin, SortableAdminMixin, admin.ModelAdmin):
     list_display = ("question", "is_published", "order")
     list_filter = ("is_published",)
     search_fields = ("question", "answer")
@@ -242,7 +320,7 @@ class FAQItemAdmin(SortableAdminMixin, admin.ModelAdmin):
 
 
 @admin.register(TeamMember)
-class TeamMemberAdmin(SortableAdminMixin, admin.ModelAdmin):
+class TeamMemberAdmin(CardFieldsetAdminMixin, SortableAdminMixin, admin.ModelAdmin):
     list_display = ("thumbnail", "name", "role", "is_active", "order")
     list_filter = ("is_active",)
     search_fields = ("name", "role")
@@ -260,7 +338,7 @@ class TeamMemberAdmin(SortableAdminMixin, admin.ModelAdmin):
 
 
 @admin.register(ContactMessage)
-class ContactMessageAdmin(admin.ModelAdmin):
+class ContactMessageAdmin(CardFieldsetAdminMixin, admin.ModelAdmin):
     list_display = ("name", "subject", "email", "created_at", "is_read")
     list_filter = ("is_read", "created_at")
     search_fields = ("name", "email", "subject", "message")

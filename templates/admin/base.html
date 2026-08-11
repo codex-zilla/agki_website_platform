@@ -124,7 +124,8 @@
 
             {% if jazzmin_settings.search_model %}
                 {% for search_model in jazzmin_settings.search_models_parsed %}
-                    <form action="{{ search_model.search_url }}" method="GET" class="d-flex ms-2">
+                    {# AGKI: agki-header-search hook lets CSS show these only on the dashboard - see agki-admin.css #}
+                    <form action="{{ search_model.search_url }}" method="GET" class="d-flex ms-2 agki-header-search">
                         <div class="input-group input-group-sm">
                             <input class="form-control form-control-navbar" name="q" type="search" placeholder="{% trans 'Search' %} {{ search_model.search_name }}..." aria-label="{% trans 'Search' %} {{ search_model.search_name }}...">
                             <button class="btn btn-navbar" type="submit">
@@ -223,7 +224,11 @@
                         <i class="far fa-user" aria-hidden="true"></i>
                     </a>
                     <div class="dropdown-menu dropdown-menu-lg dropdown-menu-end" id="jazzy-usermenu">
-                        <span class="dropdown-header">{% trans 'Account' %}</span>
+                        {# AGKI: personalized header (name + email) instead of a generic "Account" label #}
+                        <div class="agki-usermenu-header">
+                            <div class="agki-usermenu-name">{{ request.user.get_full_name|default:request.user.username }}</div>
+                            <div class="agki-usermenu-email">{{ request.user.email }}</div>
+                        </div>
                         <div class="dropdown-divider"></div>
                         <a href="{% url 'admin:password_change' %}" class="dropdown-item">
                             <i class="fas fa-key me-2"></i> {% trans 'Change password' %}
@@ -254,30 +259,31 @@
             {% get_side_menu as side_menu_list %}
 
             <aside class="app-sidebar bg-body-secondary shadow {{ jazzmin_ui.sidebar_classes }}" id="jazzy-sidebar" data-bs-theme="dark">
+                {% comment %}
+                AGKI: replaces jazzmin's default <img site_logo> + site_brand
+                link. The logo is a self-contained circular badge (dark
+                background baked into the file, not a transparent mark), so
+                it's sized and shown directly rather than boxed inside
+                another colored tile — a second background box behind an
+                image that already has its own would double up.
+                {% endcomment %}
                 <div class="sidebar-brand">
-                    <a href="{% url 'admin:index' %}" class="brand-link {{ jazzmin_ui.brand_classes }}" id="jazzy-logo">
-                        <img src="{% static jazzmin_settings.site_logo %}" alt="{{ jazzmin_settings.site_header }} Logo" class="{{ jazzmin_settings.site_logo_classes }} brand-image opacity-75 shadow">
-                        <span class="brand-text fw-light">{{ jazzmin_settings.site_brand }}</span>
+                    <a href="{% url 'admin:index' %}" class="agki-brand-link">
+                        <img src="{% static 'app/logo.png' %}" alt="AGKI logo" class="agki-brand-mark">
+                        <span class="agki-brand-text">
+                            <span class="agki-brand-word">AGKI</span>
+                            <span class="agki-brand-sub">Content Manager</span>
+                        </span>
                     </a>
                 </div>
 
                 <div class="sidebar-wrapper">
-                    <div class="user-panel d-flex">
-                        <div class="image">
-                            {% if jazzmin_settings|has_jazzmin_setting:"user_avatar" %}
-                                <img src="{% get_user_avatar request.user %}" width="160px" class="img-circle elevation-2" alt="User Image">
-                            {% else %}
-                                <i class="fas fa-inverse user-profile fa-user-circle"></i>
-                            {% endif %}
-                        </div>
-                        <div class="info">
-                            {% if perms|can_view_self %}
-                                <a href="{% jazzy_admin_url request.user request.current_app|default:"admin" %}" class="d-block">{{ request.user }}</a>
-                            {% else %}
-                                <span class="d-block opacity-75">{{ request.user }}</span>
-                            {% endif %}
-                        </div>
-                    </div>
+                    {% comment %}
+                    AGKI: jazzmin's default user-panel (avatar + username/email)
+                    removed — it duplicated the user menu already in the
+                    top-right of the header. One place for account identity,
+                    not two.
+                    {% endcomment %}
 
                     <nav class="mt-2">
                         <ul class="nav sidebar-menu flex-column {{ jazzmin_ui.sidebar_list_classes }}" data-lte-toggle="treeview" role="navigation" aria-label="Main navigation" data-accordion="false" id="jazzy-navigation">
@@ -451,9 +457,7 @@
 {% block footer %}
     {% if not is_popup %}
         <footer class="app-footer {{ jazzmin_ui.footer_classes }}">
-            <div class="float-end d-none d-sm-inline">
-                <b>{% trans 'Jazzmin version' %}</b> {% get_jazzmin_version %}
-            </div>
+            {# AGKI: jazzmin version notice removed - not something a content editor needs to see #}
             {% autoescape off %}
                 <strong>{% trans 'Copyright' %} &copy; {% now 'Y' %} {{ jazzmin_settings.copyright }}.</strong> {% trans 'All rights reserved.' %}
             {% endautoescape %}

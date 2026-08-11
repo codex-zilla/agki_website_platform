@@ -355,6 +355,7 @@ JAZZMIN_SETTINGS = {
     "site_logo": "app/logo.png",
     "site_logo_classes": "",
     "site_icon": "app/logo.png",
+    "login_logo": "app/logo.png",
     # AGKI brand palette layered on top of the Flatly bootswatch theme —
     # see cms/static/cms/admin/agki-admin.css for the full rationale.
     "custom_css": "cms/admin/agki-admin.css",

@@ -72,15 +72,15 @@ class SiteSettings(SingletonModel):
 
 class HeroContent(SingletonModel):
     kicker_text = models.CharField(max_length=60, help_text="Small label above the headline, e.g. 'Afya Mfukoni'")
-    headline_line1 = models.CharField(max_length=60)
-    headline_line2 = models.CharField(max_length=60)
+    headline_line1 = models.CharField(max_length=60, verbose_name="Headline line 1")
+    headline_line2 = models.CharField(max_length=60, verbose_name="Headline line 2")
     headline_accent = models.CharField(max_length=60, help_text="Styled differently from the two lines above, e.g. 'Community'")
     lede = models.TextField()
 
-    primary_cta_text = models.CharField(max_length=40)
-    primary_cta_url = models.CharField(max_length=200)
-    secondary_cta_text = models.CharField(max_length=40, blank=True)
-    secondary_cta_url = models.CharField(max_length=200, blank=True)
+    primary_cta_text = models.CharField(max_length=40, verbose_name="Primary CTA text")
+    primary_cta_url = models.CharField(max_length=200, verbose_name="Primary CTA URL")
+    secondary_cta_text = models.CharField(max_length=40, blank=True, verbose_name="Secondary CTA text")
+    secondary_cta_url = models.CharField(max_length=200, blank=True, verbose_name="Secondary CTA URL")
 
     class Meta:
         verbose_name = "Hero section"

@@ -1,0 +1,36 @@
+{% load i18n jazzmin %}
+{% comment %}
+AGKI override of jazzmin/includes/single.html.
+
+Why this exists: the only change from the upstream template is the inline
+card-header — every inline formset in this project (HeroImpactStat,
+CoreValue, see cms/admin.py) is a SortableTabularInline, so "Drag rows to
+reorder" is always true here. Adds that hint next to the heading instead
+of leaving it undiscoverable (the drag handle itself has no visible label).
+Everything else below is byte-for-byte the upstream template.
+{% endcomment %}
+{% get_sections adminform inline_admin_formsets as forms %}
+
+{% for fieldset in forms %}
+    {% if fieldset.is_inline %}
+        {% if adminform|has_fieldsets %}
+            <div class="card {{ fieldset.classes }}">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div class="card-title mb-0">{{ fieldset.name }}</div>
+                    <span class="agki-inline-hint">{% trans "Drag rows to reorder" %}</span>
+                </div>
+                <div class="card-body">
+                    {% include fieldset.opts.template with inline_admin_formset=fieldset %}
+                </div>
+            </div>
+        {% else %}
+            <h6 class="d-flex justify-content-between align-items-center">
+                <strong>{{ fieldset.name }}</strong>
+                <span class="agki-inline-hint">{% trans "Drag rows to reorder" %}</span>
+            </h6>
+            {% include fieldset.opts.template with inline_admin_formset=fieldset %}
+        {% endif %}
+    {% else %}
+        {% include "admin/includes/fieldset.html" with card=adminform|has_fieldsets card_header=adminform|has_fieldsets %}
+    {% endif %}
+{% endfor %}
