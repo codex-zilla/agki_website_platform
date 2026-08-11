@@ -726,59 +726,102 @@
             <div class="row justify-content-center">
                 <div class="col-12 col-lg-8" data-aos="fade-up" data-aos-delay="100">
                     <div class="contact-form-modern">
-                        <form class="modern-form">
+                        {% comment %}
+                        Real submission, replacing the form that went nowhere:
+                        it had no action, no name attribute on four of its five
+                        inputs (so those fields could never have been sent even
+                        with one), and a JS handler that preventDefault()ed and
+                        showed a fake success alert. See design §1/§6.
+                        Values repopulate from the bound form so a validation
+                        error doesn't throw away what the visitor typed.
+                        {% endcomment %}
+                        {% if messages %}
+                        <div class="form-messages">
+                            {% for message in messages %}
+                            <div class="form-message {% if message.tags %}form-message-{{ message.tags }}{% endif %}">
+                                <i
+                                    class="fas {% if message.level_tag == 'success' %}fa-circle-check{% else %}fa-circle-exclamation{% endif %} me-2"></i>{{ message }}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        <form class="modern-form" method="post" action="{% url 'contact_submit' %}" novalidate>
+                            {% csrf_token %}
+                            {% if contact_form.non_field_errors %}
+                            <div class="field-error">{{ contact_form.non_field_errors }}</div>
+                            {% endif %}
                             <div class="row g-3">
                                 <div class="col-12 col-md-6">
                                     <div class="form-floating">
-                                        <input type="text" class="form-control" id="name" placeholder="Your Name"
+                                        <input type="text" name="name" class="form-control{% if contact_form.name.errors %} is-invalid{% endif %}"
+                                            id="name" placeholder="Your Name"
+                                            value="{{ contact_form.name.value|default_if_none:'' }}" maxlength="100"
                                             required>
                                         <label for="name"><i class="far fa-user me-2"></i>Your Name</label>
                                     </div>
+                                    {% for error in contact_form.name.errors %}
+                                    <p class="field-error">{{ error }}</p>{% endfor %}
                                 </div>
                                 <div class="col-12 col-md-6">
                                     <div class="form-floating">
-                                        <input type="email" class="form-control" id="email" placeholder="Your Email"
-                                            required>
+                                        <input type="email" name="email" class="form-control{% if contact_form.email.errors %} is-invalid{% endif %}"
+                                            id="email" placeholder="Your Email"
+                                            value="{{ contact_form.email.value|default_if_none:'' }}" required>
                                         <label for="email"><i class="far fa-envelope me-2"></i>Your Email</label>
                                     </div>
+                                    {% for error in contact_form.email.errors %}
+                                    <p class="field-error">{{ error }}</p>{% endfor %}
                                 </div>
                                 <div class="col-12 col-md-6">
                                     <div class="form-floating">
-                                        <input type="tel" class="form-control" id="phone" placeholder="Phone Number">
+                                        <input type="tel" name="phone" class="form-control{% if contact_form.phone.errors %} is-invalid{% endif %}"
+                                            id="phone" placeholder="Phone Number"
+                                            value="{{ contact_form.phone.value|default_if_none:'' }}" maxlength="30">
                                         <label for="phone"><i class="fas fa-phone-alt me-2"></i>Phone Number</label>
                                     </div>
+                                    {% for error in contact_form.phone.errors %}
+                                    <p class="field-error">{{ error }}</p>{% endfor %}
                                 </div>
+                                {% comment %}
+                                The visible value and the aria-selected state
+                                follow the submitted subject, so a re-render
+                                after a validation error doesn't silently reset
+                                the dropdown to "General Inquiry".
+                                {% endcomment %}
+                                {% with chosen_subject=contact_form.subject.value|default_if_none:"General Inquiry" %}
                                 <div class="col-12 col-md-6 subject-field-col">
                                     <div class="form-floating">
                                         <div class="custom-select form-select" id="subjectSelect" tabindex="0"
                                             role="combobox" aria-haspopup="listbox" aria-expanded="false"
                                             aria-labelledby="subjectLabel" aria-controls="subjectOptions">
-                                            <span class="custom-select-value">General Inquiry</span>
+                                            <span class="custom-select-value">{{ chosen_subject }}</span>
                                             <ul class="custom-select-options" id="subjectOptions" role="listbox"
                                                 aria-labelledby="subjectLabel">
-                                                <li role="option" aria-selected="true" data-value="General Inquiry">
-                                                    General Inquiry</li>
-                                                <li role="option" aria-selected="false"
-                                                    data-value="Partnership Opportunity">Partnership Opportunity</li>
-                                                <li role="option" aria-selected="false" data-value="Support Request">
-                                                    Support Request</li>
-                                                <li role="option" aria-selected="false" data-value="Feedback">Feedback
-                                                </li>
-                                                <li role="option" aria-selected="false" data-value="Other">Other</li>
+                                                {% for option in contact_subjects %}
+                                                <li role="option"
+                                                    aria-selected="{% if option == chosen_subject %}true{% else %}false{% endif %}"
+                                                    data-value="{{ option }}">{{ option }}</li>
+                                                {% endfor %}
                                             </ul>
                                         </div>
-                                        <input type="hidden" name="subject" id="subject" value="General Inquiry">
+                                        <input type="hidden" name="subject" id="subject" value="{{ chosen_subject }}">
                                         <label for="subjectSelect" id="subjectLabel"><i
                                                 class="fas fa-tag me-2"></i>Subject</label>
                                     </div>
+                                    {% for error in contact_form.subject.errors %}
+                                    <p class="field-error">{{ error }}</p>{% endfor %}
                                 </div>
+                                {% endwith %}
                                 <div class="col-12">
                                     <div class="form-floating">
-                                        <textarea class="form-control" id="message" style="height: 110px"
-                                            placeholder="Your Message" required></textarea>
+                                        <textarea name="message" class="form-control{% if contact_form.message.errors %} is-invalid{% endif %}"
+                                            id="message" style="height: 110px" placeholder="Your Message"
+                                            required>{{ contact_form.message.value|default_if_none:'' }}</textarea>
                                         <label for="message"><i class="far fa-comment-dots me-2"></i>Your
                                             Message</label>
                                     </div>
+                                    {% for error in contact_form.message.errors %}
+                                    <p class="field-error">{{ error }}</p>{% endfor %}
                                 </div>
 
                                 <!-- Submit -->
@@ -924,11 +967,12 @@
             document.querySelector('.navbar').classList.toggle('scrolled', window.scrollY > 40);
         });
 
-        // form alert (prevent actual submit)
-        document.querySelector('form')?.addEventListener('submit', (e) => {
-            e.preventDefault();
-            alert('Thank you! We will respond soon.');
-        });
+        {% comment %}
+        Removed here: a submit handler that called preventDefault() and showed
+        an alert('Thank you! We will respond soon.') without sending anything
+        anywhere. The form now POSTs to contact_submit for real, so nothing
+        may intercept its submit event. See design §1/§6.
+        {% endcomment %}
 
         // ========== NAVBAR AUTO-CLOSE FUNCTIONALITY ==========
         // This ensures the mobile navbar closes when a link is clicked
@@ -1195,37 +1239,25 @@
 
     <!-- Add this JavaScript for enhanced form interaction -->
     <script>
-        // Form submission with animation
-        document.querySelector('.btn-submit')?.addEventListener('click', function (e) {
-            e.preventDefault();
+        {% comment %}
+        Also removed: a .btn-submit click handler that preventDefault()ed, span
+        a two-second fake "loading" state, then wrote a hardcoded "Message Sent
+        Successfully!" panel into a .form-header element. Nothing was ever
+        sent. It was broken on its own terms too - .form-header does not exist
+        anywhere in this template, so the handler threw a TypeError on
+        `originalContent` every time it ran. The submit button now simply
+        submits the form; real success and error feedback comes from the
+        server via Django's messages framework, rendered above the form.
+        {% endcomment %}
 
-            // Add loading animation
-            this.classList.add('loading');
-
-            // Simulate form submission (replace with actual AJAX call)
-            setTimeout(() => {
-                this.classList.remove('loading');
-
-                // Show success message
-                const formHeader = document.querySelector('.form-header');
-                const originalContent = formHeader.innerHTML;
-
-                formHeader.innerHTML = `
-            <div class="form-success">
-                <i class="fas fa-check-circle fa-3x" style="color: var(--accent-green);"></i>
-                <h4>Message Sent Successfully!</h4>
-                <p>Thank you for reaching out. We'll get back to you within 24 hours.</p>
-            </div>
-        `;
-
-                // Reset form
-                document.querySelector('.modern-form').reset();
-
-                // Restore original content after 5 seconds
-                setTimeout(() => {
-                    formHeader.innerHTML = originalContent;
-                }, 5000);
-            }, 2000);
+        // Show a real loading state while the browser submits the form, so a
+        // slow connection doesn't look unresponsive or invite a double-send.
+        document.querySelector('.modern-form')?.addEventListener('submit', function () {
+            const button = this.querySelector('.btn-submit');
+            if (button) {
+                button.classList.add('loading');
+                button.disabled = true;
+            }
         });
 
         // Real-time form validation styling

@@ -3,7 +3,15 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('home', views.home, name='home'),
+    # Named 'ecommerce_home', not 'home': this app is included after app.urls
+    # in project/urls.py, and both used to register the name 'home'. Django
+    # resolves a duplicate name to the LAST one registered, so {% url 'home' %}
+    # site-wide silently pointed at the shop instead of the marketing
+    # homepage - breaking the "Home" links in useraccount's signup and
+    # pre-approval pages and the admin's "View live site" link. Same class of
+    # collision the design doc flagged for 'signin' (§1). The URL path is
+    # unchanged; only the reversible name differs.
+    path('home', views.home, name='ecommerce_home'),
     path('<slug:category_slug>', views.ourproduct, name='product_by_category'),
     path('base/', views.base, name='base'),
     path('blog/', views.blog, name='blog'),

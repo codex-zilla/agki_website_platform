@@ -3177,3 +3177,49 @@ a {
     font-weight: 600;
     color: #2d542d;
 }
+
+/* Contact form feedback (Phase 7).
+   The form now really submits, so it needs real success/error feedback -
+   previously a JS handler faked a success panel without sending anything. */
+.form-messages {
+    margin-bottom: 18px;
+}
+
+.form-message {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    background: rgba(255, 255, 255, 0.92);
+    color: #2d542d;
+    border-left: 4px solid var(--accent-green, #4caf50);
+}
+
+.form-message+.form-message {
+    margin-top: 8px;
+}
+
+.form-message-error {
+    color: #8a2020;
+    border-left-color: #c0392b;
+}
+
+.field-error {
+    margin: 6px 2px 0;
+    font-size: 0.85rem;
+    color: #ffd7d1;
+    /* the contact section sits on the dark green band, so errors are
+       light-on-dark here rather than the usual dark red on white */
+}
+
+.contact-form-modern .form-control.is-invalid {
+    border-color: #e57373;
+    box-shadow: 0 0 0 0.15rem rgba(229, 115, 115, 0.25);
+}
+
+/* The submit button's disabled/loading state during a real submission. */
+.btn-submit.loading {
+    opacity: 0.75;
+    cursor: progress;
+}

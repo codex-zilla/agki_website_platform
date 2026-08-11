@@ -58,7 +58,7 @@ def contact(request):
 		if form.is_valid():
 			form.save()
 			messages.success(request,'Message sent successfully,thanks for contacting to us')
-			return redirect('home')
+			return redirect('ecommerce_home')
 	context = {
 		'form':form
 	}

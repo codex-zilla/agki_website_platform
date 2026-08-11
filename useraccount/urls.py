@@ -15,7 +15,14 @@ from .views import (
 
 
 urlpatterns = [
-    path('', views.home, name='home'),
+    # Named 'useraccount_home', not 'home' - see the note in ecommerce/urls.py.
+    # Three apps registered the name 'home' (app, useraccount, ecommerce) and
+    # Django resolves duplicates to the last one included, so the name never
+    # pointed at the actual marketing homepage. It belongs to app.urls now.
+    # The view behind this route renders a 13-line developer scratch page
+    # ("QR Code Generator" / "McColn Basement"); nothing links to it. Left in
+    # place rather than deleted - flagged as cleanup, not silently removed.
+    path('', views.home, name='useraccount_home'),
     path('dashboard/', views.dashboard, name='dashboard'),
     path('profile/', views.profile, name='profile'),
     path('profile/edit/', views.profile_edit, name='profile_edit'),
