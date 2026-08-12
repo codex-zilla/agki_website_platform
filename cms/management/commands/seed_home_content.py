@@ -85,7 +85,17 @@ class Command(BaseCommand):
             help="Delete existing rows in the seeded content models first (never touches contact messages).",
         )
 
+    def _say(self, message):
+        """Write progress output unless the caller asked for silence.
+
+        Django passes `verbosity` to every command; honouring it is what lets
+        the test suite call this without flooding its output.
+        """
+        if self.verbosity:
+            self.stdout.write(message)
+
     def handle(self, *args, **options):
+        self.verbosity = options["verbosity"]
         self.dry_run = options["dry_run"]
         self.created = 0
         self.updated = 0
@@ -96,7 +106,7 @@ class Command(BaseCommand):
         # a cPanel/shared-host shell at Phase 10, where a non-UTF-8 codepage
         # turns decorative dashes and middots into mojibake.
         if self.dry_run:
-            self.stdout.write(self.style.WARNING("DRY RUN - no database writes, no file copies.\n"))
+            self._say(self.style.WARNING("DRY RUN - no database writes, no file copies.\n"))
 
         try:
             with transaction.atomic():
@@ -124,16 +134,16 @@ class Command(BaseCommand):
         except _DryRunRollback:
             pass
 
-        self.stdout.write("")
+        self._say("")
         verb = "would be" if self.dry_run else ""
-        self.stdout.write(
+        self._say(
             self.style.SUCCESS(
                 f"Rows {verb} created: {self.created} | {verb} updated: {self.updated} | "
                 f"files {verb} copied: {self.copied} (unchanged: {self.skipped_files})"
             )
         )
         if self.dry_run:
-            self.stdout.write(self.style.WARNING("Rolled back - nothing was saved."))
+            self._say(self.style.WARNING("Rolled back - nothing was saved."))
 
     # --- Assets -------------------------------------------------------------
 
@@ -197,10 +207,10 @@ class Command(BaseCommand):
         # str() is required, not decorative: model _meta names are lazy
         # translation proxies, and a __proxy__ does not implement __format__
         # for an alignment spec like :<24 (it raises TypeError).
-        self.stdout.write(f"  {str(label):<24} {count}")
+        self._say(f"  {str(label):<24} {count}")
 
     def _flush(self):
-        self.stdout.write(self.style.WARNING("Flushing existing seeded content rows..."))
+        self._say(self.style.WARNING("Flushing existing seeded content rows..."))
         for model in reversed(SEEDED_LIST_MODELS):
             deleted, _ = model.objects.all().delete()
             if deleted:

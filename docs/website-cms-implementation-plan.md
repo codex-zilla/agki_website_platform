@@ -356,16 +356,35 @@ Re-tested after the change — **17 assertions, all passing**: 16 → 0 queries 
 
 ## Phase 9 — Testing
 
+**80 tests, all passing, in ~18s** (`python manage.py test`). Before this phase every `tests.py` in the project was the empty `startapp` stub — the gap both prior audits called out. The suites live in `cms/tests.py`, `app/tests.py` and `useraccount/tests.py`, with shared fixtures in `cms/test_utils.py`.
+
 | #   | Task                                                                                     | Status | Notes / Remarks |
 | --- | ---------------------------------------------------------------------------------------- | ------ | --------------- |
-| 9.1 | `SingletonModel` — concurrent `.load()` calls never create a second row             | 🔲     |                 |
-| 9.2 | `home` view renders 200 with every `cms` table empty                                 | 🔲     |                 |
-| 9.3 | `home` view renders 200 with seeded data, spot-checks key strings in the response      | 🔲     |                 |
-| 9.4 | Content-editor group: reaches`cms` admin, 403 on the other three apps' admin pages     | 🔲     |                 |
-| 9.5 | Contact form: valid POST creates a`ContactMessage` and triggers `send_mail` (mocked) | 🔲     |                 |
-| 9.6 | Full test suite run, not just the new tests — confirm nothing else regressed            | 🔲     |                 |
+| 9.1 | `SingletonModel` — concurrent `.load()` calls never create a second row             | ✅     | `SingletonModelTests`. Covers repeated `load()`, the no-op `delete()`, and all four singletons behaving alike. The race itself is simulated **deterministically** rather than with threads: the protection is `save()` pinning `pk = 1`, so two independently-built instances saved in sequence is exactly the state a lost race produces, and asserting on that is reliable. Real threads against in-memory SQLite would have made the test flaky for reasons unrelated to the behaviour — a flaky test in the suite is worse than no test, and the reasoning is recorded in the test's own docstring. |
+| 9.2 | `home` view renders 200 with every `cms` table empty                                 | ✅     | `HomePageEmptyStateTests`. Asserts 200 on a completely empty DB, that each optional section is **absent rather than broken**, that the non-content shell (contact, footer) survives, and that `.load()` creates the singletons on first view so a fresh install renders instead of raising `DoesNotExist`. Also empties each of the 11 list tables **individually**, re-seeding between, so one empty table can't take out its neighbours. |
+| 9.3 | `home` view renders 200 with seeded data, spot-checks key strings in the response      | ✅     | `HomePageSeededTests`, running the real `seed_home_content` against a temp `MEDIA_ROOT`. Spot-checks a string from all 14 sections, and adds guards for the specific Phase 6 findings: `data-count-to` present for `500000` but **absent** for `24/7` (`parseInt("24/7")` is 24, which would animate the label to a wrong "24"), both carousel loop-sets rendering from one queryset, the two team copies agreeing on Kulwa Cherehani's role, rich text rendering as HTML rather than escaped markup, unpublished rows staying hidden, and the footer social icons appearing only once a URL is set. |
+| 9.4 | Content-editor group: reaches`cms` admin, 403 on the other three apps' admin pages     | ✅     | `ContentEditorPermissionTests`, by signing in as the scoped account rather than reading the permission list. Confirms the group exists **from the data migration** (so it's present in production without anyone assembling it), all nine cms changelists reachable, the singleton redirect working, add/delete blocked on singletons, 403 on `appointments`/`useraccount`, and that those apps aren't even linked on the admin index. `ContactMessageAdminTests` covers the inbox rules: nobody can add by hand, editors can't delete, superusers can. |
+| 9.5 | Contact form: valid POST creates a`ContactMessage` and triggers `send_mail` (mocked) | ✅     | `ContactFormTests` — 15 tests. The mocked-`send_mail` assertion the plan asks for, plus the real outbox path, the notification following the editable Site settings address, whitespace normalisation, the invalid path preserving input and sending no mail, `GET` → 405, CSRF enforced, and the `Subject:\nBcc:` injection attempt staying a handled 302 rather than a `BadHeaderError` 500. One test deliberately documents a limit: `fail_silently=True` does **not** cover a connection-level `OSError`, so what actually guarantees no message is lost is that the row commits *before* the mail is attempted. |
+| 9.6 | Full test suite run, not just the new tests — confirm nothing else regressed            | ✅     | `python manage.py test` → **Ran 80 tests, OK**. Confirmed afterwards that the suite leaves no trace: the dev DB still holds its 9 team members / 12 feature rows / 0 contact messages, and `media/cms/` still has exactly its 32 seeded files — the seeding tests run against a throwaway `MEDIA_ROOT` precisely so they never write into the real one. |
 
-**Phase gate:** green test suite, not just "it looked right in the browser."
+**Phase gate:** green test suite, not just "it looked right in the browser." ✅ **Met.**
+
+### Phase 9 — the tests were checked for teeth, not just for green
+
+A passing test proves nothing unless it would fail when the behaviour breaks. Each high-value guard was verified by **re-introducing the original bug and confirming the right tests — and only those — fail**:
+
+| Bug put back | Result |
+| --- | --- |
+| `@cache_page` restored on `home` | 3 failures, exactly the CSRF-token, cached-visitor-submits and message-leak tests |
+| `SortableAdminMixin` returned to `NewsPostAdmin` | 2 failures, both naming `published_date` / `DateField` |
+| `post_login_redirect` sending everyone to the doctor dashboard again | 8 failures across both sign-in routes, correctly leaving doctors passing |
+| `DJANGO_LOGIN_REDIRECT_URL=dashboard` set in the environment | 1 failure — **this is the one that matters for rollout**: it proves the suite catches the "code is right but the production `.env` still overrides it" case flagged in 10.5a, which is how that fix would otherwise have shipped inert |
+
+Every mutation was reverted afterwards and the full suite re-run green.
+
+**Also fixed here:** `seed_home_content` ignored Django's `verbosity` option, so calling it from tests flooded the output. It now routes progress through a `_say()` helper and is silent at `verbosity=0` — which is also what makes it usable from any future scripted deploy step.
+
+**Known gap, deliberate:** `appointments`, `doctorDashboard` and `ecommerce` still have empty `tests.py`. This phase's scope is the CMS work; those apps have their own audits and are untouched by it. Worth naming so the green suite isn't mistaken for whole-project coverage.
 
 ---
 
