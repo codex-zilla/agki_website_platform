@@ -329,11 +329,28 @@ The first two redirected **every** account — content editor, patient, superuse
 
 | #   | Task                                                                                                                                    | Status | Notes / Remarks |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------- | ------ | --------------- |
-| 8.1 | Split`home` (cacheable GET) from `contact_submit` (POST, uncached) if not already separated in Phase 7                              | 🔲     |                 |
-| 8.2 | `@cache_page(60 * 10)` on `home`                                                                                                    | 🔲     |                 |
-| 8.3 | Confirm 10-minute staleness on edits is acceptable to AGKI, or revisit (design §9 flags signal-based invalidation as a Phase 2 option) | 🔲     |                 |
+| 8.1 | Split`home` (cacheable GET) from `contact_submit` (POST, uncached) if not already separated in Phase 7                              | ✅     | Already done in 7.2. `home` is a pure GET; `contact_submit` is `@require_POST` at `/contact/`. Re-confirmed here that no POST touches a cached path and that `GET /contact/` still returns 405 rather than cached HTML. |
+| 8.2 | `@cache_page(60 * 10)` on `home`                                                                                                    | ✅     | **Implemented, but not with `cache_page` — that turned out to be unsafe on this page, and the alternative meets the same goal.** Full reasoning in 8.4 below; the short version is that `cache_page` stores the finished HTML, and this page carries two pieces of per-visitor state (the contact form's CSRF token, and flash messages). What ships instead is a five-minute cache of the *queried content* (`app/views.py::_home_content`, key `home_content_v1`), so the template still renders per request. Same headline result — **16 queries → 0 on a hit** — with the per-visitor bits still correct. Measured against the real dev DB: cold 16 queries / 634 ms, warm 0 queries / ~10 ms. |
+| 8.3 | Confirm 10-minute staleness on edits is acceptable to AGKI, or revisit (design §9 flags signal-based invalidation as a Phase 2 option) | ✅     | **AGKI's decision: five minutes, not the design's ten.** `HOME_CACHE_SECONDS = 60 * 5`. Verified both directions — an admin edit is genuinely not visible inside the window, and is visible once it passes. Signal-based invalidation deliberately **not** built: AGKI chose a staleness window, so eliminating it would contradict that. Worth recording that it is now a much smaller change than the design assumed — the content lives under one explicit cache key, so a `post_save`/`post_delete` hook calling `cache.delete("home_content_v1")` would be a few lines if instant updates are ever wanted. |
+| 8.4 | Verify the cache doesn't break the contact form or leak between visitors                                                                | ✅     | See the section below — this is where the real work of this phase went. |
 
-**Phase gate:** conscious decision made and recorded, not a default left unexamined.
+**Phase gate:** conscious decision made and recorded, not a default left unexamined. ✅ **Met.**
+
+### Phase 8 — why `cache_page` was rejected (measured, not assumed)
+
+`@cache_page(60 * 5)` was implemented first, exactly as design §9 proposed, then tested against multi-visitor scenarios before being accepted. It failed three of them, and the failures are the kind that only show up with a second visitor — a single-user click-through would have looked perfect:
+
+| What was tested | Result with `cache_page` |
+| --- | --- |
+| A second visitor loads the homepage and submits the contact form | **403 — "CSRF cookie not set."** They were served the *first* visitor's cached token, but no `csrftoken` cookie of their own, because the view never ran for them and so never issued one. **The Phase 7 contact form would have been broken for effectively every real visitor after the first.** |
+| A stranger loads the homepage after someone else submits | **They saw the submitter's "Thank you — we'll respond soon." banner.** Flash messages were baked into the cached HTML. |
+| Does `Vary: Cookie` protect either case? | **No.** Django does add it, but first-time visitors have no cookie at all, so they all share a single cache entry — and that is most of a marketing site's traffic. The header only separates visitors who *already* have cookies. |
+
+The fix keeps the performance goal and drops the hazard: cache the content, not the response. `_home_content()` caches the model instances behind one key; `_home_context()` then adds a freshly-built `ContactForm` on every request. The expensive part (the DB round-trips design §9 was worried about) is eliminated; the cheap part (rendering) still happens per request, which is what keeps the token and the messages correct.
+
+Re-tested after the change — **17 assertions, all passing**: 16 → 0 queries on a hit; rendered output byte-identical apart from the per-request CSRF token; each visitor gets their own token *and* their own cookie; a visitor served cached content submits successfully **under `enforce_csrf_checks=True`** (the production path, not just the permissive test default); a stranger does not see someone else's banner; an edit is stale inside the window and live after it; and `GET /contact/` is still 405. Phases 6 and 7 suites re-run green, including the full empty-state pass (updated to invalidate the cache after each mutation, since otherwise it would have been asserting against pre-change HTML).
+
+**Deployment caveat for Phase 10:** no `CACHES` is configured, so Django's default `LocMemCache` applies — a **per-process** cache. Under Passenger/cPanel with more than one worker process, each holds its own copy, so two visitors can briefly see different versions of the page and the effective staleness window is per-process rather than global. That is acceptable for this content and needs no action now; if it ever matters, configuring a shared backend is a settings-only change with no code impact.
 
 ---
 

@@ -3,6 +3,7 @@ from django.contrib import messages
 from django.core.mail import send_mail
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.core.cache import cache
 from django.views.decorators.http import require_POST
 
 from cms.forms import CONTACT_SUBJECTS, ContactForm
@@ -23,6 +24,70 @@ from cms.models import (
 )
 
 
+HOME_CACHE_SECONDS = 60 * 5
+HOME_CONTENT_CACHE_KEY = "home_content_v1"
+
+
+def _home_content():
+    """The cms content for the homepage, cached for HOME_CACHE_SECONDS.
+
+    **Why this caches the content and not the response.** Design §9 proposed
+    `@cache_page` on `home`, and the concern it names is the ~14 queries the
+    page went from zero to. But the homepage also carries two pieces of
+    per-visitor state — the contact form's CSRF token and any flash message —
+    and `cache_page` stores the finished HTML, so both get served to whoever
+    asks next. That was measured, not assumed:
+
+    * A visitor served the cached page got the *first* visitor's CSRF token
+      but no `csrftoken` cookie of their own, because the view never ran for
+      them and so never issued one. Their submission came back **403 CSRF
+      cookie not set** — the Phase 7 contact form, broken for anyone arriving
+      after the first.
+    * A stranger loading the homepage saw the previous submitter's "Thank
+      you — we'll respond soon." banner.
+
+    `Vary: Cookie` (which Django does add) doesn't rescue either case: first
+    time visitors have no cookie at all, so they all share one cache entry —
+    and that is most of a marketing site's traffic.
+
+    Caching the queried content instead gets the same win — zero queries on a
+    hit — while the template still renders per request, so the token and the
+    messages are always the real visitor's. Querysets are forced to lists
+    here so what goes into the cache is data rather than a lazy query that
+    would re-run on unpickling.
+    """
+    content = cache.get(HOME_CONTENT_CACHE_KEY)
+    if content is not None:
+        return content
+
+    hero = HeroContent.load()
+    about = AboutContent.load()
+    content = {
+        "site_settings": SiteSettings.load(),
+        "hero": hero,
+        "about": about,
+        "problem": ProblemSectionContent.load(),
+        # `.all()` relies on each child model's Meta.ordering = ["order"],
+        # which adminsortable2 maintains.
+        "hero_stats": list(hero.impact_stats.all()),
+        "core_values": list(about.core_values.all()),
+        "problem_cards": list(ProblemCard.objects.all()),
+        "problem_stats": list(ProblemStat.objects.all()),
+        "solutions": list(FeatureRow.objects.filter(category=FeatureRow.Category.SOLUTION)),
+        "why_us": list(FeatureRow.objects.filter(category=FeatureRow.Category.WHY_US)),
+        "awards": list(AwardLogo.objects.all()),
+        "testimonials": list(Testimonial.objects.filter(is_published=True)),
+        "community_photos": list(CommunityPhoto.objects.filter(is_published=True)),
+        # Newest first, from the date itself — news is not drag-sortable,
+        # see the docstring on NewsPostAdmin.
+        "news_posts": list(NewsPost.objects.filter(is_published=True)),
+        "faqs": list(FAQItem.objects.filter(is_published=True)),
+        "team_members": list(TeamMember.objects.filter(is_active=True)),
+    }
+    cache.set(HOME_CONTENT_CACHE_KEY, content, HOME_CACHE_SECONDS)
+    return content
+
+
 def _home_context(contact_form=None):
     """Build the homepage context.
 
@@ -40,31 +105,12 @@ def _home_context(contact_form=None):
     `settings` as sketched in design §8 — `{{ settings.x }}` in a Django
     template reads like `django.conf.settings` to anyone maintaining this
     later, which it very much is not.
-    """
-    hero = HeroContent.load()
-    about = AboutContent.load()
 
+    The form is built fresh on every request and deliberately kept out of the
+    cached content — it carries the CSRF token.
+    """
     return {
-        "site_settings": SiteSettings.load(),
-        "hero": hero,
-        "about": about,
-        "problem": ProblemSectionContent.load(),
-        # `.all()` on the reverse FK relies on each child model's
-        # Meta.ordering = ["order"], which adminsortable2 maintains.
-        "hero_stats": hero.impact_stats.all(),
-        "core_values": about.core_values.all(),
-        "problem_cards": ProblemCard.objects.all(),
-        "problem_stats": ProblemStat.objects.all(),
-        "solutions": FeatureRow.objects.filter(category=FeatureRow.Category.SOLUTION),
-        "why_us": FeatureRow.objects.filter(category=FeatureRow.Category.WHY_US),
-        "awards": AwardLogo.objects.all(),
-        "testimonials": Testimonial.objects.filter(is_published=True),
-        "community_photos": CommunityPhoto.objects.filter(is_published=True),
-        # Newest first, from the date itself — news is not drag-sortable,
-        # see the docstring on NewsPostAdmin.
-        "news_posts": NewsPost.objects.filter(is_published=True),
-        "faqs": FAQItem.objects.filter(is_published=True),
-        "team_members": TeamMember.objects.filter(is_active=True),
+        **_home_content(),
         "contact_form": contact_form if contact_form is not None else ContactForm(),
         "contact_subjects": CONTACT_SUBJECTS,
     }
@@ -73,9 +119,13 @@ def _home_context(contact_form=None):
 def home(request):
     """The public homepage, rendered from staff-editable cms content.
 
-    GET only by design: the contact form POSTs to `contact_submit` instead, so
-    this view stays a pure read and can sit behind `cache_page` in Phase 8
-    without a POST ever hitting a cached response path (design §9).
+    GET only by design: the contact form POSTs to `contact_submit`, so this
+    view stays a pure read.
+
+    Its content is cached for five minutes (AGKI's call — design §9 suggested
+    ten), so an edit in the admin can take up to that long to appear on the
+    live site. See `_home_content` for what is cached and why it isn't the
+    whole response.
     """
     return render(request, "app/home.html", _home_context())
 
