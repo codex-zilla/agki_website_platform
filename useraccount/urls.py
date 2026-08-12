@@ -23,6 +23,10 @@ urlpatterns = [
     # ("QR Code Generator" / "McColn Basement"); nothing links to it. Left in
     # place rather than deleted - flagged as cleanup, not silently removed.
     path('', views.home, name='useraccount_home'),
+    # Where every sign-in route lands first; it then forwards to the right
+    # dashboard for the account. Also the target of LOGIN_REDIRECT_URL, so
+    # social/allauth logins get the same treatment.
+    path('after-login/', views.post_login_redirect, name='post_login_redirect'),
     path('dashboard/', views.dashboard, name='dashboard'),
     path('profile/', views.profile, name='profile'),
     path('profile/edit/', views.profile_edit, name='profile_edit'),

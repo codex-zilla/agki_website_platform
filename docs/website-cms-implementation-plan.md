@@ -289,6 +289,42 @@ Surfaced the moment `contact_submit` tried to `reverse("home")` for its redirect
 
 ---
 
+## Interlude — two bugs fixed before Phase 8
+
+Both reported by AGKI after using the real admin.
+
+### A. Signing in never sent staff to the admin
+
+A Content Editor signing in landed on `/useraccount/dashboard/` (the patient dashboard) instead of `/admin/`. Reproduced first, and the cause turned out to be three separate entry points each making their own, different, wrong decision:
+
+| Entry point | Sent everyone to | Should send a content editor to |
+| --- | --- | --- |
+| `useraccount.views.signin` (the site's sign-in form) | `doctor_admin_dashboard` | `/admin/` |
+| `useraccount.views.otp_view` (the OTP step) | `doctor_admin_dashboard` | `/admin/` |
+| `LOGIN_REDIRECT_URL` (allauth/Google, `@login_required`) | `dashboard` — the patient dashboard | `/admin/` |
+
+The first two redirected **every** account — content editor, patient, superuser alike — to the clinical dashboard, and none of the three ever considered `is_staff`.
+
+| # | Task | Status | Notes / Remarks |
+| --- | --- | --- | --- |
+| I.1 | Reproduce before changing anything | ✅ | Scripted against a throwaway test DB with one account of each type. Confirmed all four account types hit `/doctorDashboard/` from the sign-in form, and that `LOGIN_REDIRECT_URL` resolved to `/useraccount/dashboard/` — the exact symptom reported. |
+| I.2 | One place decides the landing page | ✅ | New `useraccount.views.post_login_redirect` (`@login_required`, at `/useraccount/after-login/`), and all three entry points now funnel through it — including `LOGIN_REDIRECT_URL`, so social login gets the same treatment. Rule: `role == doctor` → doctor dashboard; else `is_staff` → `admin:index`; else patient dashboard. **`role` is checked before `is_staff` on purpose**, so a clinician who also carries a staff flag still lands on their own dashboard rather than the admin. |
+| I.3 | The setting was being overridden by `.env` | ✅ | Changing the `settings.py` default alone did nothing — `.env` carried `DJANGO_LOGIN_REDIRECT_URL=dashboard`, which won. Caught because the verification still failed after the code fix. Updated `.env` and `.env.example`; `.env.prod` doesn't set the key so it inherits the new default. **Carry-forward for Phase 10: the production `.env` is not in the repo and almost certainly still says `dashboard` — it must be updated on the server or this bug ships intact.** Added to the rollout checklist below. |
+| I.4 | Verify every account type against every route | ✅ | 6 account types (content editor, superuser, doctor, doctor-who-is-also-staff, patient, receptionist) × both sign-in routes = **12 assertions, all passing**. Plus: the landing page is actually reachable for each; an anonymous hit on `/useraccount/after-login/` redirects to sign-in rather than erroring; and `POST /admin/login/` still lands on `/admin/` (regression check on the recent `ad4de49` logout fix). Full Phase 3/4/7 suites re-run — zero regressions. |
+
+### B. The map embed URL made the admin scroll sideways
+
+`SiteSettings.map_embed_url` is 252 characters, and Django's `AdminURLFieldWidget` renders a saved URL as its full text inside `<p class="url">Currently: <a>…</a></p>`. A URL has no spaces, so the browser treats it as one unbreakable word.
+
+| # | Task | Status | Notes / Remarks |
+| --- | --- | --- | --- |
+| I.5 | Fix the overflow | ✅ | CSS in `agki-admin.css`, scoped to `body.app-cms.change-form`: `overflow-wrap: anywhere` + `word-break: break-all` on `p.url` and its anchor, plus `min-width: 0` on the field row and its cells — that last part matters, because these sit inside the grid/flex containers from 3.27 where the default `min-width: auto` lets a child refuse to shrink below its content width, and the wrap rules alone would not have been enough. Also dropped the link to `0.82rem` so it reads as a value rather than a headline. |
+| I.6 | Measure the fix, don't eyeball it | ✅ | Injected a probe reporting `documentElement.scrollWidth` vs `clientWidth` and naming any element extending past the viewport, then compared the page against a simulated pre-fix build across six viewport widths. **Before:** the anchor's right edge stayed pinned at 1362px *regardless of viewport* — at 900px and 800px that gave `scrollW=1112 > clientW=863/763`, i.e. the reported horizontal page scroll, and at wider viewports the text still ran past the card's edge. **After:** the anchor shrinks with the viewport (1048→958→860→766→722) and `scrollWidth == clientWidth` at every width, with zero offending elements. Screenshots of both states confirm the visual: the pre-fix render reproduces AGKI's screenshot exactly, the fixed one wraps flush inside the card. |
+
+**Separate pre-existing bug found while reproducing A — reported, not fixed (out of scope):** `doctorDashboard/templates/doctorDashboard/doctor_base.html` (lines 764 and 843) renders `{{ user.image.url }}` with no guard. `CustomUser.image` is `blank=True, null=True` with no default, and **5 of the 10 accounts in the local DB have no image — including `Dr. Magembe`, an actual doctor**. `FieldFile.url` raises `ValueError` on an empty field and Django's template engine does not swallow it, so those accounts get a **500 on every doctorDashboard page**, not a missing avatar. This is the same unguarded-`.image.url` pattern the earlier appointments/doctorDashboard audits flagged and that `cms/admin.py`'s `image_thumbnail` helper already defends against. Fixing A reduces the blast radius (staff no longer get routed there at all) but does not touch it. Worth its own ticket.
+
+---
+
 ## Phase 8 — Performance
 
 | #   | Task                                                                                                                                    | Status | Notes / Remarks |
@@ -325,6 +361,7 @@ Surfaced the moment `contact_submit` tried to `reverse("home")` for its redirect
 | 10.3 | Run`migrate` + `seed_home_content` on production                                                                                                                                         | 🔲     |                 |
 | 10.4 | Confirm production media persists correctly across the app's deploy process (Passenger/cPanel-style hosting — verify`media/` isn't inside a directory that gets wiped/replaced on deploy) | 🔲     |                 |
 | 10.5 | Create the first real AGKI staff "Content Editor" account                                                                                                                                    | 🔲     |                 |
+| 10.5a | **Update`DJANGO_LOGIN_REDIRECT_URL` in the production `.env`** to `post_login_redirect`                                                                                            | 🔲     | The production `.env` is not in the repo and still carries the old `dashboard` value. Env vars override the code default, so without this the sign-in fix (Interlude A) **ships broken** and content editors keep landing on the patient dashboard. Cheap to miss, so it gets its own row. |
 | 10.6 | Walk one AGKI staff member through: publish a news post, reorder the team carousel, edit the hero lede — acceptance test by the actual end user, not by us                                  | 🔲     |                 |
 | 10.7 | Once signed off, merge feature branch to`main`                                                                                                                                             | 🔲     |                 |
 | 10.8 | Separate follow-up ticket: set up a recurring backup job for`media/` (design §7.4 — content images no longer live in git after this)                                                     | 🔲     |                 |

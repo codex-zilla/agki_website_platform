@@ -257,7 +257,10 @@ SOCIALACCOUNT_PROVIDERS = {
 
 
 LOGIN_URL = os.getenv("DJANGO_LOGIN_URL", "signin")
-LOGIN_REDIRECT_URL = os.getenv("DJANGO_LOGIN_REDIRECT_URL", "dashboard")
+# Not "dashboard" (the patient dashboard): that sent staff — including
+# Content Editors signing in to update the website — to a page meant for
+# patients. post_login_redirect forwards each account to the right place.
+LOGIN_REDIRECT_URL = os.getenv("DJANGO_LOGIN_REDIRECT_URL", "post_login_redirect")
 LOGOUT_REDIRECT_URL = os.getenv("DJANGO_LOGOUT_REDIRECT_URL", "admin:login")
 ACCOUNT_LOGOUT_REDIRECT_URL = os.getenv(
     "ACCOUNT_LOGOUT_REDIRECT_URL",

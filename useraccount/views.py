@@ -200,7 +200,11 @@ def signin(request):
         if user is not None:
             if user.is_active:
                 login(request, user)
-                return redirect('doctor_admin_dashboard')
+                # Single source of truth for the landing page — see
+                # post_login_redirect. This used to send every account,
+                # including content editors and superusers, to the doctor
+                # dashboard.
+                return redirect('post_login_redirect')
             else:
                 messages.warning(request, 'Your account is not verified yet. Please check your email for OTP verification.')
                 return redirect('signin')
@@ -279,7 +283,8 @@ def otp_view(request):
                     request.session.pop('backend', None)
                     request.session.pop('username', None)
 
-                    return redirect('doctor_admin_dashboard')
+                    # Same landing-page decision as the plain signin path.
+                    return redirect('post_login_redirect')
                 else:
                     messages.error(request, 'Invalid OTP. Please try again.')
                     return redirect('otp')
@@ -296,6 +301,42 @@ def otp_view(request):
 # ==========================================================================
 def home(request):
     return render(request, 'useraccount/home.html')
+
+@login_required
+def post_login_redirect(request):
+    """Decide where an account lands straight after signing in.
+
+    Every sign-in route funnels through here — the site's own `signin` form,
+    the OTP step, and social/allauth login via `LOGIN_REDIRECT_URL` — so the
+    decision lives in exactly one place instead of being duplicated (and
+    contradicted) at each entry point, which is how it was:
+
+    * `signin` and `otp_view` both redirected *everyone* to
+      `doctor_admin_dashboard`, regardless of who they were.
+    * `LOGIN_REDIRECT_URL` pointed at `dashboard` (the patient dashboard),
+      so anyone arriving through Google/allauth landed there instead.
+
+    Neither ever sent a staff member to the admin, so a Content Editor who
+    signed in to edit the website was dropped on a clinical dashboard they
+    have no permission to use.
+
+    Order matters here: `role` is checked before `is_staff` deliberately, so
+    a clinician who also happens to have a staff flag still lands on their
+    own dashboard rather than the admin.
+    """
+    user = request.user
+
+    if user.role == CustomUser.Role.DOCTOR:
+        return redirect('doctor_admin_dashboard')
+
+    # Covers content editors, receptionists-with-admin-access and superusers:
+    # is_staff is exactly "may open the Django admin", which is where the
+    # website's content lives.
+    if user.is_staff:
+        return redirect('admin:index')
+
+    return redirect('dashboard')
+
 
 def dashboard(request):
     return render(request, 'useraccount/dashboard.html')

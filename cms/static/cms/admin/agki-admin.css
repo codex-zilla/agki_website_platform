@@ -868,6 +868,42 @@ body.app-cms.change-form .form-group > .row textarea {
   border-radius: 8px;
 }
 
+/* Long URL values must not widen the page.
+
+   Django's AdminURLFieldWidget renders a saved URL as
+   <p class="url">Currently: <a href="...">…full URL text…</a><br>Change:
+   <input></p>. A URL contains no spaces, so with normal wrapping the browser
+   treats the whole thing as one unbreakable word: the Site settings map embed
+   URL is 252 characters and pushed the change form wider than the viewport,
+   giving the whole admin page a horizontal scrollbar.
+
+   `anywhere` lets the break happen mid-URL; `break-all` is the older
+   equivalent kept for browsers that don't support it. min-width:0 matters
+   because these sit inside the grid/flex containers above, where the default
+   `min-width:auto` lets a child refuse to shrink below its content width —
+   without it the wrap rules alone would still leave the overflow. */
+body.app-cms.change-form .form-group > .row p.url,
+body.app-cms.change-form .form-group > .row p.url a {
+  min-width: 0;
+  max-width: 100%;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+body.app-cms.change-form .form-group > .row p.url a {
+  display: inline-block;
+  /* readable as a value rather than a headline, and clearly the "current"
+     reading of the field rather than the editable one below it */
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+/* Belt and braces: whatever a single field does, the change form itself
+   never becomes the thing that scrolls the page sideways. */
+body.app-cms.change-form .form-group > .row,
+body.app-cms.change-form .form-group > .row > div {
+  min-width: 0;
+}
+
 body.app-cms.change-form .form-group {
   margin-bottom: 0;
 }

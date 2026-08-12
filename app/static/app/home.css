@@ -2002,7 +2002,7 @@ a {
     letter-spacing: -0.03em;
     line-height: 1.1;
     margin: 0 0 20px;
-    max-width: 16ch;
+    /* max-width: 16ch; */
 }
 
 .about-story-copy {
