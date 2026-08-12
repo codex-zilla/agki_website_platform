@@ -388,6 +388,43 @@ Every mutation was reverted afterwards and the full suite re-run green.
 
 ---
 
+## Interlude 2 — cleanup sweep of `app/` and `cms/`
+
+Requested after Phase 9: resweep for unused files, focused on the website and CMS work.
+
+### Removed
+
+| Item | Why it was safe |
+| --- | --- |
+| `app/forms.py` | **0 bytes.** The real `ContactForm` lives in `cms/forms.py`; nothing imported this. |
+| `app/serializers.py` | **0 bytes**, and there is no Django REST Framework anywhere in the project (not in `requirements.txt`, not in `INSTALLED_APPS`) — a leftover from a scaffold that never happened. |
+| `app/admin.py` | Contained only `from app.models import *` against a models module with no models, so it registered nothing. `app` has no models by design — the content models all live in `cms`. |
+| `cms/views.py` | Untouched `startapp` stub. `cms` is admin-only: it has no views and no `urls.py`, and the public views live in `app/views.py`. |
+| `app/static/app/fpage.jpg` | **907 KB**, zero references anywhere in the codebase — not in a template, not in CSS, not in the seed data. |
+| Dead CSS in `home.css` (~530 bytes) | `.form-header` / `.form-header h4` / `.form-header p`, plus `.form-success` and its `@keyframes successPop`. The `.form-header` rules styled an element that **never existed in any template** — that was the underlying bug behind the fake-success handler removed in 7.4, which threw a `TypeError` trying to write into it. `.form-success`/`successPop` were used only by that removed handler. Confirmed no markup anywhere in the project uses any of them. |
+| Unused `include` import in `app/urls.py` | Never used in that file. |
+
+### Deliberately kept — the important finding
+
+**The ~29 content images and 2 videos in `app/static/app/` look dead and are not.** The homepage no longer references them (Phase 6 moved it to `{{ obj.image.url }}` from `media/cms/…`), so a naive sweep would delete them — but `seed_home_content` reads them as its **source** via the staticfiles finders. Deleting them would break the seeder, which is exactly what Phase 10 needs to run against production (10.3). They stay until after rollout, and even then they are the only git-tracked copy of that imagery — design §7.4's point that content bytes now live outside version control.
+
+Also kept, with reasons: `app/models.py` (empty, but `app` carries migration history — `0001_initial`, `0002_delete_appointment`); `templates/registration/password_change_*.html` (live AGKI overrides for `/admin/password_change/`, verified reachable); `static/`, `public/`, `tmp/` (all gitignored — `collectstatic` output, an empty directory, and Passenger's restart trigger respectively).
+
+### Fixed while sweeping
+
+`useraccount/templates/useraccount/change_password.html` and `password_change_done.html` both loaded their favicon from `app/images/logo.png` — **a directory that has never existed**, so it silently 404'd on both pages. Repointed at `app/logo.png`, which is what every other template uses.
+
+### Verified after
+
+`manage.py check` clean, **all 80 tests pass**, `seed_home_content --dry-run` still resolves all 33 of its source assets, and a smoke pass over the public pages plus the admin (including the password-change overrides) returns 200 throughout.
+
+### Still outstanding, not actioned here
+
+- `useraccount.views.home` and its template render a 13-line developer scratch page (*"QR Code Generator"* / `<h1>McColn Basement</h1>`) at `/useraccount/`. Nothing links to it. Left alone because `useraccount` is outside this sweep's stated scope, but it is dead weight.
+- The unguarded `{{ user.image.url }}` 500 in `doctorDashboard/doctor_base.html` (see Interlude 1) — belongs to the doctorDashboard pass.
+
+---
+
 ## Phase 10 — Rollout & handoff
 
 | #    | Task                                                                                                                                                                                         | Status | Notes / Remarks |

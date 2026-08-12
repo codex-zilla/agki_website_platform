@@ -2647,23 +2647,6 @@ a {
     padding: 32px;
 }
 
-.form-header {
-    margin-bottom: 18px;
-    text-align: center;
-}
-
-.form-header h4 {
-    color: white;
-    font-size: clamp(1.3rem, 3.2vw, 1.6rem);
-    font-weight: 600;
-    margin-bottom: 4px;
-}
-
-.form-header p {
-    color: rgba(255, 255, 255, 0.75);
-    font-size: 0.9rem;
-}
-
 /* Modern Form Controls */
 .form-floating {
     position: relative;
@@ -3110,24 +3093,6 @@ a {
     content: '...';
 }
 
-/* Success Message Animation */
-@keyframes successPop {
-    0% {
-        transform: scale(0);
-    }
-
-    50% {
-        transform: scale(1.2);
-    }
-
-    100% {
-        transform: scale(1);
-    }
-}
-
-.form-success {
-    animation: successPop 0.5s ease;
-}
 /* ==========================================================================
    CMS rendering adjustments (Phase 6)
    Small rules added when the homepage moved from hardcoded markup to
