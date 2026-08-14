@@ -1,9 +1,31 @@
 # AGKI Appointment System — Redesign
 
 **Covers:** `appointments/` (public booking) and `doctorDashboard/` (internal staff console)
-**Status:** Draft for review
+**Status:** Draft for review — **revised after a verification pass (see §0)**
 **Author:** Engineering (design doc)
-**Related:** Builds directly on the two audit passes performed on this codebase (see "Findings → Fix Mapping" for the full list of issues this design resolves).
+**Related:** Builds directly on the two audit passes performed on this codebase (see "Findings → Fix Mapping" for the full list of issues this design resolves). Also now depends on the completed CMS work — see [website-cms-implementation-plan.md](website-cms-implementation-plan.md).
+
+---
+
+## 0. Revision note — verification pass
+
+This document was written before the website CMS work shipped. It has since been re-checked **against the running code**, not just re-read: each claim below was reproduced against a throwaway database rather than inferred. That pass produced three kinds of change.
+
+**Already fixed elsewhere — struck from scope:**
+
+| Was | Now |
+| --- | --- |
+| Cross-cutting #18 — `signin()` hardcodes `redirect('doctor_admin_dashboard')` for every role | Fixed. All sign-in routes funnel through `useraccount.views.post_login_redirect`, which routes by role. |
+| §5 — constrain `CustomUser.role` with `choices` | Done, plus a correction this doc didn't anticipate: `role` was doubling as a free-text "Qualifications" field on the profile-edit form, so it was split into `role` (choices) + `qualifications` (free text). Production had doctors with `role='4491'`, which silently excluded them from the booking page. |
+
+**Severity corrections** (§10 tables updated):
+
+- **Double-booking is not a race condition.** `booking_form` never reads `is_booked` at all, so two *sequential* bookings on the same slot both succeed — reproduced, 2 appointments on 1 slot. The prescribed fix (`OneToOneField` + `select_for_update()`) is still right; the original framing understated how easily it happens.
+- **Four dashboard URLs return 500, not 403, to anonymous users** — `AnonymousUser` hits a `TypeError` inside the queryset filter. That is incidental, not protection: `/doctors/`, `/ecommerce_items/`, `/schedule/` and `/base/` all return a clean **200** to anyone.
+
+**New findings** — nine items the original pass missed, added to §10 as appointments #18-22, dashboard #17-19 and cross-cutting #19-21. The most serious is that **`delete_item` destroys an ecommerce product on an anonymous GET** (reproduced: item count 1 → 0, no login, no POST, no CSRF).
+
+**New requirement:** these two apps must now read shared branding from the CMS rather than hardcoding it — with a permission boundary that did not exist when this was written. See §3.1 and §4.3.
 
 ---
 
@@ -24,7 +46,11 @@ So this redesign:
 
 **In scope:** `appointments/` (models, views, forms, templates, urls), `doctorDashboard/` (same), the parts of `useraccount/` that gate access to them (login, roles, `is_active`/`is_approved`).
 
-**Out of scope:** `ecommerce/` app (only touched because `doctorDashboard` currently renders its product list — that link stays, the app itself is untouched), the marketing site (`app/`, `design/`), payment processing (not currently used and not recommended — see §9.4).
+**Out of scope:** the `ecommerce/` app's own code, the marketing site (`app/`, `cms/`), payment processing (not currently used and not recommended — see §9.4).
+
+**Correction to the original scope statement.** This section previously said `doctorDashboard` "only renders" the ecommerce product list and that "the app itself is untouched." That was wrong: `doctorDashboard.views.delete_item` **destroys `ecommerce.Item` rows**, and does so on an unauthenticated GET. So `doctorDashboard`'s ecommerce surface is in scope — as something to lock down and largely remove (§4.4) — even though `ecommerce/`'s own views and models stay untouched.
+
+**Also newly in scope:** `useraccount.Profile`, because the booking flow depends on it in ways this document originally didn't account for (§5.3).
 
 **Explicitly not doing:** patient self-service accounts with passwords. AGKI's patients are walk-in/one-off, and the industry-standard pattern for this (booking reference + one verification field, no password to remember) is a better fit than forcing account creation. This is revisited in §8.4.
 
@@ -38,9 +64,26 @@ So this redesign:
 | "Video Consultation" / Teleconsultation | Removed. Two real appointment modes: **In-person visit** and **Home sample collection** |
 | "Digital Prescriptions", "Secure Payments", "Insurance" | Removed — not part of a lab-visit flow today. Flagged as Phase 2 if AGKI wants online payment later (§9.4) |
 | Reason for visit: "Consultation", "Medication Management"... | Reason for visit: "Lab Test / Panel", "Doctor-Referred Test", "Result Collection / Follow-up", "Home Sample Collection", "Other" |
-| Branding: "MediBook" | AGKI Medical Laboratory branding, reusing the nav/footer/colors already built for the redesigned main site (`design/` folder, recent commits) instead of the leftover green MediBook theme |
+| Branding: "MediBook" | AGKI Medical Laboratory branding — now sourced from `cms.SiteSettings` rather than hardcoded, see **§3.1** |
 
 This reframing isn't cosmetic — it's what makes the "Popular Specialties" grid, the insurance card upload, and the video-consult badges disappear as a natural consequence of scoping the product correctly, rather than as a pile of individual deletions.
+
+---
+
+### 3.1 Branding source: the CMS, not hardcoded values
+
+This document originally said to reuse "the nav/footer/colors already built for the redesigned main site (`design/` folder, recent commits)." **That instruction is now out of date.** The marketing site is no longer hardcoded — its identity lives in `cms.SiteSettings` (logo, favicon, tagline, phone, email, address, socials, copyright), editable in the admin without a deploy.
+
+If these templates are rebuilt with AGKI's details typed in, the result is two sources of truth: staff change the phone number in the admin, the marketing site updates, and the booking pages keep showing the old one. That drift is guaranteed, just delayed.
+
+**Design:**
+
+1. Both apps' base templates read shared identity from `SiteSettings` — the same fields the homepage footer uses. A context processor is the right shape here, since it is every page in both apps rather than a handful of views.
+2. `SiteSettings` is loaded via `.load()`, which creates the row if absent, so a fresh install renders rather than raising.
+3. The homepage caches its content for five minutes (`app.views._home_content`). These pages should use the **same cache key or none at all** — what they must not do is introduce a second, differently-timed cache of the same data, so an edit appears on one page and not the other.
+4. All ~100 `MediBook` strings across these templates are removed as part of this pass — they are currently in `<title>`, footers, nav brands and even a JS share-sheet payload.
+
+**The permission boundary (per §4.3).** Reading `SiteSettings` here means a Content Editor changing the site phone number *does* change the booking page footer. That is the intended behaviour for **shared company identity** — one phone number, one place. It is *not* a licence for Content Editors to configure booking itself: appointment modes, reason-for-visit options, booking instructions and notification recipients live in a separate superuser-only model and are never exposed to that group. If AGKI wants even shared identity frozen for these pages, that is **Decision 6** and changes the above to "copy the values at build time," with the drift cost accepted explicitly.
 
 ---
 
@@ -65,7 +108,30 @@ Keep `role` as a `CharField`, but constrain it with `choices` and use it consist
 3. Object-level scoping stays as-is where it already exists (`Appointment.objects.filter(slot__user=doctor)` in `doctor_appointment_details`) — it was correctly written, it just had no auth wall in front of it. Add an `admin`-role bypass so admins can see everything, not just their own slot's appointments.
 4. **Fix the login gate to actually mean something:** `signin()` currently only checks `is_active`. Change it to also require `is_approved` (matching the model's own comment: *"added so as to add admin approval to login"*), with a clear message ("Your account is pending admin approval") when it fails. This makes the Activate/Deactivate control in `doctors.html` finally control something real.
 5. **Fix the Activate/Deactivate control itself:** today the button's label/icon/badge reflect `is_active` but the POST only flips `is_approved` (Critical #9 from the audit) — two different fields, one of them unreachable from the UI. Redesign: a single "Account status" control per staff row with two independent, clearly-labeled toggles — **Approved for login** (`is_approved`, what gates `signin()` per point 4 above) and **Active** (Django's `is_active`, an admin kill-switch that also works with `login_required`'s built-in behavior). Stop conflating them in one button.
-6. **Role-based post-login redirect:** `signin()` currently hardcodes `redirect('doctor_admin_dashboard')` for every successful login regardless of role — fine while only staff log in here, but formalize it (`admin`/`doctor`/`receptionist` → dashboard home; anything else → 403) so it doesn't silently break if patient accounts are ever added later.
+6. ~~**Role-based post-login redirect**~~ — **done, see §0.** `post_login_redirect` now owns this decision for every sign-in route. It sends `role=doctor` to the dashboard, any other `is_staff` account to `/admin/`, and everyone else to the patient dashboard. Nothing further needed here.
+
+### 4.3 Who may edit this system's content (AGKI decision, binding)
+
+The CMS shipped a **Content Editors** group scoped to the `cms` app so non-technical staff can update the marketing site. **That group must not gain any control over booking or the clinical dashboard.** Per AGKI: these two apps are configured by the **superuser only**.
+
+Concretely:
+
+1. Any new configuration model introduced for these apps (booking instructions, appointment modes offered, reason-for-visit list, notification recipients) is registered in the Django admin **without** granting permissions to `Content Editors`. The existing `cms/migrations/0003_content_editors_group.py` enumerates that group's permissions explicitly, so this is enforced by *not* adding rows — but the enforcement must be asserted in a test, not left to memory, because a future `makemigrations` or a well-meaning "grant all" would silently undo it.
+2. `role=doctor` and `role=receptionist` accounts get **no** access to these settings either. Providers manage their own availability and their own patients; they do not configure the system.
+3. Shared *identity* fields (logo, phone, email, address) are a separate question — they are read from `cms.SiteSettings`, which Content Editors **can** edit. See §3.1 and **Decision 6**, because that is exactly the boundary this rule is drawing and it deserves an explicit answer rather than an assumption.
+
+### 4.4 Ecommerce access (AGKI decision, binding)
+
+**Providers must not be able to affect anything on the ecommerce side.** Today the opposite is true, and worse than "doctors can" — *anyone* can, without logging in:
+
+- `delete_item` deletes a product on a plain **GET**, with no authentication and no CSRF protection. Reproduced against a test database: product count 1 → 0.
+- `ecommerce_items` lists the full catalogue with stock and featured counts to anonymous visitors (HTTP 200).
+
+Redesign:
+
+1. **Remove `delete_item` from `doctorDashboard` entirely.** Product deletion belongs in the Django admin, which already provides a confirmation step, object-level permissions and a `LogEntry` audit trail — none of which a hand-rolled delete URL has. This is a deletion, not a port.
+2. `ecommerce_items` becomes **read-only and superuser-only**. It stays purely as a convenience view; anything that mutates a product happens in the Django admin.
+3. The sidebar link to it renders only for superusers, so a provider never sees a control they can't use.
 
 ---
 
@@ -123,14 +189,54 @@ class Appointment(models.Model):
 
 **Why `status` instead of just `AppointmentApproval.is_approved`:** the old boolean can only express "approved" or "not yet," with no way to represent cancelled, completed, or no-show — which is why every "Cancel Appointment" button in both audits turned out to be fake (there was nowhere to persist it). `AppointmentApproval` stays as-is (it's fine, and `doctorDashboard`'s approval flow already writes to it correctly) — `status` becomes the single source of truth for the patient-facing state machine, updated by the same approve action plus new cancel/complete actions.
 
-### `useraccount/models.py`
+### 5.1 Constrain the free-text clinical fields
+
+The model sketch above keeps `visitType`, `reasonVisit` and `gender` as bare `CharField`s. **That repeats a mistake this codebase has already paid for.** `CustomUser.role` was free text, and production accumulated doctors with `role='4491'` and `role='1'` — which silently excluded a real doctor from the public booking page, because the query filtered on an exact string. §3 prescribes a lab-appropriate reason-for-visit list; that list has to exist as `choices` on the model, not only as `<option>` tags in a template a POST can bypass:
+
+```python
+class VisitType(models.TextChoices):
+    NEW_PATIENT = "new_patient", "New patient"
+    FOLLOW_UP   = "follow_up",   "Follow-up"
+
+class ReasonForVisit(models.TextChoices):
+    LAB_TEST        = "lab_test",        "Lab test / panel"
+    REFERRED_TEST   = "referred_test",   "Doctor-referred test"
+    RESULT_FOLLOWUP = "result_followup", "Result collection / follow-up"
+    HOME_COLLECTION = "home_collection", "Home sample collection"
+    OTHER           = "other",           "Other"
+```
+
+`gender` gets the same treatment, with a free-text "prefer to self-describe" option if AGKI wants one — the point is that the *set* is closed and validated server-side, not that it is short.
+
+### 5.2 Reject impossible dates
+
+Neither `AvailableSlotForm` nor `AppointmentForm` has any validation today, so a provider can publish availability in the past and a patient can book it by URL (the 5-day window is a display filter in `search_results`, not a constraint). Add `clean()` on both: a slot's `date`/`time` must be in the future when created, and `booking_form` must refuse a slot whose datetime has passed even if it is still `is_booked=False`.
+
+### 5.3 `Profile` — the booking flow's hidden dependency
+
+Not mentioned anywhere in the original draft, and it breaks booking in two ways:
+
+- `Profile` rows are created **lazily** — `get_or_create` in the `profile()` view, the first time a user opens their own profile page. Nothing creates one at account creation.
+- `search_results` iterates `Profile.objects.filter(user__role=DOCTOR)`, so **a provider with no `Profile` row is invisible to the public booking page entirely.** This is not hypothetical: after `role` was corrected, `Dr. Magembe` and `Kyla` both had `role='doctor'` and still didn't appear, because neither had ever opened their profile page.
+- `booking_success_page` and `appointment_detail` then call `Profile.objects.get(user=...)` unguarded, which raises `DoesNotExist` for exactly those providers.
+
+Fix: create the `Profile` in a `post_save` signal on `CustomUser` (with a data migration to backfill the accounts missing one), and change the two `.get()` calls to `get_or_create` or a guarded lookup. Provider visibility should follow from `role`, never from whether someone happened to visit a page once.
+
+### 5.4 `Rating` — decide, don't inherit
+
+`Rating` is read by `search_results`, `booking_form` and `appointment_detail`, which compute averages and "recommended %" from it. **Nothing in the entire codebase ever creates a `Rating`.** It is permanently empty scaffolding from the MediBook template, so every one of those computed values is a fixed "No ratings yet."
+
+§6 step 2 removes the rating *filters* but never decides the model's fate. It needs one — see **Decision 7**. Recommendation: **drop the model and all three read sites** unless AGKI actually wants to collect post-visit feedback, in which case that is its own small feature (a rating form on a completed appointment), not a template detail.
+
+### 5.5 `useraccount/models.py`
 
 ```python
 class CustomUser(AbstractUser):
     ...
-    role = models.CharField(max_length=100, choices=[("admin", "Admin"), ("doctor", "Provider"), ("receptionist", "Receptionist")])
+    role = models.CharField(max_length=20, choices=Role.choices)   # DONE - see §0
+    qualifications = models.CharField(max_length=255, blank=True)   # DONE - split out of role
 ```
-No structural change beyond constraining `role` — everything else (`is_active`, `is_approved`, `image`) is reused as-is.
+Already shipped. Everything else (`is_active`, `is_approved`, `image`) is reused as-is.
 
 ---
 
@@ -149,7 +255,7 @@ Every step below is a **real Django `POST` to a real view** — no `e.preventDef
 
 ## 7. Staff dashboard (redesigned)
 
-All 12 `doctorDashboard` views get `@login_required` + `@role_required(...)` (§4.2). Beyond the auth wall:
+All `doctorDashboard` views get `@login_required` + `@role_required(...)` (§4.2), the ecommerce views get the tighter superuser-only treatment from §4.4, and the chrome reads its branding from `SiteSettings` per §3.1. Beyond the auth wall:
 
 - **`doctor_admin_dashboard`**: keep the existing server-computed stats (today/week counts, utilization) — they were correctly written, just needs the sidebar's hardcoded fake badges (`12`, `8`) replaced with the real `pending_count` the view already computes but the template ignores.
 - **`available_appointments`**: add a Date column (currently missing — the page shows only time-of-day, useless for a list not scoped to "today"); fix the empty-state copy, which currently says "No appointments scheduled for today" on a page that lists *all* appointments.
@@ -196,7 +302,14 @@ Not currently implemented anywhere despite the UI promising it (price breakdowns
 2. **Accessibility**: form labels correctly tied to inputs, required fields marked with `required` **and** visually asterisked consistently (fixes the `symptoms` field mismatch where the backend required it but the UI never indicated that).
 3. **Mobile responsiveness**: keep the existing card/grid patterns (they're already responsive), just re-skinned to AGKI branding.
 4. **Observability**: none of this currently has logging beyond Django's defaults. Add structured logging on booking creation, cancellation, and staff approval actions — useful both operationally and as an audit trail for a system that handles health data.
-5. **Testing**: both apps currently have empty `tests.py` files. Minimum bar before this ships: model tests for the `OneToOneField`/`unique_together` constraints, a view test proving the detail page 403s/redirects without a valid session marker, and a view test proving every `doctorDashboard` URL redirects anonymous users to login.
+5. **Testing**: both apps still have empty `tests.py` files. The CMS work established the pattern to follow (`cms/tests.py`, `app/tests.py`, `useraccount/tests.py` — 80 tests, with shared fixtures in `cms/test_utils.py`), including verifying the tests actually fail when the bug is reintroduced rather than trusting a green run. Minimum bar before this ships:
+   - Model tests for the `OneToOneField` / `unique_together` constraints.
+   - A test proving the detail page redirects to the lookup form without a valid session marker, and **does not** render PII.
+   - A test **enumerating every URL in both apps** and asserting anonymous access redirects to login — enumerated from the URLconf, not a hand-written list, so a new view can't be added without a decision.
+   - A test asserting `delete_item` no longer exists as a route (`NoReverseMatch`), so it can't quietly return.
+   - A test asserting the `Content Editors` group holds **zero** permissions on `appointments`, `doctorDashboard` or `ecommerce` models (§4.3).
+   - A test asserting a provider appears on the booking page based on `role` alone, with no `Profile` visit required (§5.3).
+   - A test proving a second booking on an already-booked slot fails.
 
 ---
 
@@ -211,7 +324,7 @@ Not currently implemented anywhere despite the UI promising it (price breakdowns
 | 3 | **Critical** — Booking form's "Confirm" only works by accident (fake JS success handler, real submission happens only because unrelated JS crashes first) | §6 step 3 — plain HTML submit, no JS interception at all |
 | 4 | **Critical** — Entire section is generic "MediBook" template content, wrong for a lab | §3 — domain reframing (specialties/video-consult/insurance removed, lab-appropriate copy) |
 | 5 | **Critical** — `.image.url` unguarded, crashes page if a provider has no photo | §7 last bullet — `{% if doctor.image %}` guard everywhere, modeled on `doctors.html`'s existing correct pattern |
-| 6 | **High** — Double-booking race condition | §5 — `Appointment.slot` becomes `OneToOneField` + `select_for_update()` |
+| 6 | **Critical** *(was High)* — Double-booking. **Re-verified: this is not a race condition.** `booking_form` never reads `is_booked`, so two *sequential* bookings on the same slot both succeed — reproduced, 2 appointments on 1 slot, no concurrency involved | §5 — `Appointment.slot` becomes `OneToOneField` + an actual `is_booked` check under `select_for_update()` |
 | 7 | **High** — Promised email/SMS never sent | §6 step 4, §9.1 — real `send_mail` on confirmation; SMS flagged Phase 2, not promised in copy until built |
 | 8 | **High** — Cancel/Reschedule/Contact/Live-Chat are decorative only | §6 step 6 — real Cancel action; other buttons removed until backed by real views |
 | 9 | **High** — No `status` field, cancellation structurally impossible | §5 — `Appointment.status` state machine, slot freed on cancel |
@@ -223,12 +336,17 @@ Not currently implemented anywhere despite the UI promising it (price breakdowns
 | 15 | Medium — hardcoded countdown date / "Dr. Sarah Johnson" | §6 step 6 — real appointment data only, no hardcoded demo content survives |
 | 16 | Low — dead placeholder links/contacts, "MediBook" footer | §3 — AGKI branding pass |
 | 17 | Low — no tests | §9.5 |
+| **18** | **Critical (new)** — `Profile` is created lazily, so a provider who has never opened their profile page is **invisible to the public booking page**, despite having `role='doctor'`. Confirmed live for two real accounts. `booking_success_page` / `appointment_detail` additionally raise `Profile.DoesNotExist` for them | §5.3 — create `Profile` on user creation + backfill migration; guard the two `.get()` calls |
+| **19** | **High (new)** — no date validation anywhere: a provider can publish availability in the past and a patient can book it directly by URL (the 5-day window is only a display filter) | §5.2 — `clean()` on both forms; refuse past slots at booking time |
+| **20** | **Medium (new)** — `visitType` / `reasonVisit` / `gender` remain free-text with no `choices`, the same shape as the `role` field that accumulated values like `'4491'` in production | §5.1 — `TextChoices` on all three, validated server-side |
+| **21** | **Medium (new)** — `Rating` is read in three views but **nothing anywhere creates one**; every rating figure shown is permanently "No ratings yet" | §5.4 — drop it, or build feedback collection as its own feature (**Decision 7**) |
+| **22** | **Medium (new)** — booking creation is an unauthenticated public write with no rate limit; §8.2 throttles only the lookup endpoint | §8.2 extended to `booking_form` |
 
 ### `doctorDashboard/` (staff console)
 
 | # | Finding (severity) | Fix in this design |
 |---|---|---|
-| 1 | **Critical** — zero authentication on all 12 views | §4.2 point 1 — `@login_required` everywhere |
+| 1 | **Critical** — zero authentication on all views. **Verified:** `/doctors/`, `/ecommerce_items/`, `/schedule/` and `/base/` return a clean **200** to anonymous visitors. The others return **500, not 403** — `AnonymousUser` hits a `TypeError` inside the queryset filter. That crash is incidental, not a security control | §4.2 point 1 — `@login_required` everywhere |
 | 2 | **Critical** — `.image.url` in shared base template crashes entire dashboard | §7 last bullet — same guard pattern applied to `doctor_base.html` |
 | 3 | **Critical** — `doctors()` lists every account type; stat cards bound to undefined context | §7 `doctors.html` bullet — role-scoped query, real or removed stat cards |
 | 4 | **Critical** — Activate/Deactivate button shows `is_active`, toggles `is_approved` | §4.2 point 5 — split into two explicit, correctly-labeled controls |
@@ -244,13 +362,19 @@ Not currently implemented anywhere despite the UI promising it (price breakdowns
 | 14 | Low — "MediBook" branding | §3 |
 | 15 | Low — mismatched icons/labels (wedding-ring icon on "Reason for Visiting," etc.) | §7 `doctor_appointment_details` bullet |
 | 16 | Low — no tests | §9.5 |
+| **17** | **Critical (new)** — **`delete_item` destroys an `ecommerce.Item` on an anonymous GET.** No login, no POST guard, no CSRF token. Reproduced against a test database: item count 1 → 0 from a single unauthenticated URL fetch. `@login_required` alone would *not* fix this — a destructive GET stays CSRF-triggerable by any logged-in staff member who visits a crafted link | §4.4 — the endpoint is **deleted**, not ported. Product deletion moves to the Django admin, which has confirmation, permissions and a `LogEntry` trail |
+| **18** | **Critical (new)** — `activate_deactivate_doctor` flips `is_approved` on **any** staff account via an unauthenticated POST. Reproduced: `False` → `True` with no session | §4.2 point 1 + §4.2 point 5 — auth wall, admin-only, and the two flags split into explicit controls |
+| **19** | **Medium (new)** — `/doctorDashboard/base/` renders a base template standalone (HTTP 200). Base templates are not pages; the route and its `doctor_base` view are dead | Delete both during implementation |
 
 ### Cross-cutting (found during this design pass, not the original audits)
 
 | # | Finding | Fix |
 |---|---|---|
-| 17 | `signin()` never actually checks `is_approved` — the approval flag `doctorDashboard` lets admins toggle currently gates nothing | §4.2 point 4 |
-| 18 | `signin()` hardcodes redirect to `doctor_admin_dashboard` regardless of role, ignoring `LOGIN_REDIRECT_URL` | §4.2 point 6 |
+| 17 | `signin()` never actually checks `is_approved` — the approval flag `doctorDashboard` lets admins toggle currently gates nothing | §4.2 point 4 — **still outstanding**, re-confirmed against the current code |
+| ~~18~~ | ~~`signin()` hardcodes redirect to `doctor_admin_dashboard` regardless of role~~ | ✅ **Done** — `post_login_redirect`, see §0 |
+| **19** | **(new)** Both apps hardcode AGKI branding and contact details while the marketing site now serves them from `cms.SiteSettings`. Rebuilding these templates with typed-in values guarantees drift the first time staff edit the footer in the admin | §3.1 — read shared identity from `SiteSettings`; booking-specific configuration stays superuser-only per §4.3 |
+| **20** | **(new)** `useraccount/urls.py` still registers `name='profile'` **twice** (lines 31 and 67, pointing at `views.profile` and `views.get_user_profile`). Django resolves the duplicate to the last one registered, so one of the two views is unreachable by name — the same collision class that made `{% url 'home' %}` resolve to the shop | Collapse to one registration; this was listed as dashboard #13 but is really a `useraccount` bug |
+| **21** | **(new)** The `Content Editors` group created for the CMS must never gain permissions over booking or clinical data. Nothing enforces that today beyond the migration happening not to grant it | §4.3 — assert it in a test rather than relying on memory |
 
 ---
 
@@ -266,8 +390,21 @@ Not currently implemented anywhere despite the UI promising it (price breakdowns
 
 ## 12. Open decisions (need AGKI sign-off before implementation)
 
-1. **Provider terminology**: keep `role='doctor'` in the database (minimal churn) but should the **UI label** say "Doctor," "Provider," "Consultant," or something else across booking/dashboard copy?
-2. **Home sample collection**: is this an actual AGKI service today? If not, ship with **In-person only** and add the second mode when it's real — don't promise a service that doesn't exist (the same mistake as the old "Video Consultation" badge).
-3. **SMS reminders**: worth the integration cost (Phase 2) for this patient volume, or is email-only sufficient for now?
-4. **Receptionist role**: does AGKI have front-desk staff who need dashboard access without being a provider, or is `admin` + `doctor` sufficient?
-5. **`doctor_schedule.html`**: confirmed OK to delete in favor of `doctor_availability.html`, or does it need to survive as a distinct read-only calendar view?
+**Settled during the review pass** (recorded here so they aren't re-litigated):
+
+- ✅ **Who configures these apps** — superuser only. The CMS's `Content Editors` group gets nothing here. §4.3.
+- ✅ **Provider access to ecommerce** — none. `delete_item` is removed outright; the product list becomes read-only and superuser-only. §4.4.
+
+**Still open:**
+
+| # | Decision | Why it can't be assumed | Recommendation |
+|---|---|---|---|
+| 1 | **Provider terminology** — `role='doctor'` stays in the DB, but should the UI say "Doctor," "Provider," "Consultant"? | Wording appears on every public booking page; a lab's staff are often not doctors | "Provider" in public copy, unless AGKI's patients expect "Doctor" |
+| 2 | **Home sample collection** — is this a real AGKI service today? | Shipping it as a bookable mode promises a service that may not exist — the same mistake as the old "Video Consultation" badge | Ship **In-person only** unless confirmed; add the mode when it's real |
+| 3 | **SMS reminders** — worth the integration cost now, or is email enough? | Real Tanzanian-market feature, but a paid integration and Phase 2 scope | Email only for now; don't mention SMS in any copy until built |
+| 4 | **Receptionist role** — real front-desk staff, or is `admin` + `doctor` enough? | Determines whether `@role_required` needs three roles or two | Skip it until someone actually needs it |
+| 5 | **`doctor_schedule.html`** — delete in favour of `doctor_availability`, or keep as a read-only calendar? | It is currently 100% hardcoded fake data with no view context | Delete; `doctor_availability` already covers it |
+| **6** | **Shared branding on booking pages** — should these pages read logo/phone/email/address from `cms.SiteSettings`, which **Content Editors can edit**? | This is the exact edge of the §4.3 rule you set. Reading from `SiteSettings` means a Content Editor updating the company phone number also changes the booking-page footer. The alternative is hardcoding, which guarantees the two drift apart the first time anyone edits the admin | **Read from `SiteSettings`.** It is shared company identity, not booking configuration, and one phone number should live in one place. Booking-specific settings stay superuser-only regardless |
+| **7** | **`Rating`** — drop the model, or build feedback collection? | Three views compute averages from a table **nothing ever writes to**, so every rating display is permanently "No ratings yet." Leaving it is the worst option: it looks like a feature and is scaffolding | **Drop it.** Revisit as a real post-visit feedback feature if AGKI wants patient ratings |
+| **8** | **Booking notifications to staff** — should a new booking email AGKI, not just the patient? | §6 step 4 only sends the patient a confirmation; staff would have to poll the dashboard to notice a booking exists | Send to the `SiteSettings` address, mirroring how the contact form already notifies |
+| **9** | **Cancellation window** — may a patient cancel at any time, or is there a cut-off? | `status=CANCELLED` frees the slot for rebooking; with no cut-off someone can cancel minutes before | Allow cancellation up to a configurable number of hours before the slot |
