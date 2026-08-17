@@ -167,6 +167,27 @@ DATABASES = {
     )
 }
 
+if DATABASES["default"]["ENGINE"].endswith("mysql"):
+    # Two settings that MySQL gets wrong by default, both silently.
+    #
+    # `utf8mb4` is the only charset in MySQL that stores the whole of Unicode.
+    # The one confusingly named `utf8` is a three-byte subset that cannot hold
+    # an emoji or several scripts, and inserting one either errors or truncates
+    # depending on the mode below.
+    #
+    # `STRICT_TRANS_TABLES` is the mode Django's own deployment docs ask for.
+    # Without it MySQL silently truncates a value too long for its column and
+    # carries on — a patient's name quietly cut to 100 characters, with no
+    # error anywhere. Django validates lengths itself, but only for data that
+    # arrives through a form; a management command or a data migration writes
+    # straight past that.
+    DATABASES["default"].setdefault("OPTIONS", {}).update(
+        {
+            "charset": "utf8mb4",
+            "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
+        }
+    )
+
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators

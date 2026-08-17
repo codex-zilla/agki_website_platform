@@ -20,6 +20,10 @@ htmlcov/
 # Django runtime and deployment output
 /db.sqlite3
 /db.sqlite3-*
+# Copies of the live database pulled down for inspection. Real accounts and
+# email addresses - never commit one.
+/deployed_copy_db.sqlite3
+/*.sqlite3
 /media/
 /static/
 /public/
@@ -44,3 +48,6 @@ design/_extract/
 build/
 dist/
 *.egg-info/
+
+# Local pre-migration database/media snapshots (plan 0.2). Never committed.
+/backups/
