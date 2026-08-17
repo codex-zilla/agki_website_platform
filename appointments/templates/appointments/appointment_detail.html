@@ -912,7 +912,7 @@
 
                     <!-- Doctor Profile -->
                     <div class="doctor-profile">
-                        <img src="{{profile.user.image.url}}" alt="Dr. Sarah Johnson" class="doctor-avatar">
+                        {% include "partials/avatar.html" with image=appointment.slot.user.image alt=appointment.slot.user.get_full_name css_class="doctor-avatar" only %}
                         <div class="doctor-info">
                             <h4>{{ appointment.slot.user.get_full_name }}</h4>
                             <div class="doctor-specialty">{{profile.expertise}} • {{profile.years_of_experience}} years experience</div>

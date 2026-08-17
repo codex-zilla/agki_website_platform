@@ -167,6 +167,44 @@ DATABASES = {
     )
 }
 
+# Two caches, because the two things being cached want opposite properties
+# (pre-flight decision 0.5).
+#
+# `default` stays in-process. It holds rendered page content — the homepage's
+# five-minute `_home_content` cache — where per-worker copies are harmless
+# (each worker just misses once) and where every read must be free. Pointing
+# this at the database would turn a zero-query cache hit into a query, which
+# is the opposite of what the cache is for.
+#
+# `ratelimit` is shared, and the backend is the entire point. Passenger runs
+# several worker processes; with a per-process cache each keeps its own
+# counter, so "5 attempts per 10 minutes" silently means 5 x however many
+# workers are up. A limit that weakens as the site scales reads as protection
+# without being any. DatabaseCache rather than Redis/memcached because this is
+# shared cPanel hosting with neither available, and the database is already
+# the shared state every worker agrees on.
+#
+# ROLLOUT: `python manage.py createcachetable` must be run once per
+# environment before the rate limiter works — see plan 9.11. Test databases
+# get the table automatically (Django's `create_test_db` runs the same
+# command for every db-backed cache).
+RATELIMIT_CACHE_ALIAS = "ratelimit"
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+    },
+    RATELIMIT_CACHE_ALIAS: {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": os.getenv("RATELIMIT_CACHE_TABLE", "django_cache"),
+        "OPTIONS": {
+            # Cull aggressively: these are throwaway counters, and an
+            # unbounded cache table on shared hosting is a slow leak.
+            "MAX_ENTRIES": 5000,
+        },
+    },
+}
+
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -287,6 +325,9 @@ SOCIALACCOUNT_EMAIL_VERIFICATION = os.getenv(
 
 # enable social account adapter verify user email
 SOCIALACCOUNT_ADAPTER = 'useraccount.adapters.SocialAccountAdapter'
+# Applies the is_approved gate to allauth's login paths, which do not go
+# through useraccount.backends.EmailBackend (plan 1.10).
+ACCOUNT_ADAPTER = 'useraccount.adapters.AccountAdapter'
 
 
 # Email Configuration

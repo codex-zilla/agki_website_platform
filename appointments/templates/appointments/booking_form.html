@@ -795,7 +795,7 @@
                 <h3 class="section-title" style="font-size: 1.3rem; margin-bottom: 1.5rem;">Appointment Summary</h3>
 
                 <div class="doctor-summary">
-                    <img src="{{doctor.user.image.url}}" alt="Dr. Sarah Johnson" class="doctor-avatar-small">
+                    {% include "partials/avatar.html" with image=slot.user.image alt=slot.user.get_full_name css_class="doctor-avatar-small" only %}
                     <div class="doctor-summary-info">
                         <div class="doctor-name-small">Dr. {{slot.user.first_name}} {{slot.user.last_name}}</div>
                         <div class="doctor-specialty-small">{{doctor.expertise}}</div>

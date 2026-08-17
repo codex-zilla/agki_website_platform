@@ -518,13 +518,14 @@
                         </label>
                         <div class="input-wrapper">
                             <i class="fas fa-hashtag input-icon"></i>
-                            <input 
-                                type="text" 
-                                class="form-control" 
-                                id="bookingId" 
+                            <input
+                                type="text"
+                                class="form-control"
+                                id="bookingId"
                                 placeholder="AGKI-2025-XXXXX"
-                                maxlength="15"
+                                maxlength="20"
                                 name="bookingID"
+                                value="{{ bookingID|default:'' }}"
                                 required
                                 autocomplete="off"
                             >
@@ -532,6 +533,30 @@
                         <div class="form-hint">
                             <i class="fas fa-lightbulb"></i>
                             <span>Format: AGKI-YYYY-XXXXX (e.g., AGKI-2025-84729)</span>
+                        </div>
+                    </div>
+
+                    {# Second factor, per design §8.1. A booking ID on its own
+                       is a five-digit number and is not treated as a secret. #}
+                    <div class="form-group">
+                        <label for="verification" class="form-label">
+                            Phone number or date of birth <span class="required">*</span>
+                        </label>
+                        <div class="input-wrapper">
+                            <i class="fas fa-user-shield input-icon"></i>
+                            <input
+                                type="text"
+                                class="form-control"
+                                id="verification"
+                                placeholder="0700 000 000  or  1990-05-01"
+                                name="verification"
+                                required
+                                autocomplete="off"
+                            >
+                        </div>
+                        <div class="form-hint">
+                            <i class="fas fa-lock"></i>
+                            <span>As given when the appointment was booked. This confirms the record is yours.</span>
                         </div>
 
                         {% if error %}
@@ -586,102 +611,31 @@
     </footer>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+    {% comment %}
+      The client-side lookup script that used to live here has been removed
+      (plan 1.7, design finding appointments #2). It did not work and it made
+      the page not work:
+
+        * it rewrote whatever the patient typed into MediBook's MB-YYYY-XXXXX
+          format, so a real AGKI- booking ID could never be entered;
+        * its submit handler cancelled the submit event unconditionally and
+          then returned, so the form was never actually submitted;
+        * the handler was left unterminated, which nested every later listener
+          inside it and made `errorMessage` - an element id that exists nowhere
+          in this page - throw on the first keystroke.
+
+      The form is now a plain HTML POST to a real view. Nothing about finding
+      an appointment should depend on JavaScript running correctly.
+
+      A template comment rather than an HTML one: this is a note to whoever
+      reads the template next, and there is no reason to ship it to every
+      visitor's browser.
+    {% endcomment %}
     <script>
-        const form = document.getElementById('lookupForm');
-        const bookingIdInput = document.getElementById('bookingId');
-        const submitBtn = document.getElementById('submitBtn');
-        const errorMessage = document.getElementById('errorMessage');
-        const errorText = document.getElementById('errorText');
-
-        // Auto-format booking ID as user types
-        bookingIdInput.addEventListener('input', function(e) {
-            let value = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
-            
-            // Remove existing error state while typing
-            this.classList.remove('is-invalid', 'is-valid');
-            errorMessage.classList.remove('show');
-            
-            // Format: MB-YYYY-XXXXX
-            if (value.length > 0 && !value.startsWith('MB-')) {
-                if (value.startsWith('MB')) {
-                    value = 'MB-' + value.substring(2);
-                } else {
-                    value = 'MB-' + value;
-                }
-            }
-            
-            e.target.value = value;
-        });
-
-        // Validate booking ID format
-        function validateBookingId(id) {
-            // Format: MB-YYYY-XXXXX (e.g., MB-2025-84729)
-            const regex = /^MB-\d{4}-\d{5}$/;
-            return regex.test(id);
-        }
-
-        // Form submission
-        form.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const bookingId = bookingIdInput.value.trim();
-            
-            // Validate format
-            if (!validateBookingId(bookingId)) {
-                bookingIdInput.classList.add('is-invalid');
-                errorText.textContent = 'Invalid format. Please use: MB-YYYY-XXXXX (e.g., MB-2025-84729)';
-                errorMessage.classList.add('show');
-                return;
-            }
-
-            // Show loading state
-            submitBtn.classList.add('loading');
-            submitBtn.disabled = true;
-            bookingIdInput.disabled = true;
-
-           
-
-        // Remove error state when user starts typing again
-        bookingIdInput.addEventListener('focus', function() {
-            this.classList.remove('is-invalid');
-            errorMessage.classList.remove('show');
-        });
-
-        // Alternative options handlers
-        document.getElementById('loginBtn').addEventListener('click', function(e) {
-            e.preventDefault();
-            alert('Redirecting to login page...');
-            // window.location.href = 'login.html';
-        });
-
-        document.getElementById('emailLookupBtn').addEventListener('click', function(e) {
-            e.preventDefault();
-            alert('Redirecting to email/phone lookup...');
-            // window.location.href = 'email-lookup.html';
-        });
-
-        document.getElementById('supportBtn').addEventListener('click', function(e) {
-            e.preventDefault();
-            alert('Opening support chat...');
-            // Open support chat or redirect to contact page
-        });
-
-        // Check if there's a booking ID in localStorage from recent booking
-        window.addEventListener('load', function() {
-            const recentBookingId = localStorage.getItem('lastBookingId');
-            if (recentBookingId) {
-                bookingIdInput.value = recentBookingId;
-                bookingIdInput.classList.add('is-valid');
-            }
-        });
-
-        // Enable paste formatting
-        bookingIdInput.addEventListener('paste', function(e) {
-            e.preventDefault();
-            const pastedText = (e.clipboardData || window.clipboardData).getData('text');
-            const formatted = pastedText.toUpperCase().replace(/[^A-Z0-9-]/g, '');
-            this.value = formatted;
-            this.dispatchEvent(new Event('input'));
+        // Uppercase the booking ID as it is typed. Cosmetic only: the server
+        // does not care about case, and the form submits with or without this.
+        document.getElementById('bookingId').addEventListener('input', function () {
+            this.value = this.value.toUpperCase();
         });
     </script>
 </body>

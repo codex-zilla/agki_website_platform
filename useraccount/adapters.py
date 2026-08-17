@@ -1,6 +1,39 @@
+from allauth.account.adapter import DefaultAccountAdapter
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
+from django.contrib import messages
+from django.http import HttpResponseRedirect
+from django.urls import reverse
 from .models import CustomUser
 from allauth.account.models import EmailAddress
+
+
+class AccountAdapter(DefaultAccountAdapter):
+    """Apply the admin-approval gate to allauth's login paths too.
+
+    `EmailBackend.user_can_authenticate` covers the site's own sign-in form,
+    but allauth logs users in through its own backend and never calls it — so
+    without this, "Sign in with Google" was a way around the approval gate
+    that plan 1.10 exists to create. Which is worse than no gate, because the
+    admin toggling the switch would believe it worked.
+
+    `save_user`/`pre_social_login` below set `is_active` for social accounts;
+    neither sets `is_approved`, and deliberately so — approving an account is
+    a decision a human makes.
+    """
+
+    def pre_login(self, request, user, **kwargs):
+        response = super().pre_login(request, user, **kwargs)
+        if response is not None:  # allauth already refused (e.g. inactive)
+            return response
+        if not user.is_approved:
+            messages.warning(
+                request,
+                'Your account is pending admin approval. You will be able to '
+                'sign in once an administrator approves it.',
+            )
+            return HttpResponseRedirect(reverse('signin'))
+        return None
+
 
 class SocialAccountAdapter(DefaultSocialAccountAdapter):
     def pre_social_login(self, request, sociallogin):

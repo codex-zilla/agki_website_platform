@@ -730,9 +730,7 @@
                          data-teleconsult="true"
                          data-new-patients="true">
                         <div class="doctor-header">
-                            <img src="{{ doctor_data.doctor.user.image.url }}" 
-                                alt="{{ doctor_data.doctor.user.first_name }} {{ doctor_data.doctor.user.last_name }}" 
-                                class="doctor-avatar">
+                            {% include "partials/avatar.html" with image=doctor_data.doctor.user.image alt=doctor_data.doctor.user.get_full_name css_class="doctor-avatar" only %}
                             <div class="doctor-info">
                                 <h3 class="doctor-name">{{ doctor_data.doctor.user.first_name }} {{ doctor_data.doctor.user.last_name }}</h3>
                                 <div class="doctor-specialty">{{ doctor_data.doctor.expertise }} • {{ doctor_data.doctor.years_of_experience }} years experience • {{doctor_data.doctor.gender}}</div>

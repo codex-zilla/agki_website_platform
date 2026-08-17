@@ -181,7 +181,7 @@
                                 <div class="note-item">
                                     <div class="note-header">
                                         <div class="note-author">
-                                            <img src="{{i.added_by.image.url}}" alt="Doctor" class="note-avatar">
+                                            {% include "partials/avatar.html" with image=i.added_by.image alt=i.added_by.get_full_name css_class="note-avatar" only %}
                                             <div>
                                                 <div class="note-author-name">{{i.added_by.get_full_name}}</div>
                                                 <div class="note-timestamp">{{ i.created_at|date:"l, Y-m-d" }} at {{ i.created_at|time:"H:i" }}</div>

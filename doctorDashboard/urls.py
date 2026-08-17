@@ -12,8 +12,9 @@ urlpatterns = [
     path('add_doctor_availability/', views.add_doctor_availability, name='add_doctor_availability'),
     
     path('ecommerce_items/', views.ecommerce_items, name='ecommerce_items'),
-    path('products/delete/<int:item_id>/', views.delete_item, name='delete_item'),
-    
+    # No `delete_item` route. It deleted a product on an anonymous GET; see the
+    # note where the view used to be in views.py (design §4.4, plan 1.4).
+
     path('doctors/', views.doctors, name='doctors'),
     path('activate_deactivate_doctor/<int:doctor_id>/', views.activate_deactivate_doctor, name='activate_deactivate_doctor'),
     

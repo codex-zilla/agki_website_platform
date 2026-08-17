@@ -8,6 +8,16 @@ from .models import OtpToken, CustomUser
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
 def create_token(sender, instance, created, **kwargs):
+    if created and instance.is_superuser and not instance.is_approved:
+        # `is_approved` gates sign-in as of plan 1.10, and it defaults to
+        # False. Without this, `manage.py createsuperuser` produces an account
+        # that cannot use the site's own login form and has to approve itself
+        # through the admin first — a footgun with no upside, since
+        # `is_superuser` already means "everything" (design §4.1).
+        # `.update()` rather than `.save()` to avoid re-entering this signal.
+        CustomUser.objects.filter(pk=instance.pk).update(is_approved=True)
+        instance.is_approved = True
+
     if created and not instance.is_superuser:
         # Check if this user was created by social login
         # We can check this by looking at the session or by checking if they have a usable password

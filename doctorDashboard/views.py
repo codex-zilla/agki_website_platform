@@ -3,14 +3,30 @@ from appointments.forms import AppointmentApprovalForm, AppointmentNoteForm, Ava
 from appointments.models import *
 from django.utils import timezone
 from datetime import timedelta
-from django.contrib import messages
 
 from ecommerce.models import Category, Item
+from useraccount.decorators import role_required, superuser_required
+
+# Every view in this module is behind an access decorator, and that is a
+# deliberate all-or-nothing rule rather than a judgement call per view: until
+# now the console had no auth wall at all (design §10 dashboard #1). If a new
+# view is added here without one, `DashboardAccessTests` fails — it enumerates
+# the URLconf rather than a hand-written list, so "I forgot" is not a
+# reachable state.
+#
+# Object-level scoping is unchanged in this phase. `role=admin` accounts can
+# now *reach* these pages but still see querysets filtered to their own slots,
+# so an admin's dashboard reads empty. That is Phase 5's job (5.10) — widening
+# a queryset is a behaviour change, and this phase ships alone.
+STAFF_CONSOLE = role_required("admin", "doctor")
+
 
 # Create your views here.
+@STAFF_CONSOLE
 def doctor_base(request):
     return render(request, 'doctorDashboard/doctor_base.html')
 
+@STAFF_CONSOLE
 def doctor_admin_dashboard(request):
     doctor = request.user
     today = timezone.now().date()
@@ -80,9 +96,11 @@ def doctor_admin_dashboard(request):
 
     return render(request, 'doctorDashboard/doctor_admin_dashboard.html', context)
 
+@STAFF_CONSOLE
 def  doctor_schedule(request):
     return render(request, 'doctorDashboard/doctor_schedule.html')
 
+@STAFF_CONSOLE
 def  available_appointments(request):
     doctor = request.user
     today = timezone.now().date()
@@ -134,9 +152,13 @@ def  available_appointments(request):
     }
     return render(request, 'doctorDashboard/available_appointments.html', context)
 
+@STAFF_CONSOLE
 def doctor_appointment_details(request, appointment_id):
     doctor = request.user
-    appointment = Appointment.objects.get(id=appointment_id, slot__user=doctor)
+    # 404 rather than the bare `.get()` that was here: an id belonging to
+    # another doctor raised DoesNotExist and returned a 500, which is both a
+    # worse answer and a noisier one than "no such appointment for you".
+    appointment = get_object_or_404(Appointment, id=appointment_id, slot__user=doctor)
     approval_status = AppointmentApproval.objects.filter(appointment=appointment).first()
     appointment_notes = AppointmentNote.objects.filter(appointment=appointment).order_by('-id')
     context = {
@@ -146,6 +168,7 @@ def doctor_appointment_details(request, appointment_id):
     }
     return render(request, 'doctorDashboard/doctor_appointment_details.html', context)
 
+@STAFF_CONSOLE
 def add_appointment_note(request, appointment_id):
     doctor = request.user
     appointment = get_object_or_404(Appointment, id=appointment_id, slot__user=doctor)
@@ -167,6 +190,7 @@ def add_appointment_note(request, appointment_id):
     }
     return render(request, 'doctorDashboard/doctor_appointment_details.html', context)
 
+@STAFF_CONSOLE
 def appointment_approval(request, appointment_id):
     doctor = request.user
     appointment = get_object_or_404(Appointment, id=appointment_id, slot__user=doctor)
@@ -193,6 +217,7 @@ def appointment_approval(request, appointment_id):
     }
     return render(request, 'doctorDashboard/doctor_appointment_details.html', context)
 
+@STAFF_CONSOLE
 def doctor_availability(request):
     doctor = request.user
     # Get all available slots for the doctor, not just one
@@ -237,6 +262,7 @@ def doctor_availability(request):
     }
     return render(request, 'doctorDashboard/doctor_availability.html', context)
 
+@STAFF_CONSOLE
 def add_doctor_availability(request):
     form = AvailableSlotForm()
     if request.method == 'POST':
@@ -251,6 +277,7 @@ def add_doctor_availability(request):
     }
     return render(request, 'doctorDashboard/doctor_availability.html', context)
 
+@role_required("admin")
 def doctors(request):
     doctors = CustomUser.objects.all()
     doctors_count = doctors.count()
@@ -260,6 +287,7 @@ def doctors(request):
     }
     return render(request, 'doctorDashboard/doctors.html', context)
 
+@role_required("admin")
 def activate_deactivate_doctor(request, doctor_id):
     doctor = get_object_or_404(CustomUser, id=doctor_id)
     if request.method == 'POST':
@@ -272,10 +300,19 @@ def activate_deactivate_doctor(request, doctor_id):
     }
     return render(request, 'doctorDashboard/doctors.html', context)
 
+@superuser_required
 def ecommerce_items(request):
+    """Read-only catalogue view, superuser-only (design §4.4).
+
+    Ecommerce is frozen pending its own redesign, and this is the only window
+    onto it from the staff console. Nothing here mutates a product: the delete
+    endpoint that used to live below this function is gone, and anything that
+    changes a product happens in the Django admin, which has a confirmation
+    step, object permissions and a LogEntry trail.
+    """
     items = Item.objects.all()
     categories = Category.objects.all()  # Add this line
-    
+
     context = {
         'items': items,
         'categories': categories,  # Add this
@@ -284,12 +321,14 @@ def ecommerce_items(request):
     }
     return render(request, 'doctorDashboard/ecommerce_items.html', context)
 
-def delete_item(request, item_id):
-    try:
-        item = Item.objects.get(id=item_id)
-        item_name = item.title
-        item.delete()
-        messages.success(request, f'Product "{item_name}" deleted successfully!')
-    except Item.DoesNotExist:
-        messages.error(request, 'Product not found!')
-    return redirect('ecommerce_items')
+
+# `delete_item` was deleted here, not ported (design §4.4, plan 1.4).
+#
+# It destroyed an `ecommerce.Item` on a plain **GET** with no authentication
+# and no CSRF token — reproduced against a test database, product count 1 -> 0
+# from a single unauthenticated URL fetch. Adding @login_required would not
+# have been enough: a destructive GET stays CSRF-triggerable by any signed-in
+# staff member who follows a crafted link, because no token is involved.
+#
+# Product deletion now happens in the Django admin. `NoDeleteItemRouteTests`
+# asserts the name no longer reverses, so it cannot quietly come back.

@@ -191,27 +191,36 @@ def signin(request):
         password1 = request.POST['password1']
 
         # Check if username exists
-        if not CustomUser.objects.filter(email=username).exists():
+        account = CustomUser.objects.filter(email=username).first()
+        if account is None:
             messages.error(request, 'No account found with this username.')
             return redirect('signin')
 
-        user = authenticate(username=username, password=password1)
+        user = authenticate(request, username=username, password=password1)
 
         if user is not None:
-            if user.is_active:
-                login(request, user)
-                # Single source of truth for the landing page — see
-                # post_login_redirect. This used to send every account,
-                # including content editors and superusers, to the doctor
-                # dashboard.
-                return redirect('post_login_redirect')
-            else:
+            login(request, user)
+            # Single source of truth for the landing page — see
+            # post_login_redirect. This used to send every account,
+            # including content editors and superusers, to the doctor
+            # dashboard.
+            return redirect('post_login_redirect')
+
+        # `authenticate` refuses three different things and reports none of
+        # them: a wrong password, an unverified account, and — since plan 1.10
+        # — an unapproved one. The gate itself lives in the backend, where it
+        # applies to every caller; this only re-derives which of the three it
+        # was, so the person reading the message can act on it. Checking the
+        # password again is what keeps "pending approval" from being said to
+        # someone who does not know the password.
+        if account.check_password(password1):
+            if not account.is_active:
                 messages.warning(request, 'Your account is not verified yet. Please check your email for OTP verification.')
-                return redirect('signin')
-            
+            else:
+                messages.warning(request, 'Your account is pending admin approval. You will be able to sign in once an administrator approves it.')
         else:
             messages.error(request, 'Incorrect password. Please try again.')
-            return redirect('signin')
+        return redirect('signin')
 
     return render(request, 'useraccount/signin.html')
 
@@ -323,10 +332,18 @@ def post_login_redirect(request):
     Order matters here: `role` is checked before `is_staff` deliberately, so
     a clinician who also happens to have a staff flag still lands on their
     own dashboard rather than the admin.
+
+    **Both operational roles** route to the dashboard (design §4.1.2). This
+    used to name only `doctor`, which meant the lab administrator - staff, not
+    a superuser - landed on `/admin/` and never reached the console she
+    administers. `role` is "which console is this person's job", and there are
+    two roles in it; `is_staff` is "may open the Django admin", which is the
+    right answer only for an account with no operational role at all, such as
+    a Content Editor.
     """
     user = request.user
 
-    if user.role == CustomUser.Role.DOCTOR:
+    if user.role in (CustomUser.Role.DOCTOR, CustomUser.Role.ADMIN):
         return redirect('doctor_admin_dashboard')
 
     # Covers content editors, receptionists-with-admin-access and superusers:

@@ -11,8 +11,9 @@ None of them looked at `is_staff`.
 cover the matrix it is responsible for.
 """
 
-from django.contrib.auth import get_user_model
+from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.models import Group
+from django.contrib.messages import get_messages
 from django.test import TestCase
 from django.urls import reverse
 
@@ -32,6 +33,12 @@ class PostLoginRedirectTests(TestCase):
 
         cls.doctor = make_staff_user(username="doctor", email="doctor@example.com",
                                      password=PASSWORD, role=User.Role.DOCTOR)
+        # Mirrors the real `kulwa_cherehani`: the lab administrator, staff but
+        # not a superuser. She used to land on /admin/ and never reach the
+        # console she administers (design §4.1.2, plan 1.9).
+        cls.lab_admin = make_staff_user(username="labadmin", email="labadmin@example.com",
+                                        password=PASSWORD, role=User.Role.ADMIN,
+                                        is_staff=True)
         cls.receptionist = make_staff_user(username="recept", email="recept@example.com",
                                            password=PASSWORD, role=User.Role.RECEPTIONIST)
         cls.patient = make_staff_user(username="patient", email="patient@example.com",
@@ -50,6 +57,7 @@ class PostLoginRedirectTests(TestCase):
             ("content editor", cls.editor, "/admin/"),
             ("superuser", cls.superuser, "/admin/"),
             ("doctor", cls.doctor, "/doctorDashboard/"),
+            ("lab administrator", cls.lab_admin, "/doctorDashboard/"),
             ("doctor who is also staff", cls.doctor_who_is_staff, "/doctorDashboard/"),
             ("receptionist", cls.receptionist, "/useraccount/dashboard/"),
             ("patient", cls.patient, "/useraccount/dashboard/"),
@@ -127,3 +135,105 @@ class UrlNameCollisionTests(TestCase):
 
     def test_signin_resolves_to_the_working_one(self):
         self.assertEqual(reverse("signin"), "/useraccount/signin/")
+
+
+class ApprovalGateTests(TestCase):
+    """`is_approved` actually gates sign-in now (plan 1.10, design §4.2 #4).
+
+    The flag has existed since a migration whose own comment says it was
+    "added so as to add admin approval to login", and the staff console has
+    offered a button to toggle it — but `signin` only ever checked
+    `is_active`, so the button controlled nothing. An admin could
+    "unapprove" someone and watch them keep signing in.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.approved = make_staff_user(username="approved", email="approved@example.com",
+                                       password=PASSWORD, role=User.Role.DOCTOR)
+        cls.pending = make_staff_user(username="pending", email="pending@example.com",
+                                      password=PASSWORD, role=User.Role.DOCTOR)
+        User.objects.filter(pk=cls.pending.pk).update(is_approved=False)
+        cls.pending.refresh_from_db()
+
+    def sign_in(self, user):
+        return self.client.post("/useraccount/signin/",
+                                {"username": user.email, "password1": PASSWORD})
+
+    def test_an_approved_account_still_signs_in(self):
+        response = self.sign_in(self.approved)
+
+        self.assertEqual(response["Location"], reverse("post_login_redirect"))
+        self.assertEqual(int(self.client.session["_auth_user_id"]), self.approved.pk)
+
+    def test_an_unapproved_account_cannot_sign_in(self):
+        response = self.sign_in(self.pending)
+
+        self.assertEqual(response["Location"], "/useraccount/signin/")
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_the_message_says_what_is_wrong(self):
+        """"Incorrect password" would send someone to reset a password that
+        was never the problem."""
+        response = self.sign_in(self.pending)
+        messages = [str(m) for m in get_messages(response.wsgi_request)]
+
+        self.assertTrue(any("pending admin approval" in m for m in messages), messages)
+
+    def test_a_wrong_password_is_still_reported_as_a_wrong_password(self):
+        """The approval state must not leak to someone who cannot even
+        authenticate."""
+        response = self.client.post("/useraccount/signin/",
+                                    {"username": self.pending.email, "password1": "wrong"})
+        messages = [str(m) for m in get_messages(response.wsgi_request)]
+
+        self.assertTrue(any("Incorrect password" in m for m in messages), messages)
+        self.assertFalse(any("approval" in m for m in messages), messages)
+
+    def test_the_gate_lives_in_the_backend_not_only_in_the_view(self):
+        """`signin` was the only caller that checked anything, so any second
+        entry point inherited a gate that was not there."""
+        self.assertIsNone(authenticate(username=self.pending.email, password=PASSWORD))
+        self.assertIsNotNone(authenticate(username=self.approved.email, password=PASSWORD))
+
+    def test_an_inactive_account_is_still_refused_and_told_why(self):
+        User.objects.filter(pk=self.approved.pk).update(is_active=False)
+
+        response = self.sign_in(self.approved)
+        messages = [str(m) for m in get_messages(response.wsgi_request)]
+
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertTrue(any("not verified" in m for m in messages), messages)
+
+    def test_unapproving_an_account_ends_its_existing_session(self):
+        """Otherwise "revoke access" would mean "revoke access at their next
+        login", which is not what an admin clicking it expects."""
+        self.client.force_login(self.approved)
+        self.assertEqual(self.client.get(reverse("post_login_redirect")).status_code, 302)
+
+        User.objects.filter(pk=self.approved.pk).update(is_approved=False)
+
+        bounced = self.client.get(reverse("post_login_redirect"))
+        self.assertIn("/useraccount/signin/", bounced["Location"])
+
+    def test_a_new_superuser_is_approved_automatically(self):
+        """`is_approved` defaults to False, so without this `createsuperuser`
+        would produce an account that cannot use the site's own login form —
+        a footgun with no upside, since is_superuser already means
+        everything (design §4.1)."""
+        root = User.objects.create_superuser(
+            username="fresh-root", email="fresh-root@example.com", password=PASSWORD,
+        )
+
+        self.assertTrue(root.is_approved)
+        self.assertEqual(self.sign_in(root)["Location"], reverse("post_login_redirect"))
+
+    def test_an_ordinary_new_account_is_not_approved_automatically(self):
+        """Approval is a decision a human makes; self-signup must not grant
+        it."""
+        signee = User.objects.create_user(
+            username="self-signup", email="self-signup@example.com", password=PASSWORD,
+        )
+
+        signee.refresh_from_db()
+        self.assertFalse(signee.is_approved)

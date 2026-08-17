@@ -761,7 +761,7 @@
         </div>
 
         <div class="doctor-profile-sidebar">
-            <img src="{{user.image.url}}" alt="{{user.username}}" class="doctor-avatar-sidebar">
+            {% include "partials/avatar.html" with image=user.image alt=user.username css_class="doctor-avatar-sidebar" only %}
             <div class="doctor-name-sidebar">{{user.get_full_name}}</div>
             <div class="doctor-specialty-sidebar">{{user.role}}</div>
         </div>
@@ -802,12 +802,18 @@
                 <span class="menu-item-text">All Appointments</span>
             </a>
 
+            {# Ecommerce is superuser-only (design §4.4). Hidden rather than
+               shown-and-403'd, so a doctor never sees a control they cannot
+               use. The view enforces it independently — this is the courtesy,
+               not the gate. #}
+            {% if user.is_superuser %}
             <!-- eccomerce -->
              <div class="menu-section-title">E-Commerce</div>
             <a href="{% url 'ecommerce_items' %}" class="menu-item {% if request.resolver_match.url_name == 'ecommerce_items' %}active{% endif %}" data-page="ecommerce_items">
                 <i class="fas fa-box"></i>
                 <span class="menu-item-text">Products</span>
             </a>
+            {% endif %}
 
             <div class="menu-section-title">Settings</div>
             <a href="{% url 'profile' %}" class="menu-item {% if request.resolver_match.url_name == 'profile' %}active{% endif %}" data-page="profile">
@@ -840,7 +846,7 @@
                     <span class="notification-badge">8</span>
                 </div>
                 <div class="user-menu">
-                    <img src="{{user.image.url}}" alt="{{user.username}}" class="user-avatar-top">
+                    {% include "partials/avatar.html" with image=user.image alt=user.username css_class="user-avatar-top" only %}
                     <span style="font-weight: 600;">{{user.get_full_name}}</span>
                     <i class="fas fa-chevron-down"></i>
                 </div>
