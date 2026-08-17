@@ -8,6 +8,17 @@ from .models import OtpToken, CustomUser
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
 def create_token(sender, instance, created, **kwargs):
+    # `raw=True` means this save is `loaddata` restoring a fixture, not a
+    # person signing up. Django sets it for exactly this reason, and skipping
+    # is not a nicety here: without it, importing the production accounts into
+    # a new database treats all six as brand-new self-signups. Rehearsing the
+    # SQLite -> MySQL migration is what caught it — the import **deactivated
+    # five of six real accounts** and generated OTP tokens for them, and with
+    # live SMTP would have emailed five people a verification code they never
+    # asked for.
+    if kwargs.get("raw"):
+        return
+
     if created and not instance.is_superuser:
         # Check if this user was created by social login
         # We can check this by looking at the session or by checking if they have a usable password
