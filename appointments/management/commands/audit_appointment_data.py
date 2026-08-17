@@ -1,0 +1,620 @@
+"""Pre-migration data audit for the appointment system redesign (plan §0.3, §0.4).
+
+Phase 2 of the implementation plan applies constraints to tables that already
+hold live bookings. Three of those constraints can *fail on real data*, and two
+more need a human to make a mapping call that a migration must not guess. This
+command reports all of them, so the answer to "is production safe to migrate?"
+is a command anyone can re-run rather than a shell session someone once did.
+
+    python manage.py audit_appointment_data
+    python manage.py audit_appointment_data --strict      # exit 1 if blockers
+    python manage.py audit_appointment_data --json        # machine-readable
+    python manage.py audit_appointment_data --database=prod_copy
+
+Read-only: it opens no transaction and writes nothing. Safe to run against
+production directly.
+
+**Severities.**
+
+``BLOCKER``  A Phase 2 migration will fail (or silently lose data) until this
+             is resolved by hand. These are the gate.
+``REVIEW``   A person must decide something before the related step — a value
+             mapping, a lockout risk. Not fatal, but not automatable either.
+``INFO``     Scope sizing. Nothing to fix; useful for knowing how big a
+             backfill is before running it.
+
+The choice lists below are the *proposed* ones from design §5.1. They live here
+rather than on the model because the model does not have them yet — that is
+step 2.10. When 2.10 lands, delete these constants and import the model's
+``TextChoices`` instead, so this command and the schema cannot drift apart.
+"""
+
+import json
+import sys
+from collections import Counter
+
+from django.core.management.base import BaseCommand
+from django.db.models import Count
+
+from appointments.models import Appointment, AppointmentApproval, AvailableSlot
+from useraccount.models import CustomUser, Profile
+
+# --- proposed choice sets (design §5.1) — see module docstring ---------------
+
+VISIT_TYPES = {
+    "new_patient": "New patient",
+    "follow_up": "Follow-up",
+}
+
+REASONS_FOR_VISIT = {
+    "lab_test": "Lab test / panel",
+    "referred_test": "Doctor-referred test",
+    "result_followup": "Result collection / follow-up",
+    "consultation": "Consultation",
+    "other": "Other",
+}
+
+# Provisional. Design §5.1 requires `gender` to become a closed set but does
+# not enumerate it — AGKI confirms the members as part of step 2.10. Anything
+# reported as unmappable here is a prompt for that conversation, not a defect.
+GENDERS = {
+    "male": "Male",
+    "female": "Female",
+    "other": "Other",
+    "prefer_not_to_say": "Prefer not to say",
+}
+
+BLOCKER = "BLOCKER"
+REVIEW = "REVIEW"
+INFO = "INFO"
+
+SEVERITY_ORDER = [BLOCKER, REVIEW, INFO]
+
+# The report is written to be readable in a terminal, and this one is run from
+# a Windows console as often as from the production shell. cmd.exe's default
+# code page has no em dash or section sign, so text authored with them comes
+# out as `?` at best. Translate at the write boundary rather than writing ugly
+# source: see `Command.out`.
+ASCII_FALLBACKS = {
+    ord("—"): "-",     # em dash
+    ord("–"): "-",     # en dash
+    ord("…"): "...",   # ellipsis
+    ord("§"): "sec ",  # section sign
+    ord("’"): "'",
+    ord("“"): '"',
+    ord("”"): '"',
+}
+
+
+def normalise(value):
+    """Fold a free-text value towards a choice key: 'Follow Up' -> 'follow_up'."""
+    return "_".join(str(value).strip().lower().replace("-", " ").replace("_", " ").split())
+
+
+def suggest(value, choices):
+    """Return the choice key `value` obviously means, or None if it needs a human.
+
+    Matches on the key and on the human label, both normalised. Deliberately
+    conservative: it will not reach for a fuzzy match, because a near-miss that
+    looks like a match is exactly how `expertise='Cardiograph'` happened.
+    """
+    candidate = normalise(value)
+    if candidate in choices:
+        return candidate
+    for key, label in choices.items():
+        if candidate == normalise(label):
+            return key
+    return None
+
+
+class Finding:
+    def __init__(self, code, severity, headline, blocks="", rows=None, detail=""):
+        self.code = code
+        self.severity = severity
+        self.headline = headline
+        self.blocks = blocks
+        self.rows = rows or []
+        self.detail = detail
+
+    def as_dict(self):
+        return {
+            "code": self.code,
+            "severity": self.severity,
+            "headline": self.headline,
+            "blocks": self.blocks,
+            "detail": self.detail,
+            "count": len(self.rows),
+            "rows": self.rows,
+        }
+
+
+class Command(BaseCommand):
+    help = "Audit appointment data for the known Phase 2 migration blockers (plan §0.3)."
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--database",
+            default="default",
+            help="Database alias to audit. Point this at a copy of production.",
+        )
+        parser.add_argument(
+            "--limit",
+            type=int,
+            default=20,
+            help="Max example rows printed per finding (default 20). 0 = no limit.",
+        )
+        parser.add_argument(
+            "--strict",
+            action="store_true",
+            help="Exit 1 if any BLOCKER is found. For use as a migration gate.",
+        )
+        parser.add_argument(
+            "--json",
+            action="store_true",
+            dest="as_json",
+            help="Emit JSON instead of the human report.",
+        )
+
+    def handle(self, *args, **options):
+        self.db = options["database"]
+        findings = [
+            check
+            for check in (
+                self.check_duplicate_slots(),
+                self.check_slots_with_multiple_appointments(),
+                self.check_free_text_choices(),
+                self.check_missing_profiles(),
+                self.check_expertise_values(),
+                self.check_unknown_roles(),
+                self.check_login_lockout_risk(),
+                self.check_slot_booking_flags(),
+                self.check_approval_backfill(),
+            )
+            if check is not None
+        ]
+
+        if options["as_json"]:
+            self.stdout.write(
+                json.dumps(
+                    {
+                        "database": self.db,
+                        "findings": [f.as_dict() for f in findings],
+                        "blockers": sum(1 for f in findings if f.severity == BLOCKER),
+                    },
+                    indent=2,
+                    default=str,
+                )
+            )
+        else:
+            self.report(findings, limit=options["limit"])
+
+        blockers = sum(1 for f in findings if f.severity == BLOCKER)
+        if options["strict"] and blockers:
+            # SystemExit rather than CommandError: the command worked fine, the
+            # data did not. A traceback would misrepresent which one failed.
+            raise SystemExit(1)
+
+    # --- checks ------------------------------------------------------------
+
+    def check_duplicate_slots(self):
+        """Plan 2.8 — `AvailableSlot.unique_together = (user, date, time)`."""
+        dupes = (
+            AvailableSlot.objects.using(self.db)
+            .values("user_id", "date", "time")
+            .annotate(n=Count("id"))
+            .filter(n__gt=1)
+            .order_by("user_id", "date", "time")
+        )
+        rows = []
+        for group in dupes:
+            ids = list(
+                AvailableSlot.objects.using(self.db)
+                .filter(
+                    user_id=group["user_id"], date=group["date"], time=group["time"]
+                )
+                .order_by("id")
+                .values_list("id", flat=True)
+            )
+            rows.append(
+                {
+                    "user_id": group["user_id"],
+                    "user": self.username(group["user_id"]),
+                    "date": str(group["date"]),
+                    "time": str(group["time"]),
+                    "copies": group["n"],
+                    "slot_ids": ids,
+                    "booked_slot_ids": list(
+                        AvailableSlot.objects.using(self.db)
+                        .filter(id__in=ids, is_booked=True)
+                        .values_list("id", flat=True)
+                    ),
+                }
+            )
+        if not rows:
+            return Finding(
+                "duplicate_slots", INFO, "No duplicate availability slots.",
+                blocks="2.8 unique_together",
+            )
+        return Finding(
+            "duplicate_slots",
+            BLOCKER,
+            f"{len(rows)} doctor/date/time combination(s) have more than one AvailableSlot row.",
+            blocks="2.8 — AvailableSlot.unique_together",
+            rows=rows,
+            detail=(
+                "Dedupe before migrating. Keep the row carrying the appointment "
+                "(or the booked one) and delete the rest; `booked_slot_ids` says "
+                "which copies are spoken for. Deleting a copy with no appointment "
+                "is safe."
+            ),
+        )
+
+    def check_slots_with_multiple_appointments(self):
+        """Plan 2.9 — `Appointment.slot` becomes a OneToOneField."""
+        rows = []
+        oversubscribed = (
+            AvailableSlot.objects.using(self.db)
+            .annotate(n=Count("appointment"))
+            .filter(n__gt=1)
+            .order_by("date", "time")
+        )
+        for slot in oversubscribed:
+            rows.append(
+                {
+                    "slot_id": slot.id,
+                    "doctor": self.username(slot.user_id),
+                    "date": str(slot.date),
+                    "time": str(slot.time),
+                    "appointments": [
+                        {
+                            "id": appointment.id,
+                            "bookingID": appointment.bookingID,
+                            "patient": appointment.fullName,
+                            "created_at": str(appointment.created_at),
+                        }
+                        for appointment in Appointment.objects.using(self.db)
+                        .filter(slot=slot)
+                        .order_by("created_at")
+                    ],
+                }
+            )
+        if not rows:
+            return Finding(
+                "multi_appointment_slots", INFO,
+                "No slot holds more than one appointment.",
+                blocks="2.9 OneToOneField",
+            )
+        return Finding(
+            "multi_appointment_slots",
+            BLOCKER,
+            f"{len(rows)} slot(s) hold more than one appointment.",
+            blocks="2.9 — Appointment.slot -> OneToOneField",
+            rows=rows,
+            detail=(
+                "These are real double-bookings (design §10 #6: booking_form never "
+                "reads is_booked). Someone has to decide per slot which patient keeps "
+                "it and what happens to the other — a migration must not pick. Resolve "
+                "by moving the loser to another slot or cancelling it, with the patient "
+                "told either way."
+            ),
+        )
+
+    def check_free_text_choices(self):
+        """Plan 2.10 — closed choice lists on visitType / reasonVisit / gender."""
+        fields = [
+            ("visitType", VISIT_TYPES),
+            ("reasonVisit", REASONS_FOR_VISIT),
+            ("gender", GENDERS),
+        ]
+        rows = []
+        unmappable = 0
+        for field, choices in fields:
+            counts = Counter(
+                Appointment.objects.using(self.db).values_list(field, flat=True)
+            )
+            for value, count in sorted(counts.items(), key=lambda item: -item[1]):
+                mapped = suggest(value, choices)
+                if value in choices:
+                    continue  # already a valid key, nothing to do
+                if mapped is None:
+                    unmappable += 1
+                rows.append(
+                    {
+                        "field": field,
+                        "value": value,
+                        "rows_affected": count,
+                        "maps_to": mapped,
+                    }
+                )
+        if not rows:
+            return Finding(
+                "free_text_choices", INFO,
+                "visitType / reasonVisit / gender already hold only valid choice keys.",
+                blocks="2.10 choices",
+            )
+        severity = REVIEW if unmappable else INFO
+        headline = (
+            f"{len(rows)} stored value(s) are not valid choice keys yet; "
+            f"{unmappable} of them have no obvious mapping."
+        )
+        return Finding(
+            "free_text_choices",
+            severity,
+            headline,
+            blocks="2.10 — choices on visitType / reasonVisit / gender",
+            rows=rows,
+            detail=(
+                "`maps_to` is filled in only where the value differs from a choice "
+                "key by case or spacing. A null `maps_to` needs a person: pick the "
+                "right key, or add one to the list. Note home_collection is no longer "
+                "a reason for visit — it is the PROVIDER_TRAVELS mode (design §5.1)."
+            ),
+        )
+
+    def check_missing_profiles(self):
+        """Plan 0.4 / 2.13 — a doctor with no Profile is invisible to booking."""
+        missing = list(
+            CustomUser.objects.using(self.db)
+            .filter(profile__isnull=True)
+            .order_by("id")
+            .values("id", "username", "role", "is_active")
+        )
+        total = CustomUser.objects.using(self.db).count()
+        doctors_missing = [u for u in missing if u["role"] == CustomUser.Role.DOCTOR]
+        if not missing:
+            return Finding(
+                "missing_profiles", INFO,
+                f"Every account ({total}) has a Profile row.",
+                blocks="2.13 Profile backfill",
+            )
+        return Finding(
+            "missing_profiles",
+            REVIEW if doctors_missing else INFO,
+            f"{len(missing)} of {total} account(s) have no Profile row "
+            f"({len(doctors_missing)} of them role=doctor).",
+            blocks="2.13 — Profile auto-creation signal + backfill",
+            rows=missing,
+            detail=(
+                "Profiles are created lazily by the profile() view, so a doctor who "
+                "never opened their own profile page does not appear on the public "
+                "booking page at all (design §5.3). The role=doctor rows here are "
+                "currently unbookable; the rest are just backfill volume."
+            ),
+        )
+
+    def check_expertise_values(self):
+        """Plan 2.3 / 9.6 — expertise -> Specialty, reported not guessed."""
+        counts = Counter(
+            value
+            for value in Profile.objects.using(self.db).values_list(
+                "expertise", flat=True
+            )
+            if value and value.strip()
+        )
+        if not counts:
+            return Finding(
+                "expertise_values", INFO,
+                "No profile carries an `expertise` value to migrate.",
+                blocks="2.3 expertise -> specialties",
+            )
+        rows = [
+            {"expertise": value, "profiles": count}
+            for value, count in sorted(counts.items(), key=lambda item: -item[1])
+        ]
+        return Finding(
+            "expertise_values",
+            REVIEW,
+            f"{len(rows)} distinct `expertise` value(s) need a Specialty mapping.",
+            blocks="2.3 / 9.6 — expertise -> Profile.specialties",
+            rows=rows,
+            detail=(
+                "Every one of these needs a human to name the Specialty it means "
+                "before the data migration runs. Design §5.5 is explicit that the "
+                "migration must not guess: 'Cardiograph' is an ECG machine, and only "
+                "a person can say it was meant to read Cardiology."
+            ),
+        )
+
+    def check_unknown_roles(self):
+        """Cross-check for the role='4491' class of bug (design §0)."""
+        valid = set(CustomUser.Role.values) | {""}
+        counts = Counter(
+            CustomUser.objects.using(self.db).values_list("role", flat=True)
+        )
+        rows = [
+            {"role": value, "accounts": count}
+            for value, count in counts.items()
+            if value not in valid
+        ]
+        if not rows:
+            return Finding(
+                "unknown_roles", INFO, "All `role` values are valid choices.",
+                blocks="doctor visibility",
+            )
+        return Finding(
+            "unknown_roles",
+            REVIEW,
+            f"{len(rows)} account role value(s) are outside Role.choices.",
+            blocks="doctor visibility on the public booking page",
+            rows=rows,
+            detail=(
+                "`role` gained choices in useraccount migration 0007, but existing "
+                "rows were not re-validated. An account with a role outside the set "
+                "is silently excluded from every role-filtered query, including the "
+                "public doctor list."
+            ),
+        )
+
+    def check_login_lockout_risk(self):
+        """Plan 1.10 — enforcing is_approved at login can lock out live staff."""
+        at_risk = list(
+            CustomUser.objects.using(self.db)
+            .filter(is_active=True, is_approved=False)
+            .order_by("id")
+            .values("id", "username", "email", "role", "is_staff", "is_superuser")
+        )
+        if not at_risk:
+            return Finding(
+                "login_lockout_risk", INFO,
+                "No active account would be locked out by enforcing is_approved.",
+                blocks="1.10 is_approved at login",
+            )
+        return Finding(
+            "login_lockout_risk",
+            REVIEW,
+            f"{len(at_risk)} active account(s) have is_approved=False and would be "
+            f"locked out the moment 1.10 ships.",
+            blocks="1.10 — enforce is_approved at signin()",
+            rows=at_risk,
+            detail=(
+                "signin() checks only is_active today, so the approval flag gates "
+                "nothing and nobody has needed it set. Approve these accounts before "
+                "shipping 1.10, or ship it knowing exactly who has to be let back in."
+            ),
+        )
+
+    def check_slot_booking_flags(self):
+        """Plan 4.4 — is_booked is written but never read, so it can be wrong."""
+        annotated = AvailableSlot.objects.using(self.db).annotate(
+            n=Count("appointment")
+        )
+        booked_but_empty = list(
+            annotated.filter(is_booked=True, n=0)
+            .order_by("date", "time")
+            .values("id", "date", "time")
+        )
+        taken_but_free = list(
+            annotated.filter(is_booked=False, n__gt=0)
+            .order_by("date", "time")
+            .values("id", "date", "time")
+        )
+        if not booked_but_empty and not taken_but_free:
+            return Finding(
+                "slot_booking_flags", INFO,
+                "`is_booked` agrees with the appointments on every slot.",
+                blocks="4.4 real slot claim",
+            )
+        rows = [
+            {"slot_id": r["id"], "date": str(r["date"]), "time": str(r["time"]),
+             "problem": "is_booked=True with no appointment"}
+            for r in booked_but_empty
+        ] + [
+            {"slot_id": r["id"], "date": str(r["date"]), "time": str(r["time"]),
+             "problem": "has an appointment but is_booked=False"}
+            for r in taken_but_free
+        ]
+        return Finding(
+            "slot_booking_flags",
+            REVIEW,
+            f"{len(rows)} slot(s) have an `is_booked` flag that disagrees with reality.",
+            blocks="4.4 — booking_form's real slot claim",
+            rows=rows,
+            detail=(
+                "Nothing reads is_booked today, so nothing has kept it honest. Once "
+                "4.4 starts enforcing it, a stale True hides a genuinely free slot and "
+                "a stale False offers a taken one. Reconcile as part of Phase 4, not "
+                "before — the flag is not load-bearing until then."
+            ),
+        )
+
+    def check_approval_backfill(self):
+        """Plan 2.6 — preview of the status backfill from AppointmentApproval."""
+        total = Appointment.objects.using(self.db).count()
+        approved = AppointmentApproval.objects.using(self.db).filter(
+            is_approved=True
+        ).count()
+        not_approved = AppointmentApproval.objects.using(self.db).filter(
+            is_approved=False
+        ).count()
+        no_approval_row = (
+            Appointment.objects.using(self.db)
+            .filter(appointmentapproval__isnull=True)
+            .count()
+        )
+        rows = [
+            {"outcome": "CONFIRMED", "appointments": approved,
+             "from": "AppointmentApproval.is_approved=True"},
+            {"outcome": "PENDING_TIME", "appointments": not_approved,
+             "from": "AppointmentApproval.is_approved=False"},
+            {"outcome": "PENDING_TIME", "appointments": no_approval_row,
+             "from": "no AppointmentApproval row"},
+        ]
+        return Finding(
+            "approval_backfill",
+            INFO,
+            f"{total} appointment(s) to backfill: {approved} -> CONFIRMED, "
+            f"{not_approved + no_approval_row} -> PENDING_TIME.",
+            blocks="2.6 — backfill status from AppointmentApproval",
+            rows=rows,
+            detail=(
+                "Every CONFIRMED row lands with appointmentMode blank, because the "
+                "old model never held one. That is the intended lossy direction "
+                "(plan 2.6) — do not invent a mode."
+            ),
+        )
+
+    # --- output ------------------------------------------------------------
+
+    def username(self, user_id):
+        user = CustomUser.objects.using(self.db).filter(id=user_id).first()
+        return user.username if user else f"<deleted user {user_id}>"
+
+    def out(self, text, style=None):
+        """Write a line the terminal can actually render.
+
+        Typographic characters are translated first; anything else the target
+        encoding can't take is replaced rather than raising, so a patient name
+        with an accent in it can never crash the audit.
+        """
+        text = str(text).translate(ASCII_FALLBACKS)
+        encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+        text = text.encode(encoding, errors="replace").decode(encoding)
+        self.stdout.write(style(text) if style else text)
+
+    def report(self, findings, limit):
+        style = {
+            BLOCKER: self.style.ERROR,
+            REVIEW: self.style.WARNING,
+            INFO: self.style.SUCCESS,
+        }
+        self.out("")
+        self.out(f"Appointment data audit - database '{self.db}'", self.style.MIGRATE_HEADING)
+        self.out(
+            f"{Appointment.objects.using(self.db).count()} appointments, "
+            f"{AvailableSlot.objects.using(self.db).count()} slots, "
+            f"{CustomUser.objects.using(self.db).count()} accounts."
+        )
+        self.out("")
+
+        for severity in SEVERITY_ORDER:
+            for finding in (f for f in findings if f.severity == severity):
+                self.out(f"[{severity}] {finding.code} - {finding.headline}", style[severity])
+                if finding.blocks:
+                    self.out(f"    blocks: {finding.blocks}")
+                shown = finding.rows if limit == 0 else finding.rows[:limit]
+                for row in shown:
+                    self.out(f"    - {row}")
+                hidden = len(finding.rows) - len(shown)
+                if hidden > 0:
+                    self.out(f"    ... and {hidden} more (use --limit 0)")
+                if finding.detail and severity != INFO:
+                    self.out(f"    {finding.detail}")
+                self.out("")
+
+        blockers = [f for f in findings if f.severity == BLOCKER]
+        reviews = [f for f in findings if f.severity == REVIEW]
+        if blockers:
+            self.out(
+                f"{len(blockers)} blocker(s): Phase 2 migrations will fail on this "
+                f"data until they are resolved.",
+                self.style.ERROR,
+            )
+        elif reviews:
+            self.out(
+                f"No blockers. {len(reviews)} item(s) need a decision before the "
+                f"steps they name.",
+                self.style.WARNING,
+            )
+        else:
+            self.out("Clean: no blockers, nothing awaiting a decision.", self.style.SUCCESS)
+        self.out("")

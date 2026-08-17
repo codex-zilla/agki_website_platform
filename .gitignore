@@ -44,3 +44,6 @@ design/_extract/
 build/
 dist/
 *.egg-info/
+
+# Local pre-migration database/media snapshots (plan 0.2). Never committed.
+/backups/
