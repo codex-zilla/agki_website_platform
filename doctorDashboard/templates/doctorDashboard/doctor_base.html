@@ -802,10 +802,10 @@
                 <span class="menu-item-text">All Appointments</span>
             </a>
 
-            {# Ecommerce is superuser-only (design §4.4). Hidden rather than
+            {% comment %} Ecommerce is superuser-only (design §4.4). Hidden rather than
                shown-and-403'd, so a doctor never sees a control they cannot
                use. The view enforces it independently — this is the courtesy,
-               not the gate. #}
+               not the gate. {% endcomment %}
             {% if user.is_superuser %}
             <!-- eccomerce -->
              <div class="menu-section-title">E-Commerce</div>

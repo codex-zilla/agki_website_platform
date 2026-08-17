@@ -31,6 +31,35 @@ class CustomUser(AbstractUser):
     def __str__(self):
         return f"{self.username} ({self.email})"
 
+class Specialty(models.Model):
+    """What a doctor practises, as a closed set patients can search (§5.5).
+
+    A model rather than `TextChoices` because AGKI must be able to add one
+    without a deploy — a taxonomy that grows, unlike the fixed
+    reason-for-visit list. Lives here rather than in `appointments` because it
+    hangs off `Profile`, and `appointments` already imports this module;
+    the reverse would be a circular import.
+
+    Superuser-managed (design §4.3): it configures how patients find doctors,
+    which is configuration, not shared identity.
+    """
+
+    name = models.CharField(max_length=80, unique=True)
+    slug = models.SlugField(unique=True)
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Uncheck to retire a specialty without deleting it or the links to it.",
+    )
+    order = models.PositiveIntegerField(default=0, help_text="Position in the browse grid.")
+
+    class Meta:
+        verbose_name_plural = "specialties"
+        ordering = ["order", "name"]
+
+    def __str__(self):
+        return self.name
+
+
 class Profile(models.Model):
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
     gender = models.CharField(max_length=20, blank=True, null=True)
@@ -38,6 +67,14 @@ class Profile(models.Model):
     location = models.CharField(max_length=100, blank=True, null=True)
     google_map_embed = models.TextField(blank=True, null=True)
     birth_date = models.DateField(blank=True, null=True)
+    # Many-to-many because a doctor can hold more than one specialty, and
+    # forcing a single value would make someone unfindable under half their
+    # practice.
+    specialties = models.ManyToManyField(Specialty, blank=True, related_name="doctors")
+    # Free text, and it shows the drift that guarantees: the one live value is
+    # "Cardiograph", which is an ECG machine rather than a specialty. Being
+    # replaced by `specialties` above; kept until the mapping is confirmed by
+    # a human (plan 2.3 - see `map_expertise_to_specialties`), then dropped.
     expertise = models.CharField(max_length=255, blank=True, null=True)
     region = models.CharField(max_length=100, blank=True, null=True)
     years_of_experience = models.IntegerField(blank=True, null=True)

@@ -14,6 +14,13 @@ is a command anyone can re-run rather than a shell session someone once did.
 Read-only: it opens no transaction and writes nothing. Safe to run against
 production directly.
 
+**Several checks go permanently quiet once Phase 2 is applied, and that is the
+point.** `duplicate_slots`, `multi_appointment_slots` and `orphan_ratings` ask
+whether the data violates a constraint that does not exist yet; afterwards the
+database enforces each of them, so the questions can only be answered "no". The
+command's job is the window before that, on a production database that has not
+been migrated — which is also why it must never assume the new columns exist.
+
 **Severities.**
 
 ``BLOCKER``  A Phase 2 migration will fail (or silently lose data) until this
@@ -34,9 +41,10 @@ import sys
 from collections import Counter
 
 from django.core.management.base import BaseCommand
+from django.db import connections
 from django.db.models import Count
 
-from appointments.models import Appointment, AppointmentApproval, AvailableSlot
+from appointments.models import Appointment, AppointmentApproval, AvailableSlot, Rating
 from useraccount.models import CustomUser, Profile
 
 # --- proposed choice sets (design §5.1) — see module docstring ---------------
@@ -168,6 +176,7 @@ class Command(BaseCommand):
                 self.check_unknown_roles(),
                 self.check_login_lockout_risk(),
                 self.check_slot_booking_flags(),
+                self.check_orphan_ratings(),
                 self.check_approval_backfill(),
             )
             if check is not None
@@ -514,6 +523,73 @@ class Command(BaseCommand):
                 "4.4 starts enforcing it, a stale True hides a genuinely free slot and "
                 "a stale False offers a taken one. Reconcile as part of Phase 4, not "
                 "before — the flag is not load-bearing until then."
+            ),
+        )
+
+    def check_orphan_ratings(self):
+        """Plan 2.12 — `Rating` gains a mandatory link to an appointment.
+
+        This check exists because the design's premise was wrong. It said
+        nothing in the codebase creates a `Rating`; nothing in the
+        *application* does, but the model was registered in the Django admin,
+        so any superuser could add one by hand — and two turned up in the local
+        database, on a doctor with no appointments. Those rows cannot be given
+        the `appointment` link the new schema requires, so migration 0021
+        refuses to run until someone decides what they are.
+        """
+        # Once 0021 has run, a Rating is attached to an appointment by the
+        # schema itself, so every row is legitimate and there is nothing to
+        # report. Before it runs, no row has a link and all of them block.
+        # Which world we are in is a question about the database, not the
+        # models — hence introspection rather than a query that would raise on
+        # exactly the un-migrated databases this command exists to inspect.
+        with connections[self.db].cursor() as cursor:
+            columns = {
+                column.name
+                for column in connections[self.db].introspection.get_table_description(
+                    cursor, Rating._meta.db_table
+                )
+            }
+        if "appointment_id" in columns:
+            return Finding(
+                "orphan_ratings", INFO,
+                "Rating is linked to appointments by the schema; nothing to check.",
+                blocks="2.12 Rating reshape (already applied)",
+            )
+
+        # Only columns that exist both before and after 0021 are selected:
+        # that migration also renames `doctor` to `provider`, and asking for
+        # the provider here would crash on an un-migrated database. The
+        # migration's own error message names it, where the historical model
+        # still has the old field.
+        rows = [
+            {
+                "id": row["id"],
+                "rating_value": row["rating_value"],
+                "created_at": str(row["created_at"]),
+                "feedback": row["feedback"] or "",
+            }
+            for row in Rating.objects.using(self.db)
+            .order_by("id")
+            .values("id", "rating_value", "created_at", "feedback")
+        ]
+        if not rows:
+            return Finding(
+                "orphan_ratings", INFO, "Rating is empty, as the reshape expects.",
+                blocks="2.12 Rating reshape",
+            )
+        return Finding(
+            "orphan_ratings",
+            BLOCKER,
+            f"{len(rows)} Rating row(s) exist with no appointment to attach them to.",
+            blocks="2.12 — Rating gains a mandatory `appointment` link",
+            rows=rows,
+            detail=(
+                "A rating now belongs to exactly one visit, and these predate "
+                "that link. Almost certainly added by hand in the Django admin. "
+                "If that is what they are, delete them; if any is real patient "
+                "feedback, record what it says first — the new schema has "
+                "nowhere to put an unattached rating."
             ),
         )
 

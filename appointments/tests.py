@@ -17,12 +17,19 @@ found, so a green audit against production means something.
 """
 
 import json
+import re
 from datetime import date, time, timedelta
+from importlib import import_module
 from io import StringIO
 from unittest import mock
 
+from django.apps import apps as django_apps
+from django.contrib.auth.models import Group, Permission
 from django.core.cache import caches
+from django.core.exceptions import ValidationError
 from django.core.management import call_command
+from django.db import IntegrityError
+from django.db.models import ProtectedError
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -31,13 +38,44 @@ from appointments.management.commands.audit_appointment_data import (
     GENDERS,
     REASONS_FOR_VISIT,
     VISIT_TYPES,
+    Command,
+    Finding,
     suggest,
 )
 from appointments.access import has_appointment_access
-from appointments.models import Appointment, AppointmentApproval, AvailableSlot
+from appointments.models import (
+    Appointment,
+    AppointmentApproval,
+    AppointmentSettings,
+    AppointmentTransition,
+    AvailableSlot,
+    Rating,
+)
 from appointments.ratelimit import LOOKUP_LIMIT
 from cms.test_utils import make_staff_user
-from useraccount.models import CustomUser, Profile
+from useraccount.models import CustomUser, Profile, Specialty
+
+# Migration module names start with a digit, so they cannot be imported with
+# `from ... import ...`. The data migrations' decision-making is worth testing
+# directly — see `BackfillLogicTests` for why testing it through `migrate`
+# is not an option once the constraints are in place.
+_m0018 = import_module("appointments.migrations.0018_backfill_status_from_approvals")
+_m0021 = import_module("appointments.migrations.0021_choices_drop_age_reshape_rating")
+backfill_status = _m0018.backfill_status
+normalise_choice_fields = _m0021.normalise_choice_fields
+check_rating_is_empty = _m0021.check_rating_is_empty
+
+
+def set_expertise(user, value):
+    """Set `expertise` on an account's profile.
+
+    A helper rather than `Profile.objects.create(...)` because every account
+    now gets a profile from a `post_save` signal (plan 2.13) — creating a
+    second one raises on the OneToOne. Tests that want a doctor with *no*
+    profile delete it explicitly, which is the honest way to say "this is the
+    pre-backfill state production is still in".
+    """
+    Profile.objects.filter(user=user).update(expertise=value)
 
 
 def run_audit(**options):
@@ -108,46 +146,42 @@ class AppointmentDataAuditTests(TestCase):
         fields.update(overrides)
         return Appointment.objects.create(**fields)
 
-    # --- blockers ----------------------------------------------------------
+    # --- the constraints these blockers were about -------------------------
+    #
+    # The three blocking checks (`duplicate_slots`, `multi_appointment_slots`,
+    # `orphan_ratings`) can no longer be reproduced here, because Phase 2
+    # applied the constraints they were warning about — the database now
+    # refuses to hold the state the audit was looking for. They are kept in
+    # the command for the one production run that happens *before* those
+    # migrations; the proof that they detect the state is in the Phase 0
+    # commit, where the suite was mutation-checked against real duplicate rows.
+    #
+    # What replaces them is stronger: tests that the constraints themselves
+    # hold, which is what the audit was protecting in the first place.
 
-    def test_duplicate_slots_block_the_unique_constraint(self):
+    def test_a_slot_cannot_be_published_twice(self):
         day = timezone.localdate() + timedelta(days=5)
-        first = self.make_slot(day=day, at=time(11, 30))
-        second = AvailableSlot.objects.create(
-            user=self.doctor, date=day, time=time(11, 30), is_booked=True
-        )
+        self.make_slot(day=day, at=time(11, 30))
 
-        payload, findings = run_audit()
-        duplicates = findings["duplicate_slots"]
+        with self.assertRaises(IntegrityError):
+            AvailableSlot.objects.create(
+                user=self.doctor, date=day, time=time(11, 30)
+            )
 
-        self.assertEqual(duplicates["severity"], "BLOCKER")
-        self.assertEqual(duplicates["count"], 1)
-        row = duplicates["rows"][0]
-        self.assertEqual(row["copies"], 2)
-        self.assertEqual(sorted(row["slot_ids"]), sorted([first.id, second.id]))
-        # Which copy is spoken for is the whole reason this row is printed.
-        self.assertEqual(row["booked_slot_ids"], [second.id])
-        self.assertEqual(payload["blockers"], 1)
+    def test_the_same_doctor_can_publish_the_same_time_on_another_day(self):
+        """The constraint is per doctor/date/time, not per time."""
+        self.make_slot(day=timezone.localdate() + timedelta(days=6), at=time(11, 30))
+        self.make_slot(day=timezone.localdate() + timedelta(days=7), at=time(11, 30))
 
-    def test_two_appointments_on_one_slot_block_the_onetoone(self):
-        """`Appointment.slot` is still a ForeignKey, so this is creatable today
-        (design §10 #6) and will break migration 2.9 on real data."""
+    def test_a_slot_cannot_hold_two_appointments(self):
+        """Double-booking was never a race: `booking_form` never read
+        `is_booked`, so two sequential bookings both succeeded (design §10 #6).
+        Now the database refuses the second one outright."""
         slot = self.make_slot()
-        first = self.make_appointment(slot, fullName="First Patient")
-        second = self.make_appointment(slot, fullName="Second Patient")
+        self.make_appointment(slot, fullName="First Patient")
 
-        _, findings = run_audit()
-        oversubscribed = findings["multi_appointment_slots"]
-
-        self.assertEqual(oversubscribed["severity"], "BLOCKER")
-        self.assertEqual(oversubscribed["count"], 1)
-        booked = oversubscribed["rows"][0]["appointments"]
-        self.assertEqual(
-            [entry["bookingID"] for entry in booked],
-            [first.bookingID, second.bookingID],
-        )
-        # Names both patients: someone has to be told their booking moved.
-        self.assertIn("Second Patient", [entry["patient"] for entry in booked])
+        with self.assertRaises(IntegrityError):
+            self.make_appointment(slot, fullName="Second Patient")
 
     def test_a_single_appointment_per_slot_is_not_a_blocker(self):
         self.make_appointment(self.make_slot())
@@ -187,7 +221,7 @@ class AppointmentDataAuditTests(TestCase):
         self.assertEqual(findings["free_text_choices"]["severity"], "INFO")
 
     def test_expertise_values_are_reported_never_guessed(self):
-        Profile.objects.create(user=self.doctor, expertise="Cardiograph")
+        set_expertise(self.doctor, "Cardiograph")
 
         _, findings = run_audit()
         expertise = findings["expertise_values"]
@@ -200,6 +234,12 @@ class AppointmentDataAuditTests(TestCase):
     # --- scope sizing -------------------------------------------------------
 
     def test_doctors_without_a_profile_are_flagged_for_review(self):
+        """The signal now gives every new account a profile (plan 2.13), so
+        this has to be engineered — which is the improvement. The check stays
+        because production has accounts that predate the signal until the
+        backfill migration runs there."""
+        Profile.objects.filter(user=self.doctor).delete()
+
         _, findings = run_audit()
         missing = findings["missing_profiles"]
 
@@ -207,12 +247,23 @@ class AppointmentDataAuditTests(TestCase):
         self.assertIn("dr-audit", [row["username"] for row in missing["rows"]])
 
     def test_a_missing_profile_on_a_non_doctor_is_only_informational(self):
-        Profile.objects.create(user=self.doctor)
-        make_staff_user(username="editor-audit", email="editor-audit@example.com")
+        editor = make_staff_user(username="editor-audit", email="editor-audit@example.com")
+        Profile.objects.filter(user=editor).delete()
 
         _, findings = run_audit()
 
         self.assertEqual(findings["missing_profiles"]["severity"], "INFO")
+
+    def test_a_new_account_gets_a_profile_without_visiting_a_page(self):
+        """Design §5.3: doctor visibility must follow from `role`, never from
+        whether someone once opened their profile page. Three real doctors
+        were invisible to the booking site for exactly that reason."""
+        newcomer = make_staff_user(
+            username="fresh-doctor", email="fresh-doctor@example.com",
+            role=CustomUser.Role.DOCTOR,
+        )
+
+        self.assertTrue(Profile.objects.filter(user=newcomer).exists())
 
     def test_active_unapproved_accounts_are_named_as_a_lockout_risk(self):
         locked_out = make_staff_user(username="pending", email="pending@example.com")
@@ -265,20 +316,26 @@ class AppointmentDataAuditTests(TestCase):
     # --- the gate -----------------------------------------------------------
 
     def test_strict_exits_nonzero_only_when_a_blocker_exists(self):
-        out = StringIO()
-        call_command("audit_appointment_data", "--strict", stdout=out)  # clean: no raise
+        """No blocker is reachable in a migrated database — that is what the
+        constraints are for — so the finding is injected. What is under test
+        is the gate: `--strict` must turn a BLOCKER into a non-zero exit, so a
+        deploy script can stop on it."""
+        call_command("audit_appointment_data", "--strict", stdout=StringIO())  # clean
 
-        slot = self.make_slot()
-        self.make_appointment(slot)
-        self.make_appointment(slot)
+        blocker = Finding("injected", "BLOCKER", "a blocker, for the gate's sake")
+        with mock.patch.object(Command, "check_duplicate_slots", return_value=blocker):
+            with self.assertRaises(SystemExit) as raised:
+                call_command("audit_appointment_data", "--strict", stdout=StringIO())
 
-        with self.assertRaises(SystemExit) as raised:
-            call_command("audit_appointment_data", "--strict", stdout=StringIO())
         self.assertEqual(raised.exception.code, 1)
 
     def test_review_findings_alone_do_not_fail_strict(self):
-        """A doctor with no Profile needs a decision, not a migration halt."""
-        Profile.objects.create(user=self.doctor, expertise="Cardiograph")
+        """An `expertise` value nobody has mapped yet needs a decision before
+        step 2.3, not a halt on every migration in the project."""
+        set_expertise(self.doctor, "Cardiograph")
+
+        _, findings = run_audit()
+        self.assertEqual(findings["expertise_values"]["severity"], "REVIEW")
 
         call_command("audit_appointment_data", "--strict", stdout=StringIO())
 
@@ -570,9 +627,11 @@ class BookingSuccessPageTests(PatientRecordAccessTestCase):
         self.assertNotContains(response, "Asha Mbwana")
 
     def test_the_booking_page_works_for_a_doctor_with_no_profile(self):
-        """Profiles are created lazily, so three doctors in the live database
-        have none. That used to 404 the booking page (design §5.3)."""
-        self.assertFalse(Profile.objects.filter(user=self.doctor).exists())
+        """Used to 404 the booking page (design §5.3). Plan 2.13's signal means
+        this state is no longer reachable by accident, but production still
+        holds accounts that predate the backfill, so the guard stays and is
+        still tested — with the profile removed deliberately."""
+        Profile.objects.filter(user=self.doctor).delete()
         slot = AvailableSlot.objects.create(
             user=self.doctor, date=self.slot.date, time=time(14, 0),
         )
@@ -592,7 +651,7 @@ class PublicPageImageGuardTests(PatientRecordAccessTestCase):
     pages patients see."""
 
     def test_the_doctor_list_renders_for_a_doctor_with_no_photo(self):
-        Profile.objects.create(user=self.doctor, expertise="Cardiology")
+        set_expertise(self.doctor, "Cardiology")
         self.assertFalse(self.doctor.image)
 
         response = self.client.get(reverse("search_results"))
@@ -606,3 +665,607 @@ class PublicPageImageGuardTests(PatientRecordAccessTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, '<img src=""')
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 - data model & migrations
+# ---------------------------------------------------------------------------
+
+
+class AppointmentSettingsTests(TestCase):
+    """Plan 2.1 / design §6.1. One row, superuser-only, with one invariant
+    that matters more than the values themselves."""
+
+    def test_load_returns_the_same_row_every_time(self):
+        self.assertEqual(AppointmentSettings.load().pk, AppointmentSettings.load().pk)
+
+    def test_the_defaults_are_agkis_agreed_values(self):
+        settings_row = AppointmentSettings.load()
+
+        self.assertEqual(settings_row.minimum_booking_notice_minutes, 120)
+        self.assertEqual(settings_row.confirmation_cutoff_minutes, 30)
+
+    def test_notice_shorter_than_the_cutoff_is_rejected(self):
+        """The combination that would make every booking expire on creation:
+        the site would accept a booking and immediately kill it, which reads
+        as "the site is broken" rather than "the setting is wrong"."""
+        settings_row = AppointmentSettings.load()
+        settings_row.minimum_booking_notice_minutes = 15
+        settings_row.confirmation_cutoff_minutes = 30
+
+        with self.assertRaises(ValidationError) as raised:
+            settings_row.full_clean()
+
+        self.assertIn("minimum_booking_notice_minutes", raised.exception.message_dict)
+
+    def test_equal_values_are_rejected_too(self):
+        """Equal leaves a zero-length window to answer in, which is the same
+        failure with a nicer-looking pair of numbers."""
+        settings_row = AppointmentSettings.load()
+        settings_row.minimum_booking_notice_minutes = 30
+        settings_row.confirmation_cutoff_minutes = 30
+
+        with self.assertRaises(ValidationError):
+            settings_row.full_clean()
+
+    def test_the_invariant_cannot_be_bypassed_by_saving_from_code(self):
+        """A validator only the admin form runs is a validator that a
+        management command, a shell session or a fixture walks straight past."""
+        settings_row = AppointmentSettings.load()
+        settings_row.minimum_booking_notice_minutes = 10
+
+        with self.assertRaises(ValidationError):
+            settings_row.save()
+
+    def test_the_windows_are_exposed_as_durations(self):
+        settings_row = AppointmentSettings.load()
+
+        self.assertEqual(settings_row.minimum_booking_notice, timedelta(hours=2))
+        self.assertEqual(settings_row.confirmation_cutoff, timedelta(minutes=30))
+
+
+class AppointmentStateFieldTests(TestCase):
+    """The state machine's data, not its transitions — `transition_to()` is
+    plan 4.1. What matters here is that the columns can hold the flow."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.doctor = make_staff_user(
+            username="state-doctor", email="state-doctor@example.com",
+            role=CustomUser.Role.DOCTOR,
+        )
+
+    def make_appointment(self, **overrides):
+        slot = AvailableSlot.objects.create(
+            user=self.doctor,
+            date=timezone.localdate() + timedelta(days=3),
+            time=overrides.pop("at", time(9, 0)),
+        )
+        fields = {
+            "fullName": "Asha Mbwana", "birthDate": date(1990, 5, 1),
+            "gender": Appointment.Gender.FEMALE, "email": "asha@example.com",
+            "phone": "0712345678", "visitType": Appointment.VisitType.NEW_PATIENT,
+            "reasonVisit": Appointment.ReasonForVisit.LAB_TEST, "slot": slot,
+        }
+        fields.update(overrides)
+        return Appointment.objects.create(**fields)
+
+    def test_a_new_booking_waits_on_the_doctor(self):
+        self.assertEqual(self.make_appointment().status, Appointment.Status.PENDING_TIME)
+
+    def test_the_mode_is_blank_until_round_two(self):
+        """It is not known at booking: the patient chooses it after the doctor
+        confirms the time (design §0.1)."""
+        self.assertEqual(self.make_appointment().appointmentMode, "")
+
+    def test_symptoms_are_optional(self):
+        """The model required them while the form never marked them required."""
+        self.make_appointment().full_clean()
+
+    def test_an_invalid_visit_type_fails_validation(self):
+        appointment = self.make_appointment(visitType="whatever")
+
+        with self.assertRaises(ValidationError) as raised:
+            appointment.full_clean()
+
+        self.assertIn("visitType", raised.exception.message_dict)
+
+    def test_home_collection_is_not_a_reason_for_visit(self):
+        """It is a *mode* now — how the appointment happens, not why it was
+        booked (design §5.1). Someone can book a lab test and agree the
+        provider travels to them; those are independent answers."""
+        self.assertNotIn(
+            "home_collection", [value for value, _ in Appointment.ReasonForVisit.choices]
+        )
+        self.assertIn(
+            "provider_travels", [value for value, _ in Appointment.Mode.choices]
+        )
+
+    def test_the_age_column_is_gone(self):
+        self.assertNotIn("age", [field.name for field in Appointment._meta.get_fields()])
+
+    def test_deleting_a_slot_with_an_appointment_is_refused(self):
+        """CASCADE meant deleting an availability slot silently deleted the
+        patient's appointment and their only record of it."""
+        appointment = self.make_appointment()
+
+        with self.assertRaises(ProtectedError):
+            appointment.slot.delete()
+
+    def test_a_transition_records_who_moved_it_and_when(self):
+        appointment = self.make_appointment()
+
+        AppointmentTransition.objects.create(
+            appointment=appointment,
+            from_status=Appointment.Status.PENDING_TIME,
+            to_status=Appointment.Status.PENDING_MODE,
+            actor=self.doctor,
+        )
+        system = AppointmentTransition.objects.create(
+            appointment=appointment,
+            from_status=Appointment.Status.PENDING_MODE,
+            to_status=Appointment.Status.EXPIRED,
+            note="Patient never chose a mode.",
+        )
+
+        self.assertEqual(appointment.transitions.count(), 2)
+        # actor=None is the system or the patient - nobody with an account.
+        self.assertIsNone(system.actor)
+        self.assertEqual(
+            [t.to_status for t in appointment.transitions.all()],
+            ["pending_mode", "expired"],
+        )
+
+    def test_one_rating_per_appointment(self):
+        appointment = self.make_appointment()
+        Rating.objects.create(appointment=appointment, provider=self.doctor, rating_value=5)
+
+        with self.assertRaises(IntegrityError):
+            Rating.objects.create(
+                appointment=appointment, provider=self.doctor, rating_value=1
+            )
+
+
+class SpecialtyTests(TestCase):
+    """Plan 2.2 / design §5.5 — the taxonomy that makes doctor search real."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.doctor = make_staff_user(
+            username="spec-doctor", email="spec-doctor@example.com",
+            role=CustomUser.Role.DOCTOR,
+        )
+
+    def test_a_doctor_can_hold_more_than_one_specialty(self):
+        """Forcing a single value would make someone unfindable under half
+        their practice."""
+        cardiology = Specialty.objects.create(name="Cardiology", slug="cardiology")
+        pathology = Specialty.objects.create(name="Pathology", slug="pathology")
+        profile = Profile.objects.get(user=self.doctor)
+
+        profile.specialties.add(cardiology, pathology)
+
+        self.assertEqual(profile.specialties.count(), 2)
+        self.assertIn(profile, cardiology.doctors.all())
+
+    def test_specialty_names_are_unique(self):
+        Specialty.objects.create(name="Cardiology", slug="cardiology")
+
+        with self.assertRaises(IntegrityError):
+            Specialty.objects.create(name="Cardiology", slug="cardiology-2")
+
+    def test_the_taxonomy_ships_empty(self):
+        """Seeding it from a migration would be putting words in AGKI's mouth;
+        the real specialties are entered at rollout (step 9.6)."""
+        self.assertEqual(Specialty.objects.count(), 0)
+
+
+class ExpertiseMappingCommandTests(TestCase):
+    """Plan 2.3. The command maps what is unambiguous and refuses the rest —
+    `expertise='Cardiograph'` is an ECG machine, and only a person can say it
+    was meant to read Cardiology."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.doctor = make_staff_user(
+            username="map-doctor", email="map-doctor@example.com",
+            role=CustomUser.Role.DOCTOR,
+        )
+
+    def run_command(self, *args):
+        out = StringIO()
+        call_command("map_expertise_to_specialties", *args, stdout=out)
+        return out.getvalue()
+
+    def test_it_does_nothing_before_the_taxonomy_exists(self):
+        set_expertise(self.doctor, "Cardiology")
+
+        output = self.run_command("--apply")
+
+        self.assertIn("No Specialty rows exist yet", output)
+        self.assertEqual(Profile.objects.get(user=self.doctor).specialties.count(), 0)
+
+    def test_an_exact_match_is_linked(self):
+        Specialty.objects.create(name="Cardiology", slug="cardiology")
+        set_expertise(self.doctor, "  cardiology ")
+
+        self.run_command("--apply")
+
+        self.assertEqual(
+            list(Profile.objects.get(user=self.doctor).specialties.values_list("name", flat=True)),
+            ["Cardiology"],
+        )
+
+    def test_reporting_is_the_default_and_writes_nothing(self):
+        Specialty.objects.create(name="Cardiology", slug="cardiology")
+        set_expertise(self.doctor, "Cardiology")
+
+        output = self.run_command()
+
+        self.assertIn("would link", output)
+        self.assertEqual(Profile.objects.get(user=self.doctor).specialties.count(), 0)
+
+    def test_a_near_miss_is_reported_and_left_alone(self):
+        Specialty.objects.create(name="Cardiology", slug="cardiology")
+        set_expertise(self.doctor, "Cardiograph")
+
+        output = self.run_command("--apply")
+
+        self.assertIn("NEEDS A DECISION", output)
+        self.assertIn("Cardiograph", output)
+        self.assertEqual(Profile.objects.get(user=self.doctor).specialties.count(), 0)
+
+    def test_it_is_safe_to_run_twice(self):
+        Specialty.objects.create(name="Cardiology", slug="cardiology")
+        set_expertise(self.doctor, "Cardiology")
+
+        self.run_command("--apply")
+        output = self.run_command("--apply")
+
+        self.assertIn("already linked", output)
+        self.assertEqual(Profile.objects.get(user=self.doctor).specialties.count(), 1)
+
+
+class BackfillLogicTests(TestCase):
+    """The data migrations' logic, exercised directly.
+
+    These call the migration functions with the live app registry rather than
+    running the migration itself. That tests what the functions decide, not
+    Django's ability to apply an operation — and it is the only way to reach
+    them at all now that the constraints they precede are in place.
+
+    `dedupe_slots` (0019) is the exception and is deliberately untested here:
+    it needs duplicate slots to exist, and the uniqueness constraint it
+    installs makes them unconstructable. Its proof is in the Phase 0 commit,
+    where the audit that finds the same rows was mutation-checked.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.doctor = make_staff_user(
+            username="backfill-doctor", email="backfill-doctor@example.com",
+            role=CustomUser.Role.DOCTOR,
+        )
+
+    def make_appointment(self, at=time(9, 0), **overrides):
+        slot = AvailableSlot.objects.create(
+            user=self.doctor, date=timezone.localdate() + timedelta(days=3), time=at
+        )
+        fields = {
+            "fullName": "Asha Mbwana", "birthDate": date(1990, 5, 1),
+            "gender": "female", "email": "asha@example.com", "phone": "0712345678",
+            "visitType": "new_patient", "reasonVisit": "lab_test", "slot": slot,
+        }
+        fields.update(overrides)
+        return Appointment.objects.create(**fields)
+
+    def test_an_approved_appointment_becomes_confirmed_with_its_history(self):
+        appointment = self.make_appointment()
+        approved_at = timezone.now() - timedelta(days=9)
+        AppointmentApproval.objects.create(
+            appointment=appointment, is_approved=True,
+            approved_by=self.doctor, approved_at=approved_at,
+        )
+
+        backfill_status(django_apps, None)
+
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.status, Appointment.Status.CONFIRMED)
+        self.assertEqual(appointment.time_confirmed_at, approved_at)
+
+        transition = appointment.transitions.get()
+        self.assertEqual(transition.to_status, "confirmed")
+        self.assertEqual(transition.actor, self.doctor)
+        # The seeded row keeps the real approval time. An audit trail claiming
+        # every historic approval happened during a deploy is worse than one
+        # that admits it doesn't know.
+        self.assertEqual(transition.created_at, approved_at)
+
+    def test_an_unapproved_appointment_stays_pending_and_keeps_a_record(self):
+        appointment = self.make_appointment(at=time(10, 0))
+        AppointmentApproval.objects.create(
+            appointment=appointment, is_approved=False, approved_by=self.doctor
+        )
+
+        backfill_status(django_apps, None)
+
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.status, Appointment.Status.PENDING_TIME)
+        self.assertEqual(appointment.transitions.get().to_status, "pending_time")
+
+    def test_a_confirmed_appointment_gets_no_invented_mode(self):
+        """The backfill is lossy in one direction and that is correct: the old
+        model never held a mode, and "we don't know" is a true statement about
+        pre-existing data."""
+        appointment = self.make_appointment(at=time(11, 0))
+        AppointmentApproval.objects.create(
+            appointment=appointment, is_approved=True, approved_by=self.doctor
+        )
+
+        backfill_status(django_apps, None)
+
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.appointmentMode, "")
+
+    def test_an_appointment_with_no_approval_row_is_left_pending(self):
+        appointment = self.make_appointment(at=time(12, 0))
+
+        backfill_status(django_apps, None)
+
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.status, Appointment.Status.PENDING_TIME)
+        self.assertEqual(appointment.transitions.count(), 0)
+
+    def test_case_and_punctuation_drift_is_normalised(self):
+        appointment = self.make_appointment(at=time(13, 0))
+        # .update() bypasses validation, which is how these values got into
+        # the database in the first place.
+        Appointment.objects.filter(pk=appointment.pk).update(
+            visitType="Follow-Up", gender="Male"
+        )
+
+        normalise_choice_fields(django_apps, None)
+
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.visitType, "follow_up")
+        self.assertEqual(appointment.gender, "male")
+
+    def test_a_value_with_no_obvious_meaning_stops_the_migration(self):
+        """`role='4491'` is why: a migration that picks a plausible choice for
+        a value nobody understands reproduces that bug with better
+        formatting."""
+        appointment = self.make_appointment(at=time(14, 0))
+        Appointment.objects.filter(pk=appointment.pk).update(reasonVisit="home collection")
+
+        with self.assertRaises(RuntimeError) as raised:
+            normalise_choice_fields(django_apps, None)
+
+        self.assertIn("home collection", str(raised.exception))
+        self.assertIn("role='4491'", str(raised.exception))
+
+    def test_a_rating_with_no_appointment_stops_the_reshape(self):
+        """The design said nothing ever creates a Rating. The admin did, and
+        two orphan rows were sitting in the database when this migration came
+        to give the model a mandatory link to a visit."""
+        appointment = self.make_appointment(at=time(15, 0))
+        Rating.objects.create(appointment=appointment, provider=self.doctor, rating_value=4)
+
+        with self.assertRaises(RuntimeError) as raised:
+            check_rating_is_empty(django_apps, None)
+
+        self.assertIn("belongs to exactly", str(raised.exception))
+
+
+class ConfigurationIsSuperuserOnlyTests(TestCase):
+    """Design §4.3, binding: the CMS's Content Editors group must never gain
+    control over booking or clinical data. Asserted rather than remembered —
+    a future `makemigrations` or a well-meaning "grant all" would otherwise
+    undo it silently."""
+
+    PROTECTED_APPS = ("appointments", "doctorDashboard", "ecommerce")
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.editor = make_staff_user(
+            username="cfg-editor", email="cfg-editor@example.com", is_staff=True
+        )
+        cls.editor.groups.add(Group.objects.get(name="Content Editors"))
+        cls.superuser = CustomUser.objects.create_superuser(
+            username="cfg-root", email="cfg-root@example.com", password="test-pass-12345"
+        )
+
+    def test_content_editors_hold_no_permissions_on_the_protected_apps(self):
+        held = (
+            Group.objects.get(name="Content Editors")
+            .permissions.filter(content_type__app_label__in=self.PROTECTED_APPS)
+            .values_list("content_type__app_label", "codename")
+        )
+
+        self.assertEqual(list(held), [])
+
+    def test_content_editors_hold_no_permissions_on_the_specialty_taxonomy(self):
+        """It lives in `useraccount`, so an app-label check would miss it, and
+        it configures how patients find doctors — configuration, not identity."""
+        held = (
+            Group.objects.get(name="Content Editors")
+            .permissions.filter(codename__endswith="specialty")
+            .values_list("codename", flat=True)
+        )
+
+        self.assertEqual(list(held), [])
+
+    def test_an_editor_cannot_open_appointment_settings(self):
+        self.client.force_login(self.editor)
+
+        response = self.client.get("/admin/appointments/appointmentsettings/")
+
+        self.assertIn(response.status_code, (302, 403))
+
+    def test_an_editor_cannot_open_the_specialty_admin(self):
+        self.client.force_login(self.editor)
+
+        response = self.client.get("/admin/useraccount/specialty/")
+
+        self.assertIn(response.status_code, (302, 403))
+
+    def test_a_superuser_can(self):
+        """The other half of the assertion: this is a boundary, not a wall."""
+        self.client.force_login(self.superuser)
+
+        self.assertEqual(self.client.get("/admin/useraccount/specialty/").status_code, 200)
+
+    def test_the_gate_holds_even_when_the_permission_is_granted(self):
+        """The two tests above pass on an ordinary ModelAdmin, because the
+        group simply has no permission — which is what a future "grant all"
+        would change. This is the one that tests the gate itself: with the
+        permission explicitly granted, a non-superuser still cannot get in.
+
+        Found by mutation-checking: removing `SuperuserOnlyAdmin` from the
+        specialty admin broke nothing until this existed.
+        """
+        for codename in ("view_specialty", "change_specialty"):
+            self.editor.user_permissions.add(
+                Permission.objects.get(codename=codename)
+            )
+        self.editor.user_permissions.add(
+            Permission.objects.get(codename="change_appointmentsettings")
+        )
+        editor = CustomUser.objects.get(pk=self.editor.pk)  # drop the perm cache
+        self.client.force_login(editor)
+
+        self.assertTrue(editor.has_perm("useraccount.change_specialty"))
+        self.assertIn(self.client.get("/admin/useraccount/specialty/").status_code, (302, 403))
+        self.assertIn(
+            self.client.get("/admin/appointments/appointmentsettings/").status_code,
+            (302, 403),
+        )
+
+    def test_the_audit_trail_cannot_be_edited(self):
+        """"Who confirmed this and when" is worth nothing if anyone can revise
+        the answer."""
+        self.client.force_login(self.superuser)
+
+        response = self.client.get("/admin/appointments/appointmenttransition/add/")
+
+        self.assertIn(response.status_code, (302, 403))
+
+
+class BookingFormOptionsMatchTheModelTests(TestCase):
+    """Plan 2.10, the half that is easy to forget: closing the choice list on
+    the model is only half a fix if the form the public uses still offers
+    something else.
+
+    It did. This form posted visitType="first" and reasonVisit="routine",
+    "symptoms", "medication" - MediBook's list, hand-typed into the template
+    and never reconciled with the model. Every one of those would have been
+    rejected the moment the choices landed, which is to say booking would have
+    broken on the day this phase shipped.
+    """
+
+    LEGACY_VALUES = ("first", "followup", "routine", "symptoms", "medication", "test-results")
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.doctor = make_staff_user(
+            username="opt-doctor", email="opt-doctor@example.com",
+            role=CustomUser.Role.DOCTOR,
+        )
+        cls.slot = AvailableSlot.objects.create(
+            user=cls.doctor, date=timezone.localdate() + timedelta(days=3), time=time(9, 0)
+        )
+
+    def rendered(self):
+        return self.client.get(
+            reverse("booking_form", kwargs={"id": self.slot.pk})
+        ).content.decode()
+
+    def offered(self, html, field):
+        if field == "visitType":
+            return set(re.findall(r'name="visitType" value="([^"]+)"', html))
+        block = re.search(rf'<select[^>]*name="{field}".*?</select>', html, re.S).group(0)
+        return {value for value in re.findall(r'<option value="([^"]*)"', block) if value}
+
+    def test_the_form_offers_exactly_the_values_the_model_accepts(self):
+        html = self.rendered()
+
+        for field, choices in (
+            ("gender", Appointment.Gender),
+            ("visitType", Appointment.VisitType),
+            ("reasonVisit", Appointment.ReasonForVisit),
+        ):
+            with self.subTest(field=field):
+                self.assertEqual(self.offered(html, field), set(choices.values))
+
+    def test_no_medibook_value_survives(self):
+        html = self.rendered()
+
+        for legacy in self.LEGACY_VALUES:
+            with self.subTest(value=legacy):
+                self.assertNotIn(f'value="{legacy}"', html)
+
+    def test_a_booking_made_with_the_offered_values_is_accepted(self):
+        """The end of the chain: what the page offers, the server takes."""
+        html = self.rendered()
+        payload = {
+            "fullName": "Asha Mbwana", "birthDate": "1990-05-01",
+            "email": "asha@example.com", "phone": "0712345678",
+            "symptoms": "",
+            "gender": sorted(self.offered(html, "gender"))[0],
+            "visitType": sorted(self.offered(html, "visitType"))[0],
+            "reasonVisit": sorted(self.offered(html, "reasonVisit"))[0],
+        }
+
+        response = self.client.post(
+            reverse("booking_form", kwargs={"id": self.slot.pk}), payload
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Appointment.objects.filter(slot=self.slot).exists())
+
+
+class TemplateCommentHygieneTests(TestCase):
+    """Django's one-line comment syntax is exactly that: one line.
+
+    The template lexer's token regex is not DOTALL, so a comment spanning two
+    lines is not recognised as a comment at all — it renders to the page as
+    literal text, explanation and all. Multi-line notes need the block comment
+    tag instead.
+
+    This is here because it happened. Several explanatory notes added while
+    closing the security holes were being served to visitors, including one
+    describing the verification field on the booking-ID lookup form. A page
+    that explains its own security reasoning to the public is not the worst
+    outcome imaginable, but it is not the intended one — and nothing caught
+    it, because a template comment that fails to be a comment still renders a
+    valid page.
+
+    Scans every app's templates, not just this one's: the mistake belongs to
+    the syntax, not to any app.
+    """
+
+    def test_no_template_comment_spans_more_than_one_line(self):
+        import re
+        from pathlib import Path
+
+        from django.conf import settings
+
+        pattern = re.compile(r"\{#((?:(?!#\}).)*?)#\}", re.S)
+        root = Path(settings.BASE_DIR)
+        offenders = []
+
+        for path in root.rglob("*.html"):
+            if ".venv" in path.parts or "site-packages" in path.parts:
+                continue
+            source = path.read_text(encoding="utf-8")
+            for match in pattern.finditer(source):
+                if "\n" in match.group(1):
+                    line = source[: match.start()].count("\n") + 1
+                    offenders.append(f"{path.relative_to(root)}:{line}")
+
+        self.assertEqual(
+            offenders,
+            [],
+            "These one-line template comments span multiple lines and will "
+            "render to the page as visible text. Use a block comment tag "
+            "instead: " + ", ".join(offenders),
+        )

@@ -6,7 +6,11 @@ from django.shortcuts import get_object_or_404, redirect, render
 from appointments.forms import AppointmentForm
 from useraccount.models import CustomUser, Profile
 from .access import grant_appointment_access, has_appointment_access
-from .models import Appointment, AppointmentApproval, AppointmentNote, AvailableSlot, Rating
+# `Rating` is deliberately not imported: its three read sites are gone
+# (decision 7, design §5.4). The model stays, reshaped, for when feedback is
+# built — reading an empty table was what produced the permanent "No ratings
+# yet" the old pages showed as though it were a measurement.
+from .models import Appointment, AppointmentApproval, AppointmentNote, AvailableSlot
 from .ratelimit import lookup_is_rate_limited
 
 # One message for every way a lookup can fail — wrong booking ID, wrong
@@ -50,33 +54,12 @@ def search_results(request):
             'slots_by_date': dict(slots_by_date)
         })
 
-    # Doctor rating and recommended percentage calculation
-    for doctor_data in doctors_data:
-        ratings = Rating.objects.filter(doctor=doctor_data['doctor'].user)
-        rating_count = ratings.count()
+    # Ratings are not computed here any more (decision 7, design §5.4).
+    # Nothing has ever written a `Rating`, so every average this produced was
+    # a fixed "No ratings yet" dressed up as a measurement. The model is kept
+    # and reshaped for when feedback is actually built; until then, showing
+    # nothing is more honest than showing a placeholder that looks like data.
 
-        if rating_count > 0:
-            # Calculate average rating
-            total_rating = sum(r.rating_value for r in ratings)
-            average_rating = total_rating / rating_count
-
-            # Calculate recommendation percentage
-            recommended_count = ratings.filter(recommended=True).count()
-            recommended_percentage = (recommended_count / rating_count) * 100
-
-            doctor_data['rating'] = {
-                'average_rating': round(average_rating, 1),
-                'total_reviews': rating_count,
-                'recommended_percentage': round(recommended_percentage, 1)
-            }
-        else:
-            doctor_data['rating'] = {
-                'average_rating': 'No ratings yet',
-                'total_reviews': 0,
-                'recommended_percentage': 0
-            }
-
-    
     context = {
         'doctors_data': doctors_data,
         'date_range': date_range,
@@ -88,20 +71,7 @@ def search_results(request):
 def booking_form(request, id):
     # Get the selected slot
     slot = get_object_or_404(AvailableSlot, id=id)
-    rating = Rating.objects.filter(doctor=slot.user)
-    rating_count = rating.count()
-    if rating.exists():
-        average_rating = sum(r.rating_value for r in rating) / rating_count
-        rating = {
-            'average_rating': round(average_rating, 1),
-            'total_reviews': rating.count()
-        }
-    else:
-        rating = {
-            'average_rating': 'No ratings yet',
-            'total_reviews': 0
-        }
-    
+
     # Get the doctor's profile. A missing Profile must not 404 the booking
     # page: profiles are created lazily, so three of the doctors in the
     # current database have none (design §5.3, and see plan 1.1's note). The
@@ -130,10 +100,8 @@ def booking_form(request, id):
         'slot': slot,
         'doctor': doctor,
         'form':form,
-        'rating': rating,
-        'rating_count': rating_count,
     }
-    
+
     return render(request, 'appointments/booking_form.html', context)
 
 def _appointment_for_reader(request, booking_id):
@@ -239,26 +207,11 @@ def appointment_detail(request, booking_id):
     profile = Profile.objects.filter(user=appointment.slot.user).first()
     appointment_approval = AppointmentApproval.objects.filter(appointment=appointment).first()
     appointment_notes = AppointmentNote.objects.filter(appointment=appointment).order_by('-created_at')
-    rating = Rating.objects.filter(doctor=appointment.slot.user)
-    rating_count = rating.count()
-    if rating.exists():
-        average_rating = sum(r.rating_value for r in rating) / rating_count
-        rating = {
-            'average_rating': round(average_rating, 1),
-            'total_reviews': rating.count()
-        }
-    else:
-        rating = {
-            'average_rating': 'No ratings yet',
-            'total_reviews': 0
-        }
     context = {
         'appointment': appointment,
         'profile': profile,
         'appointment_approval': appointment_approval,
         'appointment_notes': appointment_notes,
-        'rating': rating,
-        'rating_count': rating_count,
     }
     return render(request, 'appointments/appointment_detail.html', context)
 

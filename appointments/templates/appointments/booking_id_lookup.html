@@ -536,8 +536,8 @@
                         </div>
                     </div>
 
-                    {# Second factor, per design §8.1. A booking ID on its own
-                       is a five-digit number and is not treated as a secret. #}
+                    {% comment %} Second factor, per design §8.1. A booking ID on its own
+                       is a five-digit number and is not treated as a secret. {% endcomment %}
                     <div class="form-group">
                         <label for="verification" class="form-label">
                             Phone number or date of birth <span class="required">*</span>

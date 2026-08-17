@@ -739,14 +739,16 @@
                                     <i class="fas fa-map-marker-alt"></i>
                                     {{ doctor_data.doctor.location }}
                                 </div>
+                                {% comment %} The rating and "% Recommend" stats are gone
+                                   (decision 7): both were computed from a table
+                                   nothing has ever written to, so they were a
+                                   fixed placeholder wearing the clothes of a
+                                   measurement. The rating *filter* in the
+                                   sidebar goes with the search rebuild (4.2). {% endcomment %}
                                 <div class="doctor-stats">
                                     <div class="stat-item">
-                                        <i class="fas fa-star rating"></i>
-                                        <span><strong>{{doctor_data.rating.average_rating}}</strong> ({{doctor_data.rating.total_reviews}} reviews)</span>
-                                    </div>
-                                    <div class="stat-item">
-                                        <i class="fas fa-user-check"></i>
-                                        <span>{{doctor_data.rating.recommended_percentage}}% Recommend</span>
+                                        <i class="fas fa-briefcase"></i>
+                                        <span>{{ doctor_data.doctor.years_of_experience }} years experience</span>
                                     </div>
                                 </div>
                                 <div style="margin-top: 0.75rem;">

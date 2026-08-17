@@ -619,10 +619,18 @@
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label class="form-label">Gender <span class="required">*</span></label>
+                                {% comment %} Options come from the model's choices, not from
+                                   hand-written <option> tags. The hand-written
+                                   ones had drifted: this form posted
+                                   visitType="first" and reasonVisit="routine",
+                                   neither of which is a value the model
+                                   accepts. A list typed in two places is a list
+                                   that disagrees with itself (design §5.1). {% endcomment %}
                                 <select class="form-select" id="gender" name="gender" required>
                                     <option value="">Select gender</option>
-                                    <option value="male">Male</option>
-                                    <option value="female">Female</option>
+                                    {% for value, label in form.fields.gender.choices %}{% if value %}
+                                    <option value="{{ value }}" {% if form.gender.value == value %}selected{% endif %}>{{ label }}</option>
+                                    {% endif %}{% endfor %}
                                 </select>
                             </div>
                         </div>
@@ -643,35 +651,33 @@
                     <div class="form-group">
                         <label class="form-label">Visit Type <span class="required">*</span></label>
                         <div class="radio-group">
+                            {% for value, label in form.fields.visitType.choices %}{% if value %}
                             <label class="radio-option">
-                                <input type="radio" name="visitType" value="first" required>
+                                <input type="radio" name="visitType" value="{{ value }}"
+                                       {% if forloop.first %}required{% endif %}
+                                       {% if form.visitType.value == value %}checked{% endif %}>
                                 <div class="option-content">
-                                    <div class="option-title">First Visit</div>
-                                    <div class="option-description">This is my first appointment with this doctor</div>
+                                    <div class="option-title">{{ label }}</div>
                                 </div>
                             </label>
-                            <label class="radio-option">
-                                <input type="radio" name="visitType" value="followup">
-                                <div class="option-content">
-                                    <div class="option-title">Follow-up Visit</div>
-                                    <div class="option-description">I've seen this doctor before</div>
-                                </div>
-                            </label>
+                            {% endif %}{% endfor %}
                         </div>
                     </div>
 
                     <!-- Reason for Visit -->
                     <div class="form-group">
                         <label class="form-label">Reason for Visit <span class="required">*</span></label>
+                        {% comment %} "Routine Checkup", "Specific Symptoms" and
+                           "Medication Management" are gone with the MediBook
+                           template they came from; the list is AGKI's, and it
+                           lives on the model. Note "home sample collection" is
+                           deliberately not here — it is *how* the appointment
+                           happens, chosen in round 2, not why it was booked. {% endcomment %}
                         <select class="form-select" id="reasonVisit" name="reasonVisit" required>
                             <option value="">Select reason</option>
-                            <option value="routine">Routine Checkup</option>
-                            <option value="consultation">Consultation</option>
-                            <option value="followup">Follow-up</option>
-                            <option value="symptoms">Specific Symptoms</option>
-                            <option value="test-results">Test Results Review</option>
-                            <option value="medication">Medication Management</option>
-                            <option value="other">Other</option>
+                            {% for value, label in form.fields.reasonVisit.choices %}{% if value %}
+                            <option value="{{ value }}" {% if form.reasonVisit.value == value %}selected{% endif %}>{{ label }}</option>
+                            {% endif %}{% endfor %}
                         </select>
                     </div>
 
@@ -799,9 +805,7 @@
                     <div class="doctor-summary-info">
                         <div class="doctor-name-small">Dr. {{slot.user.first_name}} {{slot.user.last_name}}</div>
                         <div class="doctor-specialty-small">{{doctor.expertise}}</div>
-                        <div style="color: #ffc107; font-size: 0.9rem; margin-top: 0.25rem;">
-                            ⭐ {{rating.average_rating}} ({{rating.total_reviews}} reviews)
-                        </div>
+                        {# Rating removed (decision 7) - see appointment_detail.html #}
                     </div>
                 </div>
 
@@ -1107,23 +1111,10 @@
             }, 2000);
         });
 
-        // Auto-fill demo data (for testing - remove in production)
-        function fillDemoData() {
-            document.getElementById('fullName').value = 'John Doe';
-            document.getElementById('dob').value = '1990-05-15';
-            document.getElementById('gender').value = 'male';
-            document.getElementById('email').value = 'john.doe@example.com';
-            document.getElementById('phone').value = '+1 (555) 123-4567';
-            document.querySelector('input[name="visitType"][value="first"]').checked = true;
-            document.querySelector('input[name="visitType"][value="first"]').closest('.radio-option').classList.add('selected');
-            document.getElementById('reasonVisit').value = 'consultation';
-            document.getElementById('symptoms').value = 'Experiencing chest pain and shortness of breath during exercise.';
-            document.querySelector('input[name="allergies"][value="none"]').checked = true;
-            document.querySelector('input[name="allergies"][value="none"]').closest('.checkbox-option').classList.add('selected');
-        }
-
-        // Uncomment to auto-fill demo data for testing
-        // fillDemoData();
+        // `fillDemoData()` removed: dead demo code from the MediBook template
+        // ("John Doe", a US phone number), never called, and it selected
+        // visitType="first" — a value the model no longer accepts. Anyone who
+        // had uncommented it would have got a TypeError on a null element.
 
         // Smooth scroll to first error
         bookingForm.addEventListener('invalid', function(e) {

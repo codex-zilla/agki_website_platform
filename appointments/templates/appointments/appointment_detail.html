@@ -916,9 +916,10 @@
                         <div class="doctor-info">
                             <h4>{{ appointment.slot.user.get_full_name }}</h4>
                             <div class="doctor-specialty">{{profile.expertise}} • {{profile.years_of_experience}} years experience</div>
-                            <div class="doctor-rating">
-                                ⭐⭐⭐⭐⭐ {{rating.average_rating}} ({{rating_count}} reviews)
-                            </div>
+                            {% comment %} Rating display removed (decision 7): the table it
+                               read from has never had a row written to it, so
+                               this always rendered five stars and "No ratings
+                               yet" next to them. {% endcomment %}
                         </div>
                     </div>
 

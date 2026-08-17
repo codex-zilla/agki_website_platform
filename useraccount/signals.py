@@ -4,7 +4,26 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.urls import reverse
 from django.utils import timezone
-from .models import OtpToken, CustomUser
+from .models import OtpToken, CustomUser, Profile
+
+
+@receiver(post_save, sender=settings.AUTH_USER_MODEL)
+def create_profile(sender, instance, created, **kwargs):
+    """Every account gets a Profile at creation (design §5.3).
+
+    They used to be created lazily by the `profile()` view, which meant a
+    doctor who had never opened their own profile page was **invisible to the
+    public booking site** — `search_results` iterates Profile rows, so no
+    profile meant no listing, no matter what their role said. Three real
+    accounts were in that state.
+
+    `get_or_create` rather than `create` because this fires for every save
+    where `created` is True, including fixtures and the data migration's own
+    accounts, and a duplicate would raise on the OneToOne.
+    """
+    if created:
+        Profile.objects.get_or_create(user=instance)
+
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
 def create_token(sender, instance, created, **kwargs):

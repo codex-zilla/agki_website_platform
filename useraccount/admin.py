@@ -47,5 +47,55 @@ class CustomUserAdmin(UserAdmin):
             OtpToken.objects.filter(user=obj).delete()
 
 
+class SuperuserOnlyAdmin(admin.ModelAdmin):
+    """Visible and editable only to superusers (design §4.3, binding).
+
+    Not merely "we didn't grant the Content Editors group these permissions".
+    That is true too — `cms/migrations/0003_content_editors_group.py`
+    enumerates that group's permissions and nothing here is in the list — but
+    it relies on nobody ever running a well-meaning "grant all". This makes
+    the rule code, so granting the permission is not enough to get in.
+
+    Used for booking *configuration*: appointment settings, the specialty
+    taxonomy. Note `cms.SiteSettings` is deliberately **not** in this
+    category — shared company identity stays with the CMS editors (decision
+    6). The boundary is identity vs. configuration, not which app renders it.
+    """
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+
+@admin.register(Specialty)
+class SpecialtyAdmin(SuperuserOnlyAdmin):
+    """The taxonomy patients search doctors by (§5.5).
+
+    Intentionally empty until AGKI names their real specialties (step 9.6) —
+    seeding it from here, or from a migration, would be putting words in their
+    mouth and creating rows somebody then has to hunt down.
+    """
+
+    list_display = ("name", "slug", "is_active", "order", "doctor_count")
+    list_editable = ("is_active", "order")
+    search_fields = ("name",)
+    prepopulated_fields = {"slug": ("name",)}
+
+    @admin.display(description="doctors")
+    def doctor_count(self, obj):
+        return obj.doctors.count()
+
+
 admin.site.register(OtpToken)
 admin.site.register(Profile)
