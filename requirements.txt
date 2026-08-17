@@ -12,6 +12,10 @@ django-jazzmin==3.0.5
 djangorestframework==3.16.1
 djangorestframework_simplejwt==5.5.1
 idna==3.11
+# MySQL driver for the cPanel-hosted database. If this fails to build on the
+# host (missing MySQL development headers), install PyMySQL instead - the shim
+# in project/__init__.py makes either one work, and nothing else changes.
+mysqlclient==2.2.4
 pillow==11.3.0
 pycparser==2.23
 PyJWT==2.11.0

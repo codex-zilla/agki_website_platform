@@ -1,0 +1,20 @@
+{% comment %}
+To the doctor being booked, not a central AGKI inbox (decision 8): this
+platform hosts doctors from other organisations, who cannot be expected to
+watch somebody else's dashboard for work that belongs to them.
+{% endcomment %}Hello {{ provider.get_full_name|default:provider.username }},
+
+{{ appointment.fullName }} has requested an appointment with you:
+
+  Date:    {{ slot_date }}
+  Time:    {{ slot_time }}
+  Reason:  {{ appointment.get_reasonVisit_display }}
+  Booking: {{ booking_id }}
+
+Please confirm or decline the time. If nothing is confirmed, the appointment
+is released automatically shortly before the slot and the patient is told it
+did not go ahead.
+
+  {{ dashboard_url }}
+
+AGKI Medical Laboratory

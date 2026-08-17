@@ -167,6 +167,27 @@ DATABASES = {
     )
 }
 
+if DATABASES["default"]["ENGINE"].endswith("mysql"):
+    # Two settings that MySQL gets wrong by default, both silently.
+    #
+    # `utf8mb4` is the only charset in MySQL that stores the whole of Unicode.
+    # The one confusingly named `utf8` is a three-byte subset that cannot hold
+    # an emoji or several scripts, and inserting one either errors or truncates
+    # depending on the mode below.
+    #
+    # `STRICT_TRANS_TABLES` is the mode Django's own deployment docs ask for.
+    # Without it MySQL silently truncates a value too long for its column and
+    # carries on — a patient's name quietly cut to 100 characters, with no
+    # error anywhere. Django validates lengths itself, but only for data that
+    # arrives through a form; a management command or a data migration writes
+    # straight past that.
+    DATABASES["default"].setdefault("OPTIONS", {}).update(
+        {
+            "charset": "utf8mb4",
+            "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
+        }
+    )
+
 # Two caches, because the two things being cached want opposite properties
 # (pre-flight decision 0.5).
 #
@@ -348,6 +369,23 @@ EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 DEFAULT_FROM_EMAIL = os.getenv(
     "DEFAULT_FROM_EMAIL",
     EMAIL_HOST_USER or "webmaster@localhost",
+)
+
+# How appointment notifications are delivered.
+#
+#   "queued"    - notify() writes NotificationLog rows and returns; the cron
+#                 job `send_pending_notifications` delivers them. A patient
+#                 submitting a booking never waits on an SMTP handshake, and a
+#                 mail server having a bad afternoon cannot fail a booking that
+#                 has already been recorded.
+#   "immediate" - send inline, on transaction commit. The default outside
+#                 production so a developer sees the message in their console
+#                 without running cron.
+#
+# ROLLOUT: "queued" does nothing at all without the cron entry — see plan 3.7
+# and 9.12. That is the one failure mode of this design, and it is silent.
+NOTIFICATIONS_DELIVERY = os.getenv(
+    "NOTIFICATIONS_DELIVERY", "queued" if IS_PRODUCTION else "immediate"
 )
 
 if IS_PRODUCTION and EMAIL_BACKEND.endswith("smtp.EmailBackend"):

@@ -20,6 +20,10 @@ htmlcov/
 # Django runtime and deployment output
 /db.sqlite3
 /db.sqlite3-*
+# Copies of the live database pulled down for inspection. Real accounts and
+# email addresses - never commit one.
+/deployed_copy_db.sqlite3
+/*.sqlite3
 /media/
 /static/
 /public/

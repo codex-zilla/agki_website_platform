@@ -274,16 +274,20 @@ class Command(BaseCommand):
                     "doctor": self.username(slot.user_id),
                     "date": str(slot.date),
                     "time": str(slot.time),
+                    # Named columns only, for the same reason as `username()`:
+                    # the Appointment model declares `status`, `meeting_url`
+                    # and friends, none of which exist before migration 0017.
                     "appointments": [
                         {
-                            "id": appointment.id,
-                            "bookingID": appointment.bookingID,
-                            "patient": appointment.fullName,
-                            "created_at": str(appointment.created_at),
+                            "id": row["id"],
+                            "bookingID": row["bookingID"],
+                            "patient": row["fullName"],
+                            "created_at": str(row["created_at"]),
                         }
-                        for appointment in Appointment.objects.using(self.db)
+                        for row in Appointment.objects.using(self.db)
                         .filter(slot=slot)
                         .order_by("created_at")
+                        .values("id", "bookingID", "fullName", "created_at")
                     ],
                 }
             )
@@ -632,8 +636,19 @@ class Command(BaseCommand):
     # --- output ------------------------------------------------------------
 
     def username(self, user_id):
-        user = CustomUser.objects.using(self.db).filter(id=user_id).first()
-        return user.username if user else f"<deleted user {user_id}>"
+        # `.values_list` rather than fetching the object: loading a CustomUser
+        # selects every column the *model* declares, including ones added by
+        # migrations the target database has not run yet. Production is two
+        # apps behind, so `SELECT *` here raised "no such column:
+        # qualifications" and took the whole audit down — on exactly the
+        # un-migrated database this command exists to inspect.
+        name = (
+            CustomUser.objects.using(self.db)
+            .filter(id=user_id)
+            .values_list("username", flat=True)
+            .first()
+        )
+        return name or f"<deleted user {user_id}>"
 
     def out(self, text, style=None):
         """Write a line the terminal can actually render.

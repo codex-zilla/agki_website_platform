@@ -234,22 +234,45 @@ class Rating(models.Model):
 
 
 class NotificationLog(models.Model):
-    """One row per attempted send (design §9.1).
+    """One row per message: the outbox **and** the audit trail (design §9.1).
 
     "Did the patient ever get told?" is an operational question that gets asked
     about real appointments, and "check the mail server logs" is not an answer
-    anyone at AGKI can act on. Also makes a retry possible without guessing
-    what was already sent.
+    anyone at AGKI can act on. So the message itself is stored, not just the
+    fact of it — `subject` and `body` are what was actually sent, which is a
+    different and more useful question than what a template would render today.
+
+    It doubles as the queue. A row starts `PENDING`; `send_pending_notifications`
+    (cron, every minute) delivers it and moves it to `SENT` or `FAILED`. That
+    indirection exists because the alternative is talking to an SMTP server
+    inside the request that a patient is waiting on: a slow mail host makes
+    booking feel broken, and a mail host that is down makes booking *be*
+    broken, for something that is not part of booking at all.
     """
+
+    MAX_ATTEMPTS = 3
 
     class Channel(models.TextChoices):
         EMAIL = "email", "Email"
         SMS = "sms", "SMS"
 
     class Status(models.TextChoices):
+        PENDING = "pending", "Queued"
+        # Claimed by a delivery run and not yet resolved. Exists so two
+        # overlapping cron runs cannot both send the same message: the claim
+        # is an atomic PENDING -> SENDING transition, and only one caller can
+        # win it. Counting attempts alone was not enough — a run starting
+        # while another was mid-send would read the row, see it still pending,
+        # and deliver it a second time.
+        SENDING = "sending", "Sending"
         SENT = "sent", "Sent"
         FAILED = "failed", "Failed"
         SKIPPED = "skipped", "Skipped"
+
+    #: A row left in SENDING for longer than this was almost certainly
+    #: abandoned — Passenger starts and kills application processes as it
+    #: pleases, so a run can die mid-send. Such rows go back to PENDING.
+    STALE_CLAIM = timezone.timedelta(minutes=15)
 
     appointment = models.ForeignKey(
         Appointment, on_delete=models.CASCADE, related_name="notifications",
@@ -258,12 +281,26 @@ class NotificationLog(models.Model):
     event = models.CharField(max_length=50)
     recipient = models.CharField(max_length=255)
     channel = models.CharField(max_length=10, choices=Channel.choices)
-    status = models.CharField(max_length=10, choices=Status.choices)
+    status = models.CharField(
+        max_length=10, choices=Status.choices, default=Status.PENDING
+    )
+    subject = models.CharField(max_length=255, blank=True)
+    body = models.TextField(blank=True)
+    attempts = models.PositiveSmallIntegerField(default=0)
     error = models.TextField(blank=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            # The drain's only query: pending work, oldest first.
+            models.Index(fields=["status", "created_at"], name="notif_status_created_idx"),
+        ]
+
+    @property
+    def is_deliverable(self):
+        return self.status == self.Status.PENDING and self.attempts < self.MAX_ATTEMPTS
 
     def __str__(self):
         return f"{self.event} -> {self.recipient} ({self.status})"
@@ -300,8 +337,9 @@ class AppointmentSettings(SingletonModel):
     cancellation_cutoff_minutes = models.PositiveIntegerField(
         default=120,
         help_text=(
-            "A patient may cancel up to this long before the slot. Decision 9 "
-            "left the value open - confirm it with AGKI."
+            "A patient may cancel up to this long before the slot. AGKI: "
+            "2 hours, matching the booking notice - the window in which a "
+            "booking can be made is the window in which it can be undone."
         ),
     )
 

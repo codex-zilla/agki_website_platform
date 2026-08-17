@@ -1,0 +1,12 @@
+Hello {{ appointment.fullName }},
+
+Thank you for your appointment with
+{{ provider.get_full_name|default:provider.username }} on {{ slot_date }}.
+
+Booking reference: {{ booking_id }}
+
+If you need a follow-up or another test, you can book here:
+
+  {{ site_url }}/appointments/search/
+
+AGKI Medical Laboratory

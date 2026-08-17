@@ -1,0 +1,20 @@
+Hello {{ appointment.fullName }},
+
+Unfortunately the time you requested is no longer available, so that booking
+has been cancelled and the slot released.
+
+  Date:   {{ slot_date }}
+  Time:   {{ slot_time }}
+  Doctor: {{ provider.get_full_name|default:provider.username }}
+{% if appointment.cancellation_reason %}
+Reason given: {{ appointment.cancellation_reason }}
+{% endif %}
+You are welcome to book another time:
+
+  {{ site_url }}/appointments/search/
+
+Booking reference: {{ booking_id }}
+
+We are sorry for the inconvenience.
+
+AGKI Medical Laboratory

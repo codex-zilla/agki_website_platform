@@ -2,6 +2,8 @@
 
     python manage.py map_expertise_to_specialties            # report only
     python manage.py map_expertise_to_specialties --apply    # write the links
+    python manage.py map_expertise_to_specialties --apply \\
+        --map "Cardiograph=Cardiology"                       # a decided mapping
 
 **Why this is a command and not a data migration.** Design §11 step 5a puts the
 mapping in a migration, but a migration cannot do it correctly: the mapping
@@ -12,18 +14,23 @@ ships in a migration, the names are entered in the admin, and this runs
 afterwards. It is idempotent and safe to re-run as more specialties are added.
 
 **It will not guess.** Matching is exact after folding case and spacing:
-"cardiology" finds `Cardiology`. Anything else is reported and left alone. The
-one live value is `expertise='Cardiograph'` — a cardiograph is an ECG machine,
-the specialty is Cardiology, and the difference between those two is a
-judgement only a person should make. This codebase already knows what happens
-when free text is guessed at: `role='4491'` silently removed a real doctor from
-the booking page.
+"cardiology" finds `Cardiology`. Anything else is reported and left alone. This
+codebase already knows what happens when free text is guessed at: `role='4491'`
+silently removed a real doctor from the booking page.
+
+**`--map "OLD=NEW"` is how a human's decision gets in.** It is deliberately not
+a fuzzy matcher with a confidence threshold: somebody types the pairing out,
+and it lands in the shell history and the deploy notes as an explicit act. The
+one live value needed exactly this — `expertise='Cardiograph'` is an ECG
+*machine*, the specialty is *Cardiology*, and no amount of string distance
+makes that inference safe. AGKI decided it on 2026-08-17; the flag is how that
+decision travels to production instead of being re-derived from memory.
 
 `expertise` is not cleared and not dropped. It stays until AGKI confirms every
 mapping; dropping the column is a later migration, once this reports nothing.
 """
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from useraccount.models import Profile, Specialty
@@ -42,10 +49,39 @@ class Command(BaseCommand):
             action="store_true",
             help="Write the links. Without this the command only reports.",
         )
+        parser.add_argument(
+            "--map",
+            action="append",
+            default=[],
+            metavar="OLD=SPECIALTY",
+            dest="decided",
+            help=(
+                "A mapping a person has decided, e.g. "
+                '--map "Cardiograph=Cardiology". Repeatable. The named '
+                "specialty must already exist."
+            ),
+        )
 
     def handle(self, *args, **options):
         specialties = {normalise(s.name): s for s in Specialty.objects.all()}
         specialties.update({normalise(s.slug): s for s in Specialty.objects.all()})
+
+        # Decided mappings are folded into the same lookup table, so from here
+        # on there is no difference between "matched by name" and "a human said
+        # so" — the decision is just another entry, and the reporting below
+        # treats it identically.
+        for pair in options["decided"]:
+            if "=" not in pair:
+                raise CommandError(f"--map needs the form OLD=SPECIALTY, got {pair!r}")
+            old, _, target = pair.partition("=")
+            specialty = specialties.get(normalise(target))
+            if specialty is None:
+                raise CommandError(
+                    f"--map {pair!r} names the specialty {target!r}, which does "
+                    f"not exist. Create it in the admin first — this command "
+                    f"links to a taxonomy, it does not invent one."
+                )
+            specialties[normalise(old)] = specialty
 
         if not specialties:
             self.stdout.write(

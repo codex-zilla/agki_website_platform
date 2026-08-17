@@ -25,12 +25,13 @@ from unittest import mock
 
 from django.apps import apps as django_apps
 from django.contrib.auth.models import Group, Permission
+from django.core import mail
 from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.db import IntegrityError
 from django.db.models import ProtectedError
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -43,12 +44,16 @@ from appointments.management.commands.audit_appointment_data import (
     suggest,
 )
 from appointments.access import has_appointment_access
+from appointments.notifications import deliver, delivery_mode, notify
+from appointments.notifications import channels, events
+from appointments.notifications import events as event_registry
 from appointments.models import (
     Appointment,
     AppointmentApproval,
     AppointmentSettings,
     AppointmentTransition,
     AvailableSlot,
+    NotificationLog,
     Rating,
 )
 from appointments.ratelimit import LOOKUP_LIMIT
@@ -1269,3 +1274,491 @@ class TemplateCommentHygieneTests(TestCase):
             "render to the page as visible text. Use a block comment tag "
             "instead: " + ", ".join(offenders),
         )
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 - notification layer
+# ---------------------------------------------------------------------------
+
+
+class NotificationTestCase(TestCase):
+    """One appointment, one doctor, one patient email address."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.doctor = make_staff_user(
+            username="notify-doctor", email="notify-doctor@example.com",
+            role=CustomUser.Role.DOCTOR, first_name="Anna", last_name="Magembe",
+        )
+        cls.slot = AvailableSlot.objects.create(
+            user=cls.doctor,
+            date=timezone.localdate() + timedelta(days=3),
+            time=time(14, 30),
+        )
+        cls.appointment = Appointment.objects.create(
+            fullName="Asha Mbwana", birthDate=date(1990, 5, 1),
+            gender=Appointment.Gender.FEMALE, email="asha@example.com",
+            phone="0712345678", visitType=Appointment.VisitType.NEW_PATIENT,
+            reasonVisit=Appointment.ReasonForVisit.LAB_TEST, slot=cls.slot,
+        )
+
+    def setUp(self):
+        mail.outbox = []
+
+
+@override_settings(NOTIFICATIONS_DELIVERY="queued")
+class NotifyApiTests(NotificationTestCase):
+    """Plan 3.1: call sites emit events, never messages."""
+
+    def test_every_declared_event_renders_and_queues(self):
+        """All eight, because a template that does not exist is an event that
+        silently never reaches anyone."""
+        for name in sorted(event_registry.REGISTRY):
+            with self.subTest(event=name):
+                NotificationLog.objects.all().delete()
+                queued = notify(name, self.appointment)
+
+                self.assertTrue(queued, f"{name} queued nothing")
+                for message in queued:
+                    self.assertTrue(message.subject.strip())
+                    self.assertTrue(message.body.strip())
+                    self.assertEqual(message.status, NotificationLog.Status.PENDING)
+
+    def test_a_new_booking_notifies_the_doctor_being_booked(self):
+        """Decision 8: not a central AGKI inbox. The platform hosts doctors
+        from other organisations, who cannot watch someone else's dashboard."""
+        queued = notify("appointment.booked", self.appointment)
+
+        self.assertEqual([m.recipient for m in queued], [self.doctor.email])
+
+    def test_patient_facing_events_go_to_the_patient(self):
+        for name in (
+            "appointment.time_confirmed",
+            "appointment.time_declined",
+            "appointment.mode_confirmed",
+            "appointment.completed",
+        ):
+            with self.subTest(event=name):
+                queued = notify(name, self.appointment)
+                self.assertEqual([m.recipient for m in queued], ["asha@example.com"])
+
+    def test_expiry_tells_both_parties(self):
+        """Never silent, on either side (design §6.1)."""
+        recipients = {m.recipient for m in notify("appointment.expired", self.appointment)}
+
+        self.assertEqual(recipients, {"asha@example.com", self.doctor.email})
+
+    def test_an_unknown_event_fails_loudly(self):
+        """A typo would otherwise be a message that is simply never sent."""
+        with self.assertRaises(LookupError) as raised:
+            notify("appointment.definitely_not_an_event", self.appointment)
+
+        self.assertIn("Known events", str(raised.exception))
+
+    def test_a_missing_address_is_recorded_rather_than_dropped(self):
+        CustomUser.objects.filter(pk=self.doctor.pk).update(email="")
+        # Re-read: the class fixture holds the doctor from before the update,
+        # and  is cached against it.
+        appointment = Appointment.objects.select_related("slot__user").get(
+            pk=self.appointment.pk
+        )
+
+        notify("appointment.booked", appointment)
+
+        skipped = NotificationLog.objects.get(event="appointment.booked")
+        self.assertEqual(skipped.status, NotificationLog.Status.SKIPPED)
+        self.assertIn("No email address", skipped.error)
+
+    def test_the_message_body_is_stored_not_just_the_fact_of_it(self):
+        """"Did the patient get told, and what did it say?" is one question in
+        practice, and the second half is the useful one."""
+        message = notify("appointment.time_confirmed", self.appointment)[0]
+
+        self.assertIn("Asha Mbwana", message.body)
+        self.assertIn(self.appointment.bookingID, message.body)
+
+
+@override_settings(NOTIFICATIONS_DELIVERY="queued", SITE_URL="https://agki.example")
+class MessageContentTests(NotificationTestCase):
+    """Plan 3.5 and 3.6 — what the messages actually say."""
+
+    def body(self, event_name, audience=None):
+        messages = notify(event_name, self.appointment)
+        if audience is None:
+            return messages[0].body
+        return next(m.body for m in messages if m.recipient == audience)
+
+    def test_every_patient_facing_message_links_back_to_the_appointment(self):
+        """The flow needs the patient to return twice and there are no patient
+        accounts, so the link is load-bearing, not a courtesy (design §0.1)."""
+        for name in (
+            "appointment.time_confirmed",
+            "appointment.time_declined",
+            "appointment.mode_confirmed",
+            "appointment.completed",
+        ):
+            with self.subTest(event=name):
+                self.assertIn("https://agki.example", self.body(name))
+
+    def test_the_link_carries_the_booking_reference(self):
+        body = self.body("appointment.time_confirmed")
+
+        self.assertIn(f"bookingID={self.appointment.bookingID}", body)
+
+    def test_the_time_confirmation_says_what_the_patient_must_do_next(self):
+        """Round 2 only happens if the patient understands it is their turn."""
+        body = self.body("appointment.time_confirmed")
+
+        self.assertIn("your turn", body.lower())
+        self.assertIn("Online video call", body)
+
+    def test_expiry_tells_the_patient_plainly_what_happened(self):
+        body = self.body("appointment.expired", audience="asha@example.com")
+
+        self.assertIn("expired", body.lower())
+        self.assertIn("released", body.lower())
+        self.assertIn("Nothing was wrong with your booking", body)
+
+    def test_the_confirmation_includes_the_meeting_link_when_there_is_one(self):
+        Appointment.objects.filter(pk=self.appointment.pk).update(
+            appointmentMode=Appointment.Mode.ONLINE,
+            meeting_url="https://meet.example/agki-123",
+        )
+        self.appointment.refresh_from_db()
+
+        self.assertIn("https://meet.example/agki-123", self.body("appointment.mode_confirmed"))
+
+    def test_no_meeting_link_is_promised_when_there_is_none(self):
+        self.assertNotIn("Join the call", self.body("appointment.mode_confirmed"))
+
+    def test_the_provider_message_links_to_the_dashboard_not_the_lookup_form(self):
+        body = self.body("appointment.booked")
+
+        self.assertIn("/doctorDashboard/appointment-details/", body)
+        self.assertNotIn("bookingID=", body)
+
+    def test_no_message_promises_an_sms(self):
+        """Plan 3.6: nothing says "you'll get a text" until SmsChannel is real.
+        The old templates promised exactly that with no integration anywhere."""
+        for name in sorted(event_registry.REGISTRY):
+            with self.subTest(event=name):
+                NotificationLog.objects.all().delete()
+                for message in notify(name, self.appointment):
+                    self.assertNotIn("SMS", message.body)
+                    self.assertNotIn("text message", message.body.lower())
+
+
+class CopyDisciplineTests(TestCase):
+    """Plan 3.6, applied to the pages as well as the emails."""
+
+    # The orphan `appointment_details.html` is excluded: no view renders it and
+    # step 5.8 deletes it. Guarding copy in a template scheduled for deletion
+    # is the same waste as guarding its image tags was in 1.1.
+    EXCLUDED = {"appointment_details.html"}
+
+    def test_no_page_promises_an_sms_reminder(self):
+        from pathlib import Path
+
+        from django.conf import settings
+
+        offenders = []
+        for app in ("appointments", "doctorDashboard"):
+            root = Path(settings.BASE_DIR) / app / "templates"
+            for path in root.rglob("*.html"):
+                if path.name in self.EXCLUDED:
+                    continue
+                text = path.read_text(encoding="utf-8")
+                for line_number, line in enumerate(text.splitlines(), start=1):
+                    if "sms" in line.lower() and "SmsChannel" not in line:
+                        offenders.append(f"{path.name}:{line_number}: {line.strip()[:70]}")
+
+        self.assertEqual(
+            offenders,
+            [],
+            "These pages mention SMS, which this system does not send: "
+            + " | ".join(offenders),
+        )
+
+
+@override_settings(NOTIFICATIONS_DELIVERY="queued")
+class DeliveryTests(NotificationTestCase):
+    """Plan 3.2 and 3.4 — the queue, and what it records."""
+
+    def test_nothing_is_sent_until_the_queue_is_drained(self):
+        """The point of the queue: a patient submitting a booking is not
+        waiting on an SMTP handshake."""
+        notify("appointment.booked", self.appointment)
+
+        self.assertEqual(len(mail.outbox), 0)
+
+        call_command("send_pending_notifications", stdout=StringIO())
+
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_a_delivered_message_is_marked_sent_and_timestamped(self):
+        message = notify("appointment.booked", self.appointment)[0]
+
+        call_command("send_pending_notifications", stdout=StringIO())
+
+        message.refresh_from_db()
+        self.assertEqual(message.status, NotificationLog.Status.SENT)
+        self.assertIsNotNone(message.sent_at)
+        self.assertEqual(message.attempts, 1)
+
+    def test_the_email_carries_the_stored_subject_and_body(self):
+        message = notify("appointment.time_confirmed", self.appointment)[0]
+
+        call_command("send_pending_notifications", stdout=StringIO())
+
+        self.assertEqual(mail.outbox[0].subject, message.subject)
+        self.assertEqual(mail.outbox[0].body, message.body)
+        self.assertEqual(mail.outbox[0].to, ["asha@example.com"])
+
+    def test_draining_twice_does_not_send_twice(self):
+        notify("appointment.booked", self.appointment)
+
+        call_command("send_pending_notifications", stdout=StringIO())
+        call_command("send_pending_notifications", stdout=StringIO())
+
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_a_failed_send_is_retried_and_then_given_up_on(self):
+        message = notify("appointment.booked", self.appointment)[0]
+
+        with mock.patch(
+            "appointments.notifications.channels.EmailChannel.send",
+            side_effect=OSError("mail server refused the connection"),
+        ):
+            for _ in range(NotificationLog.MAX_ATTEMPTS + 2):
+                call_command("send_pending_notifications", stdout=StringIO())
+
+        message.refresh_from_db()
+        self.assertEqual(message.status, NotificationLog.Status.FAILED)
+        self.assertEqual(message.attempts, NotificationLog.MAX_ATTEMPTS)
+        self.assertIn("mail server refused", message.error)
+
+    def test_a_failure_does_not_stop_the_rest_of_the_run(self):
+        """One bad address must not hold up everybody else's mail."""
+        first = notify("appointment.booked", self.appointment)[0]
+        notify("appointment.time_confirmed", self.appointment)
+
+        original = channels.EmailChannel.send
+
+        def fail_first(self, message):
+            if message.pk == first.pk:
+                raise OSError("nope")
+            return original(self, message)
+
+        with mock.patch.object(channels.EmailChannel, "send", fail_first):
+            call_command("send_pending_notifications", stdout=StringIO())
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["asha@example.com"])
+
+    def test_a_dry_run_changes_nothing(self):
+        notify("appointment.booked", self.appointment)
+        out = StringIO()
+
+        call_command("send_pending_notifications", "--dry-run", stdout=out)
+
+        self.assertIn("would send", out.getvalue())
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertEqual(
+            NotificationLog.objects.filter(status=NotificationLog.Status.PENDING).count(), 1
+        )
+
+    def test_exhausted_messages_are_reported_on_every_run(self):
+        """Somebody who was never told stays visible until a person looks."""
+        NotificationLog.objects.create(
+            appointment=self.appointment, event="appointment.booked",
+            recipient="x@example.com", channel="email",
+            status=NotificationLog.Status.FAILED, attempts=3,
+        )
+        out = StringIO()
+
+        call_command("send_pending_notifications", stdout=out)
+
+        self.assertIn("exhausted their retries", out.getvalue())
+
+    @override_settings(NOTIFICATIONS_DELIVERY="immediate")
+    def test_immediate_mode_sends_without_the_cron_job(self):
+        """The dev default, so a developer sees their message in the console.
+
+        Wrapped in captureOnCommitCallbacks because immediate delivery is
+        deliberately deferred to transaction commit — a booking that rolls back
+        must not email anybody about an appointment that does not exist.
+        """
+        with self.captureOnCommitCallbacks(execute=True):
+            notify("appointment.booked", self.appointment)
+
+        self.assertEqual(len(mail.outbox), 1)
+
+    @override_settings(NOTIFICATIONS_DELIVERY="immediate")
+    def test_a_rolled_back_booking_emails_nobody(self):
+        with self.captureOnCommitCallbacks(execute=False):
+            notify("appointment.booked", self.appointment)
+
+        self.assertEqual(len(mail.outbox), 0)
+
+
+@override_settings(NOTIFICATIONS_DELIVERY="queued")
+class SmsSeamTests(NotificationTestCase):
+    """Plan 3.3. The stub exists so the seam is real and tested rather than
+    imagined — a seam nobody has run is a guess about a seam."""
+
+    def test_the_sms_channel_knows_where_to_reach_both_parties(self):
+        """Recipient data already exists, which is why decision 3 could say
+        "email now, architected for SMS" and mean it: SMS needs an integration,
+        not a new data-capture form."""
+        sms = channels.get("sms")
+
+        self.assertEqual(sms.address_for(events.PATIENT, self.appointment), "0712345678")
+        self.assertEqual(
+            sms.address_for(events.PROVIDER, self.appointment), self.doctor.phone
+        )
+
+    def test_registering_sms_for_an_event_queues_an_sms(self):
+        queued = notify("appointment.booked", self.appointment, channels=("sms",))
+
+        self.assertEqual([m.channel for m in queued], ["sms"])
+        self.assertEqual(queued[0].recipient, self.doctor.phone)
+
+    def test_sending_it_fails_loudly_and_is_recorded(self):
+        """It must not silently look like a success, and it must not take the
+        booking down with it."""
+        message = notify("appointment.booked", self.appointment, channels=("sms",))[0]
+
+        call_command("send_pending_notifications", stdout=StringIO())
+
+        message.refresh_from_db()
+        self.assertIn("NotImplementedError", message.error)
+        self.assertNotEqual(message.status, NotificationLog.Status.SENT)
+
+
+class NoDirectMailTests(TestCase):
+    """Plan 3.x phase gate: no call site imports `send_mail`.
+
+    That coupling is exactly what forces a rewrite when a second channel
+    appears, and the old code had it — `send_mail` inline in a view with the
+    copy in a Python string. The one legitimate importer is the email channel
+    itself.
+    """
+
+    ALLOWED = {"appointments/notifications/channels.py"}
+
+    def test_only_the_email_channel_talks_to_the_mail_api(self):
+        from pathlib import Path
+
+        from django.conf import settings
+
+        offenders = []
+        root = Path(settings.BASE_DIR)
+        for app in ("appointments", "doctorDashboard"):
+            for path in (root / app).rglob("*.py"):
+                relative = path.relative_to(root).as_posix()
+                if relative in self.ALLOWED or "/migrations/" in relative:
+                    continue
+                # A call, not a mention: several docstrings in this project
+                # name the mail API precisely to explain why nothing calls it.
+                # The needle is assembled rather than written out so that this
+                # file does not match itself.
+                needle = "send_mail" + "("
+                if needle in path.read_text(encoding="utf-8"):
+                    offenders.append(relative)
+
+        self.assertEqual(
+            offenders,
+            [],
+            "These modules call send_mail directly instead of emitting an "
+            "event: " + ", ".join(offenders),
+        )
+
+
+@override_settings(NOTIFICATIONS_DELIVERY="queued")
+class ConcurrentDrainTests(NotificationTestCase):
+    """Two cron runs can overlap — a slow SMTP host is exactly when that
+    happens, and exactly when sending the same message twice would be most
+    confusing to the person receiving it.
+
+    Both tests here exist because mutation-checking found them missing:
+    deleting the claim broke nothing, since "drain twice in sequence" is a
+    different situation from "two runs holding the same pending row".
+    """
+
+    def test_two_runs_holding_the_same_row_send_it_once(self):
+        message = notify("appointment.booked", self.appointment)[0]
+        # Two runs that each read the row while it was still pending: same
+        # primary key, same `attempts`, no knowledge of each other.
+        first_run_view = NotificationLog.objects.get(pk=message.pk)
+        second_run_view = NotificationLog.objects.get(pk=message.pk)
+
+        self.assertTrue(deliver(first_run_view))
+        self.assertFalse(deliver(second_run_view))
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_a_run_starting_mid_send_does_not_send_again(self):
+        """The case the first version of this got wrong. Counting attempts was
+        not enough: a second run starting while the first was inside `send()`
+        saw the row still pending and delivered it a second time. The claim is
+        a status transition now, so the row is no longer pending by then."""
+        notify("appointment.booked", self.appointment)
+        overlapping = []
+
+        real_send = channels.EmailChannel.send
+
+        def send_then_overlap(self, message):
+            if not overlapping:
+                overlapping.append(True)
+                # A second cron tick, fired while this one is mid-delivery.
+                call_command("send_pending_notifications", stdout=StringIO())
+            return real_send(self, message)
+
+        with mock.patch.object(channels.EmailChannel, "send", send_then_overlap):
+            call_command("send_pending_notifications", stdout=StringIO())
+
+        self.assertTrue(overlapping, "the overlapping run never happened")
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_a_run_killed_mid_send_does_not_strand_its_message(self):
+        """Passenger kills application processes as it pleases, so a claim can
+        outlive the run that took it. Left alone, that message is somebody who
+        is never told — the silent failure the outbox exists to avoid."""
+        message = notify("appointment.booked", self.appointment)[0]
+        NotificationLog.objects.filter(pk=message.pk).update(
+            status=NotificationLog.Status.SENDING,
+            created_at=timezone.now() - NotificationLog.STALE_CLAIM - timedelta(minutes=1),
+        )
+
+        call_command("send_pending_notifications", stdout=StringIO())
+
+        message.refresh_from_db()
+        self.assertEqual(message.status, NotificationLog.Status.SENT)
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_a_claim_that_is_still_fresh_is_left_alone(self):
+        """Otherwise the recovery would itself cause the double-send it is
+        meant to clean up after."""
+        message = notify("appointment.booked", self.appointment)[0]
+        NotificationLog.objects.filter(pk=message.pk).update(
+            status=NotificationLog.Status.SENDING
+        )
+
+        call_command("send_pending_notifications", stdout=StringIO())
+
+        message.refresh_from_db()
+        self.assertEqual(message.status, NotificationLog.Status.SENDING)
+        self.assertEqual(len(mail.outbox), 0)
+
+
+class DeliveryModeDefaultTests(TestCase):
+    """The safe default matters more than the configured value.
+
+    Which mode production runs in is a deployment setting, and a test cannot
+    meaningfully assert an environment variable. What it can assert is the
+    fallback: if the setting goes missing entirely, notifications must queue
+    rather than block a patient's request on a mail server.
+    """
+
+    def test_an_absent_setting_falls_back_to_queued(self):
+        with mock.patch("appointments.notifications.settings", spec=[]):
+            self.assertEqual(delivery_mode(), "queued")

@@ -176,7 +176,11 @@ def booking_id_lookup(request):
     afternoon. §8.1 requires a second field; §8.2 requires that guessing at it
     be slow.
     """
-    context = {}
+    # Notification emails link here with the reference already in the URL, so
+    # the patient only has to supply the one thing that proves the record is
+    # theirs. Linking straight to the detail page would bounce them to this
+    # form anyway — and lose the reference they arrived with (design §8.1).
+    context = {"bookingID": request.GET.get("bookingID", "").strip()}
     if request.method == 'POST':
         if lookup_is_rate_limited(request):
             context['error'] = LOOKUP_THROTTLED
