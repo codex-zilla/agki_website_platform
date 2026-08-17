@@ -14,10 +14,12 @@ cover the matrix it is responsible for.
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.models import Group
 from django.contrib.messages import get_messages
+from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
 from cms.test_utils import make_staff_user
+from useraccount.models import OtpToken, Profile
 
 User = get_user_model()
 
@@ -237,3 +239,122 @@ class ApprovalGateTests(TestCase):
 
         signee.refresh_from_db()
         self.assertFalse(signee.is_approved)
+
+
+class FixtureLoadingTests(TestCase):
+    """Restoring a backup must not treat the accounts in it as new signups.
+
+    Found by rehearsing the SQLite-to-MySQL move rather than by any test:
+    `loaddata` saves rows, and `useraccount.signals` treated every newly saved
+    account as a public self-signup — forcing `is_active=False` and generating
+    a verification code. The import came out with five of six real accounts
+    deactivated, and with production SMTP configured would have emailed five
+    people a code for an account they already had.
+
+    Django sets `raw=True` on a fixture save so handlers can tell the
+    difference. These tests are here because nothing else would notice: the
+    import reports success either way.
+    """
+
+    def load_fixture(self, payload):
+        import json
+        import tempfile
+        from pathlib import Path
+
+        directory = tempfile.mkdtemp(prefix="agki-fixture-")
+        path = Path(directory) / "accounts.json"
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        call_command("loaddata", str(path), verbosity=0)
+        return path
+
+    def account_fixture(self, **overrides):
+        from django.contrib.auth.hashers import make_password
+
+        fields = {
+            "username": "restored",
+            "email": "restored@example.com",
+            # A **usable** hash, as every real account in the backup has. This
+            # detail is the test: an unusable password sends the signal down
+            # its social-login branch, which activates the account instead of
+            # deactivating it — so a fixture with `!unusable` here passes
+            # whether the guard exists or not. Mutation-checking caught that;
+            # the first version of this test proved nothing.
+            "password": make_password("irrelevant-but-usable"),
+            "is_active": True,
+            "is_staff": False,
+            "is_superuser": False,
+            "is_approved": True,
+            "role": "doctor",
+            "date_joined": "2026-01-01T00:00:00Z",
+            "first_name": "",
+            "last_name": "",
+        }
+        fields.update(overrides)
+        return [{"model": "useraccount.customuser", "pk": 4242, "fields": fields}]
+
+    def test_a_restored_account_keeps_its_active_flag(self):
+        self.load_fixture(self.account_fixture())
+
+        restored = User.objects.get(username="restored")
+        self.assertTrue(restored.is_active, "the import deactivated a real account")
+
+    def test_a_restored_account_keeps_its_approval(self):
+        self.load_fixture(self.account_fixture())
+
+        self.assertTrue(User.objects.get(username="restored").is_approved)
+
+    def test_restoring_an_account_sends_nobody_a_verification_code(self):
+        from django.core import mail
+
+        mail.outbox = []
+
+        self.load_fixture(self.account_fixture())
+
+        self.assertEqual(mail.outbox, [])
+        self.assertEqual(
+            OtpToken.objects.filter(user__username="restored").count(), 0
+        )
+
+    def test_a_backup_carrying_its_own_profiles_loads(self):
+        """A real dump contains Profile rows as well as accounts.
+
+        Without the guard the signal creates a profile the moment the account
+        row lands, and the fixture's own profile — a different primary key for
+        the same user — then collides with it on the OneToOne. The import
+        fails outright, which is at least loud; this keeps it from happening.
+        """
+        payload = self.account_fixture()
+        payload.append(
+            {
+                "model": "useraccount.profile",
+                "pk": 9999,
+                "fields": {"user": 4242, "expertise": "Cardiology"},
+            }
+        )
+
+        self.load_fixture(payload)
+
+        profiles = Profile.objects.filter(user__username="restored")
+        self.assertEqual(profiles.count(), 1)
+        # The restored one, not a blank one the signal invented.
+        self.assertEqual(profiles.get().expertise, "Cardiology")
+
+    def test_an_ordinary_signup_still_gets_the_verification_it_needs(self):
+        """The other half: the guard must not switch the real flow off."""
+        User.objects.create_user(
+            username="real-signup", email="real-signup@example.com",
+            password="test-pass-12345",
+        )
+
+        signee = User.objects.get(username="real-signup")
+        self.assertFalse(signee.is_active)
+        self.assertEqual(OtpToken.objects.filter(user=signee).count(), 1)
+
+    def test_an_ordinary_new_account_still_gets_a_profile(self):
+        """And the other half of the profile guard."""
+        User.objects.create_user(
+            username="profile-signup", email="profile-signup@example.com",
+            password="test-pass-12345",
+        )
+
+        self.assertTrue(Profile.objects.filter(user__username="profile-signup").exists())

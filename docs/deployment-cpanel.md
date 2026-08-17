@@ -38,7 +38,7 @@ is an argument for doing it now rather than later.
 
 ---
 
-## 2. Five things that will bite
+## 2. Six things that will bite
 
 These are the ones that cost time if you meet them for the first time at 11pm.
 
@@ -64,7 +64,16 @@ copied to the server separately and must survive every future deploy. If your de
 replaces the application directory, `media/` has to live outside it (`DJANGO_MEDIA_ROOT` exists
 for exactly this).
 
-**5. A failed migration stops the run partway.** During the rehearsal, `migrate` applied four
+**5. Importing accounts used to deactivate them.** `useraccount/signals.py` treats every
+newly saved account as a public self-signup: it forces `is_active=False` and emails a
+verification code. `loaddata` saves rows, so importing the production users into the new
+database tripped it — the rehearsal came out with **five of six accounts deactivated** and
+four spurious OTP tokens, and with live SMTP would have emailed five real people a code they
+never asked for. Fixed here by having the signal skip when Django flags the save as fixture
+loading (`raw=True`), which is what that flag is for. **If you are importing with an older
+checkout, check `is_active` afterwards.**
+
+**6. A failed migration stops the run partway.** During the rehearsal, `migrate` applied four
 appointment migrations, hit a data problem, and stopped — **before** it reached `useraccount`
 or `cms` at all. Each migration is atomic; the run as a whole is not. That is normal and
 recoverable (fix the data, re-run), but it is alarming if you are not expecting it, and it is
@@ -139,13 +148,17 @@ print('editors :', Group.objects.get(name='Content Editors').permissions.count()
 "
 ```
 
-Expected: `roles: ['doctor']` — no `'1'`, no `'4491'` — profiles 6 of 6, 54 permissions.
-That rehearsal has been run; those are the numbers it produced.
+Expected: `roles: ['doctor']` — no `'1'`, no `'4491'` — **profiles 4 of 6**, 54 permissions.
+Those are the numbers the rehearsal actually produced. Two accounts keep no profile: the
+backfill that gives everyone one arrives with the appointment work, not with this.
 
 **Two known data problems are deliberately left alone**, because nothing on `main` touches
 them: the duplicate slot pair, and the two orphan `Rating` rows. They matter only to the
 appointment work, whose migrations refuse to run until somebody resolves them. Leaving them
 here is the right call — do not tidy production data that this deployment does not need.
+
+The export and import below have both been run end to end against this data: 164 objects
+out, 164 objects in, accounts intact.
 
 ```bash
 # A5. Export. The exclusions matter - see below.
@@ -284,7 +297,8 @@ Check the things that fail silently, not the ones that fail loudly.
 | 4 | Sign in as the Content Editor → lands on `/admin/`, sees only Website Content | Proves the group and the sign-in routing |
 | 5 | Contact form → a real email **arrives in the inbox** | Proves `DJANGO_ENVIRONMENT` and SMTP together. A log line is not proof. |
 | 6 | Public doctor list shows **all five doctors**, Kyla and Dr. Magembe included | Proves the `role` cleanup landed. This is the one thing you can see from the outside. |
-| 7 | Row counts match the export | `CustomUser` 6, `Profile` 6, `AvailableSlot` 24 after dedupe |
+| 7 | Row counts match the export | `CustomUser` 6, `Profile` 4, `AvailableSlot` 25, `LogEntry` 115, `Item` 1 |
+| 8 | **Every account still has `is_active=True`** and no new `OtpToken` rows appeared | §2.5. The one check that catches a silent import doing damage |
 
 ---
 

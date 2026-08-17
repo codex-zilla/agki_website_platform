@@ -18,15 +18,37 @@ def create_profile(sender, instance, created, **kwargs):
     accounts were in that state.
 
     `get_or_create` rather than `create` because this fires for every save
-    where `created` is True, including fixtures and the data migration's own
-    accounts, and a duplicate would raise on the OneToOne.
+    where `created` is True, and a duplicate would raise on the OneToOne.
+
+    Skipped entirely during fixture loading (`raw=True`). A dump carries its
+    own Profile rows, so creating one here would race the fixture's own — and
+    `--natural-primary` omits primary keys, so the fixture's row arrives as an
+    insert and collides with the one this just made. Same flag, same reason as
+    `create_token` below.
     """
+    if kwargs.get("raw"):
+        return
     if created:
         Profile.objects.get_or_create(user=instance)
 
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
 def create_token(sender, instance, created, **kwargs):
+    # `raw=True` means this save is `loaddata` restoring a fixture, not a
+    # person signing up. Django sets it for exactly this reason, and skipping
+    # is not a nicety here: without it, importing the production accounts into
+    # a new database treats all six as brand-new self-signups. Rehearsing the
+    # SQLite -> MySQL migration is what caught it — the import **deactivated
+    # five of six real accounts** and generated OTP tokens for them, and with
+    # live SMTP would have emailed five people a verification code they never
+    # asked for.
+    #
+    # First, before anything else in this handler: a fixture already carries
+    # whatever `is_approved` and `is_active` it is supposed to have, and none
+    # of the decisions below apply to a row being restored.
+    if kwargs.get("raw"):
+        return
+
     if created and instance.is_superuser and not instance.is_approved:
         # `is_approved` gates sign-in as of plan 1.10, and it defaults to
         # False. Without this, `manage.py createsuperuser` produces an account
