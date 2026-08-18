@@ -8,13 +8,19 @@
 > There is no git integration on the server, so deployment is a manual upload of whatever is
 > checked out on your machine. That makes it easy to ship the wrong thing without noticing.
 >
-> **Check out `chore/cpanel-deployment` before building the bundle.** It is `main` plus the
-> MySQL support, and nothing else. The branch you have been working on,
+> **Check out `chore/cpanel-deployment` first — before Part A, not just before the upload.**
+> It is `main` plus the MySQL support, and nothing else. The branch you have been working on,
 > `feature/appointments-redesign`, additionally contains the whole appointment redesign
-> (Phases 0–3) — uploading that tree would deploy work you decided to hold back (§7).
+> (Phases 0–3).
 >
-> The bundle script prints enough to check this: **17 files under `appointments/migrations/`
-> is correct** (up to `0016`). If you see 25, you are on the wrong branch.
+> It matters earlier than you might expect, because **Part A migrates a copy of the production
+> database using whatever code is checked out**. On the wrong branch that copy goes through the
+> appointment redesign's migrations too — and then stops partway with a `RuntimeError` about
+> orphan `Rating` rows, which is a baffling thing to meet during a CMS deployment. Step A0 is
+> the check.
+>
+> Two ways to confirm: `showmigrations appointments` should end at `0016` (A0), and the bundle
+> script should report **17 files under `appointments/migrations/`**. 25 means the wrong branch.
 >
 > Merging this branch into `main` is worth doing for the repository's sake, but it is not a
 > deployment step and nothing here depends on it.
@@ -133,38 +139,109 @@ a single restore rather than a reconstruction. Do both halves.
 Keep both somewhere durable, off the server. They are the only thing standing between a bad
 deploy and a bad afternoon.
 
-### Part A — prepare the data (on your machine)
+### Part A — prepare the data (on your machine, using the new code)
 
-The order here matters, and is the one thing in this document that is genuinely easy to get
-wrong.
+**Nothing in this part touches the server.** It all runs on your laptop: the **new** code out
+of this repository, pointed at a **copy** of the production database you downloaded in Part 0.
+The server carries on serving the old code from its own database the whole time. It is not
+touched until C2, and if you stop after Part A nothing anywhere has changed.
 
-**Migrate the SQLite copy first, then export.** Not the other way round. Two of the migrations
-are data cleanups that find rows *by username* — `useraccount 0007` is what turns
-`role='4491'` back into `role='doctor'`. If you create an empty MySQL database, run `migrate`
-there, and then import the old data, that cleanup runs against an empty table and the garbage
-values come back with the import. Migrating the SQLite copy first means the cleanup runs while
-the rows it is looking for are actually there.
+That pairing — new code, old data, local machine — is the entire point of Part A. Some of the
+migrations are data cleanups that have to run against production's actual rows: `useraccount
+0007` is what turns `Kyla`'s `role='1'` and `Dr. Magembe`'s `role='4491'` back into
+`'doctor'`, and it finds them **by username**. Those migrations only exist in the new code. So:
+
+- Run them here, against a copy, and the export you upload is already correct.
+- Run them on the server later and you are migrating the live database in place, with no
+  rehearsal and no undo.
+- Create an empty MySQL database, migrate *that*, then import the old data, and the cleanup
+  runs against empty tables — the garbage values come straight back in with the import.
+
+**A0. Check out the branch you are deploying, before anything else.** Part A migrates a copy
+of production with whatever code is checked out right now, so this is not a formality:
 
 ```bash
-# A1. Use the db.sqlite3 you downloaded in Part 0. Nothing else needs to come off
-#     the server - media stays where it is (§4.1), and the zip is the rollback.
-#     Assume it is at ./backups/prod-<date>.sqlite3 below.
+git checkout chore/cpanel-deployment
+git rev-parse --abbrev-ref HEAD                       # must print chore/cpanel-deployment
+python manage.py showmigrations appointments | tail -1  # must end at 0016_appointmentapproval_approved_by
+```
 
-# A2. Work on a copy. Never on the file you just downloaded - if this goes wrong
-#     you want to start again from something untouched.
-cp ./backups/prod-$(date +%F).sqlite3 ./backups/rehearsal.sqlite3
+If that last line shows `0024_notification_sending_state`, you are on
+`feature/appointments-redesign` and Part A would migrate the copy through the whole appointment
+redesign. It does not fail quietly, at least — it stops partway with a `RuntimeError` about
+orphan `Rating` rows, which is a baffling thing to meet in the middle of a CMS deployment.
+
+**A1. Put the downloaded database somewhere predictable.** It is wherever your browser saved
+it — most likely `Downloads`, still called `db.sqlite3`. Copy it into the repository under a
+name you will recognise in a week:
+
+```bash
+mkdir -p backups
+cp ~/Downloads/db.sqlite3 backups/prod-2026-08-18.sqlite3     # adjust both sides to reality
+```
+
+```powershell
+# PowerShell
+New-Item -ItemType Directory -Force backups
+Copy-Item "$HOME\Downloads\db.sqlite3" backups\prod-2026-08-18.sqlite3
+```
+
+**A2. Work on a copy of that copy.** If Part A goes wrong you want to restart from something
+untouched without downloading again.
+
+```bash
+cp backups/prod-2026-08-18.sqlite3 backups/rehearsal.sqlite3
+```
+
+Now point Django at it. **The path form matters on Windows** — `$(pwd)` gives Git Bash's
+`/c/Users/...`, which SQLite cannot open, and the error you get is a bare
+`unable to open database file`:
+
+```bash
+# Git Bash on Windows - note `pwd -W`, not `pwd`
+export DATABASE_URL="sqlite:///$(pwd -W)/backups/rehearsal.sqlite3"
+```
+
+```powershell
+# PowerShell
+$env:DATABASE_URL = "sqlite:///$((Get-Location).Path -replace '\\','/')/backups/rehearsal.sqlite3"
+```
+
+```bash
+# macOS/Linux
 export DATABASE_URL="sqlite:///$(pwd)/backups/rehearsal.sqlite3"
+```
 
-# A3. Migrate the copy. Expect useraccount 0007 to print two role fixes:
-#       useraccount 0007: set role='doctor' for username='Dr. Magembe'
-#       useraccount 0007: set role='doctor' for username='Kyla'
-#     If it prints "not found, skipped" instead you are pointed at the wrong
-#     database - that message means it could not find the accounts it exists to fix.
+Check it took, before migrating anything:
+
+```bash
+python manage.py shell -c "from django.db import connection; print(connection.settings_dict['NAME'])"
+```
+
+It must print the path to `backups/rehearsal.sqlite3`. If it prints `db.sqlite3`, the variable
+did not reach Django and the next step would migrate **your development database** instead.
+
+**A3. Migrate the copy.**
+
+```bash
 python manage.py migrate
+```
 
-# A4. Confirm the cleanup landed and the CMS tables exist.
-python -c "
-import os, django; os.environ.setdefault('DJANGO_SETTINGS_MODULE','project.settings'); django.setup()
+Expect, among the rest:
+
+```
+  Applying useraccount.0007_role_qualifications_split...
+    useraccount 0007: set role='doctor' for username='Dr. Magembe'
+    useraccount 0007: set role='doctor' for username='Kyla'
+```
+
+If it says `WARNING - username='Kyla' not found, skipped`, you are pointed at the wrong
+database — that message means the migration could not find the accounts it exists to fix.
+
+**A4. Confirm the cleanup landed and the CMS tables exist.**
+
+```bash
+python manage.py shell -c "
 from useraccount.models import CustomUser, Profile
 from django.contrib.auth.models import Group
 print('roles   :', sorted({u.role for u in CustomUser.objects.all()}))
@@ -177,33 +254,39 @@ Expected: `roles: ['doctor']` — no `'1'`, no `'4491'` — **profiles 4 of 6**,
 Those are the numbers the rehearsal actually produced. Two accounts keep no profile: the
 backfill that gives everyone one arrives with the appointment work, not with this.
 
-**Two known data problems are deliberately left alone**, because nothing on `main` touches
-them: the duplicate slot pair, and the two orphan `Rating` rows. They matter only to the
-appointment work, whose migrations refuse to run until somebody resolves them. Leaving them
-here is the right call — do not tidy production data that this deployment does not need.
+**Two known data problems are deliberately left alone**, because nothing being deployed here
+touches them: the duplicate slot pair, and the two orphan `Rating` rows. They matter only to
+the appointment work, whose migrations refuse to run until somebody resolves them. Leaving them
+is the right call — do not tidy production data this deployment does not need.
 
-The export and import below have both been run end to end against this data: 164 objects
-out, 164 objects in, accounts intact.
+**A5. Export.** The export and the import have both been run end to end against this data: 164
+objects out, 164 objects in, accounts intact.
 
 ```bash
-# A5. Export. The exclusions matter - see below.
 python manage.py dumpdata \
   --natural-foreign --natural-primary \
   --exclude contenttypes --exclude auth.permission --exclude auth.group \
   --exclude sessions.session \
-  --indent 2 -o ./backups/prod_data.json
+  --indent 2 -o backups/prod_data.json
 ```
 
 Why each exclusion:
 
-| Excluded                              | Because                                                                                                                                                                                                           |
-| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `contenttypes`, `auth.permission` | Recreated by`migrate` on the new database. Importing them collides on ids. `--natural-foreign` is what lets everything else still point at them correctly.                                                    |
-| `auth.group`                        | `migrate` creates the **Content Editors** group itself (`cms` migration 0003, 54 permissions). Importing a second copy collides on the unique name. Production has no other groups, so nothing is lost. |
-| `sessions.session`                  | 110 rows of expiring cookies. Everyone signs in again; that is fine.                                                                                                                                              |
+| Excluded | Because |
+| --- | --- |
+| `contenttypes`, `auth.permission` | Recreated by `migrate` on the new database. Importing them collides on ids. `--natural-foreign` is what lets everything else still point at them correctly |
+| `auth.group` | `migrate` creates the **Content Editors** group itself (`cms` migration 0003, 54 permissions). Importing a second copy collides on the unique name. Production has no other groups, so nothing is lost |
+| `sessions.session` | 110 rows of expiring cookies. Everyone signs in again; that is fine |
 
-`prod_data.json` is about 60 KB. **It has to be uploaded to the server** (C2) — step C6 loads it
-there, because that is where the MySQL connection lives.
+`prod_data.json` is about 60 KB. **It has to be uploaded to the server** (C2) — step C6 loads
+it there, because that is where the MySQL connection lives.
+
+**A6. Unset the variable**, or every later command in this shell still points at the rehearsal
+copy:
+
+```bash
+unset DATABASE_URL          # PowerShell: $env:DATABASE_URL = $null
+```
 
 ### 4.1 What goes up, and what stays behind
 
@@ -215,24 +298,24 @@ media directories.
 
 **Not uploaded:**
 
-| Left out | Why |
-| --- | --- |
-| `.git/` | 72 MB of history the server has no use for |
-| `.venv/` | Platform-specific. The cPanel Python App builds its own |
-| `static/` | **63 MB of `collectstatic` output.** Regenerate it on the server (C7) — the sources travel inside each app, so uploading this would be shipping the same files twice |
-| `design/`, `docs/` | Mockups and reference material; never imported at runtime |
-| `backups/`, `db.sqlite3`, `deployed_copy_db.sqlite3` | Development and production database copies. The bundle script refuses to build if any appears |
-| `.env`, `.env.prod` | Development secrets. You create the real `.env` on the server (C4) |
-| `__pycache__/`, `*.pyc` | Compiled for a different Python build than the server's |
+| Left out                                                   | Why                                                                                                                                                                           |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.git/`                                                  | 72 MB of history the server has no use for                                                                                                                                    |
+| `.venv/`                                                 | Platform-specific. The cPanel Python App builds its own                                                                                                                       |
+| `static/`                                                | **63 MB of `collectstatic` output.** Regenerate it on the server (C7) — the sources travel inside each app, so uploading this would be shipping the same files twice |
+| `design/`, `docs/`                                     | Mockups and reference material; never imported at runtime                                                                                                                     |
+| `backups/`, `db.sqlite3`, `deployed_copy_db.sqlite3` | Development and production database copies. The bundle script refuses to build if any appears                                                                                 |
+| `.env`, `.env.prod`                                    | Development secrets. You create the real`.env` on the server (C4)                                                                                                           |
+| `__pycache__/`, `*.pyc`                                | Compiled for a different Python build than the server's                                                                                                                       |
 
 **Media — audited, not guessed.** Of the 33 MB in `media/`, the bundle carries **27 MB**:
 
-| Path | Ships? | Why |
-| --- | --- | --- |
-| `media/cms/**` (32 files) | **Yes** | Every CMS content image. These are what the redesigned homepage renders |
-| `media/problem/*.jpg` (3 files) | **Yes** | `seed_home_content` reads these as *sources*. Byte-identical copies already sit in `media/cms/problem/`, but the command still fails without them: `_resolve_source()` raises `CommandError` **before** the "already installed" check ever runs. 185 KB to avoid a failed seed |
-| 5 account photos + `productImages/47441.jpg` | **No** | Referenced by rows in the database you are importing — and **already on the server**, since that is where they were uploaded. Re-sending them would overwrite identical bytes |
-| 2 screenshots, `AGNES_PHOTO_FUZE-removebg.png`, `police_hAaDVrF.jpg`, `wikedzi.jpg`, 2 spare product images | **No** | Referenced by **nothing**: no database row, no template, no seed spec. Verified by extracting every file path stored in the production database and grepping the templates for hardcoded `/media/` URLs. Leftovers |
+| Path                                                                                                             | Ships?        | Why                                                                                                                                                                                                                                                                                            |
+| ---------------------------------------------------------------------------------------------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `media/cms/**` (32 files)                                                                                      | **Yes** | Every CMS content image. These are what the redesigned homepage renders                                                                                                                                                                                                                        |
+| `media/problem/*.jpg` (3 files)                                                                                | **Yes** | `seed_home_content` reads these as *sources*. Byte-identical copies already sit in `media/cms/problem/`, but the command still fails without them: `_resolve_source()` raises `CommandError` **before** the "already installed" check ever runs. 185 KB to avoid a failed seed |
+| 5 account photos +`productImages/47441.jpg`                                                                    | **No**  | Referenced by rows in the database you are importing — and**already on the server**, since that is where they were uploaded. Re-sending them would overwrite identical bytes                                                                                                            |
+| 2 screenshots,`AGNES_PHOTO_FUZE-removebg.png`, `police_hAaDVrF.jpg`, `wikedzi.jpg`, 2 spare product images | **No**  | Referenced by**nothing**: no database row, no template, no seed spec. Verified by extracting every file path stored in the production database and grepping the templates for hardcoded `/media/` URLs. Leftovers                                                                      |
 
 **This is why you extract over the existing directory rather than replacing it.** Six files the
 imported database points at are on the server and not in the bundle. Delete `media/` first and
@@ -263,7 +346,7 @@ your laptop and half are on the server, and the commands look identical.
 **C1 · on your machine — build the bundle.**
 
 ```bash
-git checkout chore/cpanel-deployment          # NOT the appointments branch - see the note at the top
+git rev-parse --abbrev-ref HEAD               # still chore/cpanel-deployment, from A0
 python scripts/make_upload_bundle.py          # writes dist/agki-upload-<date>.zip
 ```
 
@@ -450,7 +533,7 @@ rollback is genuinely cheap — and there are two levels of it:
 2. **Everything.** Extract the Part 0 zip back over the application directory, including its
    `.env`, and restart. That returns the server to exactly the state it was in before you
    started — which is the reason for taking it as a zip rather than a file list.
-2. The MySQL database can sit there untouched while you work out what happened; nothing writes
+3. The MySQL database can sit there untouched while you work out what happened; nothing writes
    to it once the URL is unset.
 
 **Keep the SQLite file for at least one full week after cutover**, not one day. The failure
