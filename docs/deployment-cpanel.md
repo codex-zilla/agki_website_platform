@@ -4,11 +4,20 @@
 **Deploying:** `main` — the CMS and website work. **Not** the appointment redesign; see §7.
 **Status:** written 2026-08-17, after rehearsing the data migration against a copy of the live database
 
-> **Read this first.** The MySQL support (driver, connection options, the fallback shim) was
-> written while the appointment work was in progress and therefore sits on
-> `feature/appointments-redesign`. It has been split onto **`chore/cpanel-deployment`**, a
-> branch off `main` containing *only* the deployment changes. **Merge that to `main` before
-> deploying**, or none of Part C works — `main` on its own has no MySQL driver.
+> **Read this first — which working tree you upload is the whole decision.**
+> There is no git integration on the server, so deployment is a manual upload of whatever is
+> checked out on your machine. That makes it easy to ship the wrong thing without noticing.
+>
+> **Check out `chore/cpanel-deployment` before building the bundle.** It is `main` plus the
+> MySQL support, and nothing else. The branch you have been working on,
+> `feature/appointments-redesign`, additionally contains the whole appointment redesign
+> (Phases 0–3) — uploading that tree would deploy work you decided to hold back (§7).
+>
+> The bundle script prints enough to check this: **17 files under `appointments/migrations/`
+> is correct** (up to `0016`). If you see 25, you are on the wrong branch.
+>
+> Merging this branch into `main` is worth doing for the repository's sake, but it is not a
+> deployment step and nothing here depends on it.
 
 Every command below has been run against `deployed_copy_db.sqlite3` — a copy of the live
 database — rather than written from memory. Where something failed during that rehearsal it
@@ -20,17 +29,17 @@ is called out, because those are the parts most likely to fail again.
 
 Read out of the live database copy, not assumed:
 
-| | |
-| --- | --- |
-| Accounts | **6.** One superuser (`mccoln`), five doctors. |
-| `role` values | Two are **garbage**: `Kyla` has `role='1'`, `Dr. Magembe` has `role='4491'`. Both are silently excluded from the public doctor list, because it filters on an exact string. |
-| Profiles | **4 of 6.** The two without one are invisible to booking regardless of role. |
-| Availability slots | 25, including **one duplicate pair** (same doctor, date and time). |
-| Appointments | **Zero.** No patient data on production at all. |
-| Ratings | 2 rows, added by hand in the admin, attached to no visit. |
-| `cms` tables | **None. The CMS has never been deployed.** |
-| Migration state | `useraccount` at 0006, `appointments` at 0016, `cms` absent. |
-| Sessions / admin log | 110 / 115 rows. |
+|                      |                                                                                                                                                                                          |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Accounts             | **6.** One superuser (`mccoln`), five doctors.                                                                                                                                   |
+| `role` values      | Two are**garbage**: `Kyla` has `role='1'`, `Dr. Magembe` has `role='4491'`. Both are silently excluded from the public doctor list, because it filters on an exact string. |
+| Profiles             | **4 of 6.** The two without one are invisible to booking regardless of role.                                                                                                       |
+| Availability slots   | 25, including**one duplicate pair** (same doctor, date and time).                                                                                                                  |
+| Appointments         | **Zero.** No patient data on production at all.                                                                                                                                    |
+| Ratings              | 2 rows, added by hand in the admin, attached to no visit.                                                                                                                                |
+| `cms` tables       | **None. The CMS has never been deployed.**                                                                                                                                         |
+| Migration state      | `useraccount` at 0006, `appointments` at 0016, `cms` absent.                                                                                                                       |
+| Sessions / admin log | 110 / 115 rows.                                                                                                                                                                          |
 
 **The single most useful fact here: there are no appointments.** Nothing on production holds
 patient data yet, so this deployment is far lower-risk than it would be in three months. That
@@ -59,10 +68,12 @@ so nothing secret is in the repository — but a dev key deployed to production 
 serve both. If images vanish the moment `DEBUG` goes off, this is why — and it matters more
 than usual here, because the CMS is a system for uploading images.
 
-**4. `media/` is 33 MB, is not in git, and is where all CMS content images live.** It must be
-copied to the server separately and must survive every future deploy. If your deploy process
-replaces the application directory, `media/` has to live outside it (`DJANGO_MEDIA_ROOT` exists
-for exactly this).
+**4. `media/` is not in git, and part of it exists only on the server.** All CMS content
+images live there, and so do six files the imported database points at that are **not** in the
+upload bundle because the server already has them (§4.1). Two consequences: extract the bundle
+*over* the existing directory rather than replacing it, and make sure `media/` survives every
+future deploy — if your process ever replaces the application directory wholesale, move it out
+with `DJANGO_MEDIA_ROOT`.
 
 **5. Importing accounts used to deactivate them.** `useraccount/signals.py` treats every
 newly saved account as a public self-signup: it forces `is_active=False` and emails a
@@ -106,6 +117,21 @@ without it MySQL silently truncates a value too long for its column).
 ---
 
 ## 4. Runbook
+
+### Part 0 — back up what is there now
+
+Zipping the whole application directory on the server is the right instinct: it makes rollback
+a single restore rather than a reconstruction. Do both halves.
+
+1. **cPanel → File Manager**, select the application directory, **Compress → zip**. Download
+   it. That captures the code, the media, *and* the current `.env` if one exists — which is
+   also how you find out what environment variables the site is really running with (§2.1).
+2. **Download `db.sqlite3` separately** as well. It is inside that zip, but you need it as a
+   loose file for Part A, and the two backups serve different purposes: the zip is the
+   rollback, the loose database is the input to the migration.
+
+Keep both somewhere durable, off the server. They are the only thing standing between a bad
+deploy and a bad afternoon.
 
 ### Part A — prepare the data (on your machine)
 
@@ -171,11 +197,45 @@ python manage.py dumpdata \
 
 Why each exclusion:
 
-| Excluded | Because |
+| Excluded                              | Because                                                                                                                                                                                                           |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `contenttypes`, `auth.permission` | Recreated by`migrate` on the new database. Importing them collides on ids. `--natural-foreign` is what lets everything else still point at them correctly.                                                    |
+| `auth.group`                        | `migrate` creates the **Content Editors** group itself (`cms` migration 0003, 54 permissions). Importing a second copy collides on the unique name. Production has no other groups, so nothing is lost. |
+| `sessions.session`                  | 110 rows of expiring cookies. Everyone signs in again; that is fine.                                                                                                                                              |
+
+### 4.1 What goes up, and what stays behind
+
+`scripts/make_upload_bundle.py` is the authority; this is what it decides and why.
+
+**Uploaded** — the seven Django apps (including their `static/` *source* directories),
+`templates/`, `manage.py`, `passenger_wsgi.py`, `requirements.txt`, `.env.example`, and two
+media directories.
+
+**Not uploaded:**
+
+| Left out | Why |
 | --- | --- |
-| `contenttypes`, `auth.permission` | Recreated by `migrate` on the new database. Importing them collides on ids. `--natural-foreign` is what lets everything else still point at them correctly. |
-| `auth.group` | `migrate` creates the **Content Editors** group itself (`cms` migration 0003, 54 permissions). Importing a second copy collides on the unique name. Production has no other groups, so nothing is lost. |
-| `sessions.session` | 110 rows of expiring cookies. Everyone signs in again; that is fine. |
+| `.git/` | 72 MB of history the server has no use for |
+| `.venv/` | Platform-specific. The cPanel Python App builds its own |
+| `static/` | **63 MB of `collectstatic` output.** Regenerate it on the server (C5) — the sources travel inside each app, so uploading this would be shipping the same files twice |
+| `design/`, `docs/` | Mockups and reference material; never imported at runtime |
+| `backups/`, `db.sqlite3`, `deployed_copy_db.sqlite3` | Development and production database copies. The bundle script refuses to build if any appears |
+| `.env`, `.env.prod` | Development secrets. You create the real `.env` on the server (C2) |
+| `__pycache__/`, `*.pyc` | Compiled for a different Python build than the server's |
+
+**Media — audited, not guessed.** Of the 33 MB in `media/`, the bundle carries **27 MB**:
+
+| Path | Ships? | Why |
+| --- | --- | --- |
+| `media/cms/**` (32 files) | **Yes** | Every CMS content image. These are what the redesigned homepage renders |
+| `media/problem/*.jpg` (3 files) | **Yes** | `seed_home_content` reads these as *sources*. Byte-identical copies already sit in `media/cms/problem/`, but the command still fails without them: `_resolve_source()` raises `CommandError` **before** the "already installed" check ever runs. 185 KB to avoid a failed seed |
+| 5 account photos + `productImages/47441.jpg` | **No** | Referenced by rows in the database you are importing — and **already on the server**, since that is where they were uploaded. Re-sending them would overwrite identical bytes |
+| 2 screenshots, `AGNES_PHOTO_FUZE-removebg.png`, `police_hAaDVrF.jpg`, `wikedzi.jpg`, 2 spare product images | **No** | Referenced by **nothing**: no database row, no template, no seed spec. Verified by extracting every file path stored in the production database and grepping the templates for hardcoded `/media/` URLs. Leftovers |
+
+**This is why you extract over the existing directory rather than replacing it.** Six files the
+imported database points at are on the server and not in the bundle. Delete `media/` first and
+five staff photos and a product image turn into broken images — with nothing in any log to say
+so.
 
 ### Part B — create the database (in cPanel)
 
@@ -193,9 +253,25 @@ DATABASE_URL=mysql://cpuser_agki:PASSWORD@localhost:3306/cpuser_agki
 
 ### Part C — configure and deploy
 
+**C1. Build the upload bundle**, on your machine, from the `chore/cpanel-deployment`
+working tree:
+
 ```bash
-# C1. Get the code onto the server (git pull, or upload). Then, in the cPanel
-#     Python App's virtualenv:
+git checkout chore/cpanel-deployment
+python scripts/make_upload_bundle.py            # writes dist/agki-upload-<date>.zip
+python scripts/make_upload_bundle.py --list     # or just look at what it would include
+```
+
+263 files, 79 MB, 76 MB compressed. The script exists because "what exactly do I upload?" has
+an expensive wrong answer in both directions, and because a hand-assembled zip that happens to
+contain `.env` looks exactly like one that does not — so it **refuses to build** if anything
+in `FORBIDDEN` would end up inside. What it leaves out, and why, is §4.1.
+
+Upload it through **cPanel → File Manager**, into the application directory, and extract it
+there. **Do not delete the existing directory first** — see §4.1 on media. Then, in the cPanel
+Python App's virtualenv:
+
+```bash
 pip install -r requirements.txt
 ```
 
@@ -289,25 +365,30 @@ python manage.py seed_home_content
 
 Check the things that fail silently, not the ones that fail loudly.
 
-| # | Check | Why this one |
-| --- | --- | --- |
-| 1 | `python manage.py check --deploy` reports no ERRORs | Catches a `DEBUG` or `ALLOWED_HOSTS` left wrong |
-| 2 | The homepage loads over HTTPS with **images visible** | Proves §2.3 and §2.4 — the two most common silent breakages |
-| 3 | `/admin/` loads and shows the **Website Content** section | Proves the cms migrations ran |
-| 4 | Sign in as the Content Editor → lands on `/admin/`, sees only Website Content | Proves the group and the sign-in routing |
-| 5 | Contact form → a real email **arrives in the inbox** | Proves `DJANGO_ENVIRONMENT` and SMTP together. A log line is not proof. |
-| 6 | Public doctor list shows **all five doctors**, Kyla and Dr. Magembe included | Proves the `role` cleanup landed. This is the one thing you can see from the outside. |
-| 7 | Row counts match the export | `CustomUser` 6, `Profile` 4, `AvailableSlot` 25, `LogEntry` 115, `Item` 1 |
-| 8 | **Every account still has `is_active=True`** and no new `OtpToken` rows appeared | §2.5. The one check that catches a silent import doing damage |
+| # | Check                                                                                      | Why this one                                                                           |
+| - | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| 1 | `python manage.py check --deploy` reports no ERRORs                                      | Catches a`DEBUG` or `ALLOWED_HOSTS` left wrong                                     |
+| 2 | The homepage loads over HTTPS with**images visible**                                 | Proves §2.3 and §2.4 — the two most common silent breakages                         |
+| 3 | `/admin/` loads and shows the **Website Content** section                          | Proves the cms migrations ran                                                          |
+| 4 | Sign in as the Content Editor → lands on`/admin/`, sees only Website Content            | Proves the group and the sign-in routing                                               |
+| 5 | Contact form → a real email**arrives in the inbox**                                 | Proves`DJANGO_ENVIRONMENT` and SMTP together. A log line is not proof.               |
+| 6 | Public doctor list shows**all five doctors**, Kyla and Dr. Magembe included          | Proves the`role` cleanup landed. This is the one thing you can see from the outside. |
+| 7 | Row counts match the export                                                                | `CustomUser` 6, `Profile` 4, `AvailableSlot` 25, `LogEntry` 115, `Item` 1    |
+| 8 | **Every account still has `is_active=True`** and no new `OtpToken` rows appeared | §2.5. The one check that catches a silent import doing damage                         |
 
 ---
 
 ## 6. If it goes wrong
 
-Because the old database is a file and you kept it, rollback is genuinely cheap:
+Because you zipped the whole application directory in Part 0 and the old database is a file,
+rollback is genuinely cheap — and there are two levels of it:
 
-1. Set `DATABASE_URL=` back to empty (SQLite) in `.env`, restore the backed-up `db.sqlite3`,
-   `touch tmp/restart.txt`. The site is back on the old data within a minute.
+1. **Data only.** Set `DATABASE_URL=` back to empty (SQLite) in `.env`, restore the backed-up
+   `db.sqlite3`, `touch tmp/restart.txt`. The site is back on the old data within a minute,
+   still running the new code.
+2. **Everything.** Extract the Part 0 zip back over the application directory, including its
+   `.env`, and restart. That returns the server to exactly the state it was in before you
+   started — which is the reason for taking it as a zip rather than a file list.
 2. The MySQL database can sit there untouched while you work out what happened; nothing writes
    to it once the URL is unset.
 

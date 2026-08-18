@@ -51,3 +51,6 @@ dist/
 
 # Local pre-migration database/media snapshots (plan 0.2). Never committed.
 /backups/
+
+# Upload bundles built by scripts/make_upload_bundle.py
+/dist/
