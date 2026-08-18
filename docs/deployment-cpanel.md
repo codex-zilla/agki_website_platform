@@ -339,10 +339,38 @@ so.
 3. Add the user to the database with **ALL PRIVILEGES**.
 4. Note the final names: cPanel prefixes both with your account name.
 
-The resulting URL:
+The resulting URL. **The order is user, then password, then database** — and they are easy to
+transpose, because cPanel prefixes all three with the same account name and shows them on the
+same screen:
 
 ```
-DATABASE_URL=mysql://agkimed1_medical_db:agkimed1_admin@localhost:3306/cpuser_agki
+DATABASE_URL=mysql://USER:PASSWORD@localhost:3306/DBNAME
+                     └──┬─┘ └───┬──┘           └──┬──┘
+                        │       │                 └── the database, e.g. agkimed1_medical_db
+                        │       └── the password you generated for that user
+                        └── the user, e.g. agkimed1_admin
+```
+
+So for a database `agkimed1_medical_db` owned by user `agkimed1_admin`:
+
+```
+DATABASE_URL=mysql://agkimed1_admin:ThePasswordYouGenerated@localhost:3306/agkimed1_medical_db
+```
+
+> A name ending in `_db` in the **user** position, or a name ending in `_admin` in the
+> **password** position, means the fields have been transposed. The error you get is
+> `Access denied for user`, which reads like a permissions problem and sends you back to
+> cPanel to re-grant privileges that were never the issue.
+
+Check it before going further — this is the one line most likely to be wrong, and C5 is the
+cheapest place to find out:
+
+```bash
+python manage.py shell -c "
+from django.db import connection
+connection.ensure_connection()
+print('connected to', connection.settings_dict['NAME'], 'as', connection.settings_dict['USER'])
+"
 ```
 
 ### Part C — upload, configure, migrate
@@ -453,33 +481,95 @@ python -c "from django.core.management.utils import get_random_secret_key; print
 ```
 
 ```ini
-DJANGO_ENVIRONMENT=production            # ← the one from §2.1. Without it, nothing else here matters.
+# ─── Required. The site refuses to start without these in production ────────
+DJANGO_ENVIRONMENT=production
 DJANGO_SECRET_KEY=<the key you just generated>
-DJANGO_DEBUG=false
 DJANGO_ALLOWED_HOSTS=agkimedicallaboratory.co.tz,www.agkimedicallaboratory.co.tz
-DJANGO_CSRF_TRUSTED_ORIGINS=https://agkimedicallaboratory.co.tz,https://www.agkimedicallaboratory.co.tz
 SITE_URL=https://agkimedicallaboratory.co.tz
+DATABASE_URL=mysql://DBUSER:DBPASSWORD@localhost:3306/DBNAME
 
-DATABASE_URL=mysql://cpuser_agki:PASSWORD@localhost:3306/cpuser_agki
+# ─── Strongly recommended, even though the defaults are already right ───────
+# Explicit because these are the ones you want to be able to read off the file
+# during an incident rather than infer from a default.
+DJANGO_DEBUG=false
+DJANGO_CSRF_TRUSTED_ORIGINS=https://agkimedicallaboratory.co.tz,https://www.agkimedicallaboratory.co.tz
 DATABASE_CONN_MAX_AGE=60
+DATABASE_CONN_HEALTH_CHECKS=true
 
+# ─── Email. All four are enforced in production ─────────────────────────────
 EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
 EMAIL_HOST=mail.agkimedicallaboratory.co.tz
 EMAIL_PORT=465
 EMAIL_USE_SSL=true
+EMAIL_USE_TLS=false
 EMAIL_HOST_USER=noreply@agkimedicallaboratory.co.tz
 EMAIL_HOST_PASSWORD=<the mailbox password>
 DEFAULT_FROM_EMAIL=noreply@agkimedicallaboratory.co.tz
 
-DJANGO_LOGIN_REDIRECT_URL=post_login_redirect   # ← if the old .env you recovered in Part 0
-                                                #   sets this to "dashboard", the sign-in fix
-                                                #   ships inert.
-
+# ─── HTTPS and cookies ──────────────────────────────────────────────────────
 DJANGO_SECURE_SSL_REDIRECT=true
 DJANGO_SESSION_COOKIE_SECURE=true
 DJANGO_CSRF_COOKIE_SECURE=true
 DJANGO_TRUST_X_FORWARDED_PROTO=true
+# HSTS stays OFF for the first deploy - see the note below. Turn it on later.
+DJANGO_SECURE_HSTS_SECONDS=0
+DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS=false
+DJANGO_SECURE_HSTS_PRELOAD=false
+
+# ─── Auth redirects ─────────────────────────────────────────────────────────
+DJANGO_LOGIN_URL=signin
+DJANGO_LOGIN_REDIRECT_URL=post_login_redirect
+DJANGO_LOGOUT_REDIRECT_URL=admin:login
+ACCOUNT_LOGOUT_REDIRECT_URL=signin
+
+# ─── Locale ─────────────────────────────────────────────────────────────────
+DJANGO_TIME_ZONE=Africa/Dar_es_Salaam
+DJANGO_LANGUAGE_CODE=en-us
+DJANGO_USE_TZ=true
+DJANGO_USE_I18N=true
+
+# ─── OAuth. Blank = the social buttons do not work. See below ───────────────
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_CLIENT_KEY=
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+GITHUB_CLIENT_KEY=
 ```
+
+**`DJANGO_LOGOUT_REDIRECT_URL` is not a copy of the dev file.** `.env.example` carries
+`logout`, which names the logout view itself — logging out would redirect to logging out, in a
+loop. The value above matches the code default and is the one to use.
+
+**Leave HSTS at 0 for the first deploy.** Once a browser has seen an HSTS header it refuses
+plain HTTP for that domain for the full duration, cache and all, and you cannot take it back by
+removing the header. Turn it on — start at `3600`, then raise — once you have confirmed
+every page, image and redirect works over HTTPS. `check --deploy` will warn about it being
+unset in the meantime; that warning is expected here, not a failure.
+
+**The OAuth keys are deliberately blank**, because Google and GitHub sign-in have never been
+set up: production has **zero** rows in `socialaccount_socialapp`, `socialaccount_socialaccount`
+and `account_emailaddress`. Nothing is lost by leaving them empty — but any "Sign in with
+Google" button on the site is inert and will send visitors to a Google error page. Either
+configure the credentials or remove the buttons; do not leave it looking like a working option.
+
+
+**Deliberately not in the file above.** Every one of these is read by `settings.py`, and every
+one already defaults to the right production value — so setting them adds a line to get wrong
+without changing behaviour:
+
+| Variable | Default | Why that is fine |
+| --- | --- | --- |
+| `DJANGO_SITE_ID` | `1` | Production has exactly one `django_site` row, id 1. But see D3 — its *domain* is wrong |
+| `DJANGO_STATIC_URL`, `DJANGO_MEDIA_URL` | `/static/`, `/media/` | Match the `.htaccess` rules in C9 |
+| `DJANGO_STATIC_ROOT`, `DJANGO_MEDIA_ROOT` | `BASE_DIR/static`, `BASE_DIR/media` | Correct while the app root is the project root. Set `DJANGO_MEDIA_ROOT` only if you ever move `media/` outside the directory a deploy replaces (§2.4) |
+| `SOCIALACCOUNT_*`, `ACCOUNT_UNIQUE_EMAIL` | as in `.env.example` | Only reachable through OAuth, which is not configured |
+
+And one that is in the **dev `.env`** but is **not a setting at all**: a stray
+`UB_CLIENT_SECRET=`, a truncated leftover of `GITHUB_CLIENT_SECRET`. `settings.py` never reads
+it, so it does nothing anywhere — worth deleting from the dev file so the next person reading
+it does not go looking for what it configures. (`.env.example` is clean; this one only exists
+in the working copy.)
 
 ---
 
@@ -558,6 +648,26 @@ it up.
 **D2 · in the browser — create the first Content Editor account.** `/admin/` → Users → Add
 user, `is_staff` on, group **Content Editors**, **not** superuser.
 
+**D3 · on the server — fix the site domain.** Production's one `django_site` row still says
+`example.com`, the value Django ships with, and the import carries it across unchanged:
+
+```bash
+python manage.py shell -c "
+from django.contrib.sites.models import Site
+s = Site.objects.get(pk=1)
+s.domain = 'agkimedicallaboratory.co.tz'
+s.name = 'AGKI Medical Laboratory'
+s.save()
+print('site is now', s.domain)
+"
+```
+
+Not cosmetic. `django.contrib.sites` is installed, so Django's password-reset email builds its
+link from this row — `useraccount/templates/useraccount/password_reset_email.html` renders
+`{{ protocol }}://{{ domain }}…`, and `domain` comes from here. Left alone, every password
+reset email sends staff to `example.com`. It fails silently, at the least convenient moment,
+and to the one person who cannot get in to report it.
+
 ---
 
 ## 5. Verifying it actually worked
@@ -574,6 +684,7 @@ Check the things that fail silently, not the ones that fail loudly.
 | 6 | Public doctor list shows**all five doctors**, Kyla and Dr. Magembe included          | Proves the`role` cleanup landed. This is the one thing you can see from the outside. |
 | 7 | Row counts match the export                                                                | `CustomUser` 6, `Profile` 4, `AvailableSlot` 25, `LogEntry` 115, `Item` 1    |
 | 8 | **Every account still has `is_active=True`** and no new `OtpToken` rows appeared | §2.5. The one check that catches a silent import doing damage                         |
+| 9 | Request a password reset → the emailed link points at **agkimedicallaboratory.co.tz**, not `example.com` | Proves D3. This is only visible in the email body, so nothing else catches it |
 
 ---
 
