@@ -143,12 +143,15 @@ deploy and a bad afternoon.
 
 **Nothing in this part touches the server.** It all runs on your laptop: the **new** code out
 of this repository, pointed at a **copy** of the production database you downloaded in Part 0.
+
+> Commands in Part A run in **your local shell** — PowerShell, most likely. Where the syntax
+> genuinely differs, both forms are given. From Part C onward, anything marked *on the server*
+> runs in cPanel's Terminal, which is bash, so those blocks are bash and only bash.
 The server carries on serving the old code from its own database the whole time. It is not
 touched until C2, and if you stop after Part A nothing anywhere has changed.
 
 That pairing — new code, old data, local machine — is the entire point of Part A. Some of the
-migrations are data cleanups that have to run against production's actual rows: `useraccount
-0007` is what turns `Kyla`'s `role='1'` and `Dr. Magembe`'s `role='4491'` back into
+migrations are data cleanups that have to run against production's actual rows: `useraccount 0007` is what turns `Kyla`'s `role='1'` and `Dr. Magembe`'s `role='4491'` back into
 `'doctor'`, and it finds them **by username**. Those migrations only exist in the new code. So:
 
 - Run them here, against a copy, and the export you upload is already correct.
@@ -162,9 +165,11 @@ of production with whatever code is checked out right now, so this is not a form
 
 ```bash
 git checkout chore/cpanel-deployment
-git rev-parse --abbrev-ref HEAD                       # must print chore/cpanel-deployment
-python manage.py showmigrations appointments | tail -1  # must end at 0016_appointmentapproval_approved_by
+git rev-parse --abbrev-ref HEAD          # must print chore/cpanel-deployment
+python manage.py showmigrations appointments
 ```
+
+The last line of that list must be `[X] 0016_appointmentapproval_approved_by`.
 
 If that last line shows `0024_notification_sending_state`, you are on
 `feature/appointments-redesign` and Part A would migrate the copy through the whole appointment
@@ -262,21 +267,21 @@ is the right call — do not tidy production data this deployment does not need.
 **A5. Export.** The export and the import have both been run end to end against this data: 164
 objects out, 164 objects in, accounts intact.
 
-```bash
-python manage.py dumpdata \
-  --natural-foreign --natural-primary \
-  --exclude contenttypes --exclude auth.permission --exclude auth.group \
-  --exclude sessions.session \
-  --indent 2 -o backups/prod_data.json
+**One line, deliberately.** A backslash continues a line in bash but is just an argument in
+PowerShell, where the continuation character is a backtick — split this across lines there and
+it fails with `unrecognized arguments: \ \ \`. One line works in every shell:
+
+```
+python manage.py dumpdata --natural-foreign --natural-primary --exclude contenttypes --exclude auth.permission --exclude auth.group --exclude sessions.session --indent 2 -o backups/prod_data.json
 ```
 
 Why each exclusion:
 
-| Excluded | Because |
-| --- | --- |
-| `contenttypes`, `auth.permission` | Recreated by `migrate` on the new database. Importing them collides on ids. `--natural-foreign` is what lets everything else still point at them correctly |
-| `auth.group` | `migrate` creates the **Content Editors** group itself (`cms` migration 0003, 54 permissions). Importing a second copy collides on the unique name. Production has no other groups, so nothing is lost |
-| `sessions.session` | 110 rows of expiring cookies. Everyone signs in again; that is fine |
+| Excluded                              | Because                                                                                                                                                                                                          |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `contenttypes`, `auth.permission` | Recreated by`migrate` on the new database. Importing them collides on ids. `--natural-foreign` is what lets everything else still point at them correctly                                                    |
+| `auth.group`                        | `migrate` creates the **Content Editors** group itself (`cms` migration 0003, 54 permissions). Importing a second copy collides on the unique name. Production has no other groups, so nothing is lost |
+| `sessions.session`                  | 110 rows of expiring cookies. Everyone signs in again; that is fine                                                                                                                                              |
 
 `prod_data.json` is about 60 KB. **It has to be uploaded to the server** (C2) — step C6 loads
 it there, because that is where the MySQL connection lives.
@@ -285,7 +290,11 @@ it there, because that is where the MySQL connection lives.
 copy:
 
 ```bash
-unset DATABASE_URL          # PowerShell: $env:DATABASE_URL = $null
+unset DATABASE_URL
+```
+
+```powershell
+$env:DATABASE_URL = $null
 ```
 
 ### 4.1 What goes up, and what stays behind
