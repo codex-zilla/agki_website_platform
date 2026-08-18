@@ -60,7 +60,7 @@ that `.env.prod` in the repo does **not** contain it.
 
 **2. `.env.prod` is a template, not a config.** It carries `DATABASE_URL=`, `EMAIL_HOST_USER=`
 and `EMAIL_HOST_PASSWORD=` all empty, and a `django-insecure-…` secret key that was generated
-for development. **Generate a new secret key for production** (step C3). The file is gitignored,
+for development. **Generate a new secret key for production** (step C4). The file is gitignored,
 so nothing secret is in the repository — but a dev key deployed to production is a real one.
 
 **3. Django serves neither `/static/` nor `/media/` when `DEBUG=False`.** Look at the end of
@@ -146,13 +146,12 @@ values come back with the import. Migrating the SQLite copy first means the clea
 the rows it is looking for are actually there.
 
 ```bash
-# A1. Take the live database and media off the server first. Keep them somewhere durable;
-#     this is the rollback.
-#     cPanel → File Manager, or:
-#     scp user@host:~/app/db.sqlite3  ./backups/prod-$(date +%F).sqlite3
-#     scp -r user@host:~/app/media    ./backups/media-$(date +%F)
+# A1. Use the db.sqlite3 you downloaded in Part 0. Nothing else needs to come off
+#     the server - media stays where it is (§4.1), and the zip is the rollback.
+#     Assume it is at ./backups/prod-<date>.sqlite3 below.
 
-# A2. Work on a copy. Never on the file you just downloaded.
+# A2. Work on a copy. Never on the file you just downloaded - if this goes wrong
+#     you want to start again from something untouched.
 cp ./backups/prod-$(date +%F).sqlite3 ./backups/rehearsal.sqlite3
 export DATABASE_URL="sqlite:///$(pwd)/backups/rehearsal.sqlite3"
 
@@ -203,6 +202,9 @@ Why each exclusion:
 | `auth.group`                        | `migrate` creates the **Content Editors** group itself (`cms` migration 0003, 54 permissions). Importing a second copy collides on the unique name. Production has no other groups, so nothing is lost. |
 | `sessions.session`                  | 110 rows of expiring cookies. Everyone signs in again; that is fine.                                                                                                                                              |
 
+`prod_data.json` is about 60 KB. **It has to be uploaded to the server** (C2) — step C6 loads it
+there, because that is where the MySQL connection lives.
+
 ### 4.1 What goes up, and what stays behind
 
 `scripts/make_upload_bundle.py` is the authority; this is what it decides and why.
@@ -217,10 +219,10 @@ media directories.
 | --- | --- |
 | `.git/` | 72 MB of history the server has no use for |
 | `.venv/` | Platform-specific. The cPanel Python App builds its own |
-| `static/` | **63 MB of `collectstatic` output.** Regenerate it on the server (C5) — the sources travel inside each app, so uploading this would be shipping the same files twice |
+| `static/` | **63 MB of `collectstatic` output.** Regenerate it on the server (C7) — the sources travel inside each app, so uploading this would be shipping the same files twice |
 | `design/`, `docs/` | Mockups and reference material; never imported at runtime |
 | `backups/`, `db.sqlite3`, `deployed_copy_db.sqlite3` | Development and production database copies. The bundle script refuses to build if any appears |
-| `.env`, `.env.prod` | Development secrets. You create the real `.env` on the server (C2) |
+| `.env`, `.env.prod` | Development secrets. You create the real `.env` on the server (C4) |
 | `__pycache__/`, `*.pyc` | Compiled for a different Python build than the server's |
 
 **Media — audited, not guessed.** Of the 33 MB in `media/`, the bundle carries **27 MB**:
@@ -251,25 +253,42 @@ The resulting URL:
 DATABASE_URL=mysql://cpuser_agki:PASSWORD@localhost:3306/cpuser_agki
 ```
 
-### Part C — configure and deploy
+### Part C — upload, configure, migrate
 
-**C1. Build the upload bundle**, on your machine, from the `chore/cpanel-deployment`
-working tree:
+Every step says where it runs. That seam is where deployments go wrong: half of these are on
+your laptop and half are on the server, and the commands look identical.
+
+---
+
+**C1 · on your machine — build the bundle.**
 
 ```bash
-git checkout chore/cpanel-deployment
-python scripts/make_upload_bundle.py            # writes dist/agki-upload-<date>.zip
-python scripts/make_upload_bundle.py --list     # or just look at what it would include
+git checkout chore/cpanel-deployment          # NOT the appointments branch - see the note at the top
+python scripts/make_upload_bundle.py          # writes dist/agki-upload-<date>.zip
 ```
 
-263 files, 79 MB, 76 MB compressed. The script exists because "what exactly do I upload?" has
-an expensive wrong answer in both directions, and because a hand-assembled zip that happens to
-contain `.env` looks exactly like one that does not — so it **refuses to build** if anything
-in `FORBIDDEN` would end up inside. What it leaves out, and why, is §4.1.
+263 files, 79 MB, 76 MB compressed. Check the printed manifest says **17 files under
+`appointments/migrations/`**; 25 means you are on the wrong branch. The script **refuses to
+build** if anything in `FORBIDDEN` would end up inside, because a hand-assembled zip that
+contains `.env` looks exactly like one that does not. What it leaves out, and why, is §4.1.
 
-Upload it through **cPanel → File Manager**, into the application directory, and extract it
-there. **Do not delete the existing directory first** — see §4.1 on media. Then, in the cPanel
-Python App's virtualenv:
+---
+
+**C2 · in cPanel File Manager — upload two things.**
+
+1. **`dist/agki-upload-<date>.zip`** → into the application directory → **Extract**.
+   **Do not delete the existing directory first.** Six files the imported database points at
+   live in the server's `media/` and are deliberately not in the bundle (§4.1); extracting
+   *over* the directory keeps them.
+2. **`backups/prod_data.json`** → into the application directory too. C6 loads it from there.
+
+Extraction **merges**, it does not mirror: files deleted in this version still linger on the
+server afterwards. Harmless here — nothing imports them once `urls.py` and the templates are
+replaced — but worth knowing before you go looking for a file that should be gone.
+
+---
+
+**C3 · on the server, in the cPanel Python App's virtualenv — install dependencies.**
 
 ```bash
 pip install -r requirements.txt
@@ -283,13 +302,21 @@ already makes either one work:
 pip install PyMySQL
 ```
 
-**C2. Create `.env` in the application root** (next to `manage.py`). cPanel's "Setup Python
-App" environment-variable panel works too and takes precedence — either is fine, but pick one
-so there is a single place to look.
+---
+
+**C4 · on the server — create `.env`** in the application root, next to `manage.py`. cPanel's
+"Setup Python App" environment-variable panel works too and takes precedence — either is fine,
+but pick one so there is a single place to look.
+
+Generate the secret key first (either machine):
+
+```bash
+python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+```
 
 ```ini
 DJANGO_ENVIRONMENT=production            # ← the one from §2.1. Without it, nothing else here matters.
-DJANGO_SECRET_KEY=<generate a new one, see C3>
+DJANGO_SECRET_KEY=<the key you just generated>
 DJANGO_DEBUG=false
 DJANGO_ALLOWED_HOSTS=agkimedicallaboratory.co.tz,www.agkimedicallaboratory.co.tz
 DJANGO_CSRF_TRUSTED_ORIGINS=https://agkimedicallaboratory.co.tz,https://www.agkimedicallaboratory.co.tz
@@ -306,8 +333,9 @@ EMAIL_HOST_USER=noreply@agkimedicallaboratory.co.tz
 EMAIL_HOST_PASSWORD=<the mailbox password>
 DEFAULT_FROM_EMAIL=noreply@agkimedicallaboratory.co.tz
 
-DJANGO_LOGIN_REDIRECT_URL=post_login_redirect   # ← if an old .env sets this to "dashboard",
-                                                #   the sign-in fix ships inert.
+DJANGO_LOGIN_REDIRECT_URL=post_login_redirect   # ← if the old .env you recovered in Part 0
+                                                #   sets this to "dashboard", the sign-in fix
+                                                #   ships inert.
 
 DJANGO_SECURE_SSL_REDIRECT=true
 DJANGO_SESSION_COOKIE_SECURE=true
@@ -315,27 +343,53 @@ DJANGO_CSRF_COOKIE_SECURE=true
 DJANGO_TRUST_X_FORWARDED_PROTO=true
 ```
 
+---
+
+**C5 · on the server — check the configuration before touching the database.**
+
 ```bash
-# C3. A real secret key.
-python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+python manage.py check --deploy
+```
 
-# C4. Schema, then data.
+Cheap, and it catches a mistyped `DATABASE_URL` or a missing `DJANGO_ENVIRONMENT` *before* a
+half-finished migration does.
+
+---
+
+**C6 · on the server — schema, then data.**
+
+```bash
 python manage.py migrate
-python manage.py loaddata ./backups/prod_data.json
+python manage.py loaddata prod_data.json      # the file you uploaded in C2
+```
 
-# C5. Static files.
+`migrate` runs against the empty MySQL database and builds every table. `loaddata` then puts
+production's 164 rows into it. Expect "Installed 164 object(s) from 1 fixture(s)".
+
+---
+
+**C7 · on the server — static files.**
+
+```bash
 python manage.py collectstatic --noinput
-#     `createcachetable` is NOT needed for this deployment - the rate limiter that
-#     wants it arrives with the appointment work (§7).
+```
 
-# C6. Upload media/ to the application root (or wherever DJANGO_MEDIA_ROOT points).
+This is why `static/` is not in the bundle: it is generated from sources that are.
+`createcachetable` is **not** needed for this deployment — the rate limiter that wants it
+arrives with the appointment work (§7).
 
-# C7. Restart Passenger.
+---
+
+**C8 · on the server — restart Passenger.**
+
+```bash
 touch tmp/restart.txt
 ```
 
-**C8. Make Apache serve `/static/` and `/media/`** (§2.3 — Django will not). In the document
-root's `.htaccess`, *above* the Passenger rules:
+---
+
+**C9 · in cPanel — make Apache serve `/static/` and `/media/`** (§2.3 — Django will not). In
+the document root's `.htaccess`, *above* the Passenger rules:
 
 ```apache
 RewriteEngine On
@@ -349,15 +403,22 @@ an image, not by reading the config.**
 
 ### Part D — after the first successful load
 
-```bash
-# D1. Import the homepage content into the CMS. Run once, deliberately: re-running
-#     overwrites the rows it manages, which is the point of an import command but not
-#     something to wire into a deploy script.
-python manage.py seed_home_content
+**D1 · on the server — import the homepage content into the CMS.**
 
-# D2. Create the first Content Editor account: /admin/ → Users → Add user,
-#     is_staff on, group "Content Editors", NOT superuser.
+```bash
+python manage.py seed_home_content
 ```
+
+Run once, deliberately. Re-running **overwrites** the rows it manages, which is what an import
+command should mean but is not something to wire into a deploy script.
+
+It reads its images from two places, both of which the bundle carries: `static:app/…` through
+the staticfiles finders, and `media:problem/…` from `media/problem/` — the three files §4.1
+explains. If it stops with `CommandError: Media asset not found`, that directory did not make
+it up.
+
+**D2 · in the browser — create the first Content Editor account.** `/admin/` → Users → Add
+user, `is_staff` on, group **Content Editors**, **not** superuser.
 
 ---
 
