@@ -147,8 +147,8 @@ of this repository, pointed at a **copy** of the production database you downloa
 > Commands in Part A run in **your local shell** — PowerShell, most likely. Where the syntax
 > genuinely differs, both forms are given. From Part C onward, anything marked *on the server*
 > runs in cPanel's Terminal, which is bash, so those blocks are bash and only bash.
-The server carries on serving the old code from its own database the whole time. It is not
-touched until C2, and if you stop after Part A nothing anywhere has changed.
+> The server carries on serving the old code from its own database the whole time. It is not
+> touched until C2, and if you stop after Part A nothing anywhere has changed.
 
 That pairing — new code, old data, local machine — is the entire point of Part A. Some of the
 migrations are data cleanups that have to run against production's actual rows: `useraccount 0007` is what turns `Kyla`'s `role='1'` and `Dr. Magembe`'s `role='4491'` back into
@@ -342,7 +342,7 @@ so.
 The resulting URL:
 
 ```
-DATABASE_URL=mysql://cpuser_agki:PASSWORD@localhost:3306/cpuser_agki
+DATABASE_URL=mysql://agkimed1_medical_db:agkimed1_admin@localhost:3306/cpuser_agki
 ```
 
 ### Part C — upload, configure, migrate
@@ -380,11 +380,41 @@ replaced — but worth knowing before you go looking for a file that should be g
 
 ---
 
-**C3 · on the server, in the cPanel Python App's virtualenv — install dependencies.**
+**C3 · on the server — enter the virtualenv, then install dependencies.**
+
+Open **cPanel → Terminal** (or SSH in). Everything from here to C8 runs there, and every one
+of those commands needs the virtualenv active first — outside it, `python` is the system
+interpreter with none of this project's packages.
+
+**cPanel writes the exact command for you.** Go to **Setup Python App**, open the application,
+and the top of its card shows a line beginning `source /home/…/bin/activate`, with a copy
+button. Paste that into Terminal. It looks like:
+
+```bash
+source /home/cpuser/virtualenv/agki/3.12/bin/activate && cd /home/cpuser/agki
+```
+
+The three variables are your cPanel username, the **Application root** you set when the app was
+created, and the Python version. Copying it from the UI avoids guessing all three.
+
+Confirm it took before doing anything else:
+
+```bash
+which python          # must be under /home/.../virtualenv/..., not /usr/bin
+python --version      # 3.12.x
+```
+
+If the prompt gains a `(agki:3.12)` prefix, you are in. Then:
 
 ```bash
 pip install -r requirements.txt
 ```
+
+> **If Terminal is disabled** on this hosting plan, Setup Python App can still install
+> dependencies on its own: add `requirements.txt` under **Configuration files** and use **Run
+> Pip Install**. That covers C3 — but *only* C3. Steps C5 through C8 and D1 are management
+> commands with no UI equivalent, so without Terminal or SSH this deployment cannot be
+> completed. Worth checking you have one **before** starting Part A.
 
 If `mysqlclient` fails to build — it needs MySQL development headers, which not every shared
 host has — install the pure-Python driver instead. Nothing else changes; `project/__init__.py`
@@ -396,9 +426,25 @@ pip install PyMySQL
 
 ---
 
-**C4 · on the server — create `.env`** in the application root, next to `manage.py`. cPanel's
-"Setup Python App" environment-variable panel works too and takes precedence — either is fine,
-but pick one so there is a single place to look.
+**C4 · on the server — create `.env`** in the application root, next to `manage.py`.
+
+**Use the file, not cPanel's environment-variable panel.** This is not a style preference. The
+panel injects variables into the *application process Passenger starts* — it does not put them
+in your Terminal session. But C5 through C8 and D1 are all commands you run from Terminal, and
+`settings.py` reads `.env` on every import regardless of how the process was started:
+
+```python
+load_dotenv(BASE_DIR / ".env", override=False)
+```
+
+So with the config only in the panel, `python manage.py migrate` in Terminal would see **no**
+`DATABASE_URL`, fall back to the SQLite default, cheerfully build every table in a
+`db.sqlite3` beside `manage.py`, and report success — while the website talks to MySQL and
+finds nothing there. Nothing errors. You would notice at C6 or later, by which point the
+obvious explanation is the wrong one.
+
+`override=False` means real environment variables still win, so the panel is safe to use *as
+well* — it just cannot be used *instead*.
 
 Generate the secret key first (either machine):
 
