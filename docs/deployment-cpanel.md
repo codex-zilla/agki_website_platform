@@ -2,7 +2,16 @@
 
 **Target:** `agkimedicallaboratory.co.tz`, cPanel + Passenger, Python 3.12
 **Deploying:** `main` — the CMS and website work. **Not** the appointment redesign; see §7.
-**Status:** written 2026-08-17, after rehearsing the data migration against a copy of the live database
+**Database:** SQLite for now — the host's MySQL is too old for Django 4.2. See **§3.1/§3.2**.
+**Status:** **executed successfully on 2026-08-19.** Corrected afterwards against what actually
+happened — every step below has now been run on the real server, not just rehearsed.
+
+> **The stack is LiteSpeed + LSAPI, not Apache + Passenger.** cPanel on CloudLinux wires the
+> Python app in the LiteSpeed vhost config, so there are no Passenger directives in
+> `.htaccess` to find or edit. `touch tmp/restart.txt` still works — LiteSpeed uses the same
+> restart convention — and LiteSpeed honours `.htaccess` the way Apache does. The application
+> root is `/home/agkimed1/agki_medical_lab_website`; the document root is
+> `/home/agkimed1/public_html`.
 
 > **Read this first — which working tree you upload is the whole decision.**
 > There is no git integration on the server, so deployment is a manual upload of whatever is
@@ -58,7 +67,15 @@ is an argument for doing it now rather than later.
 These are the ones that cost time if you meet them for the first time at 11pm.
 
 **1. `DJANGO_ENVIRONMENT` is probably not set, and everything hangs off it.**
-`settings.py` decides what "production" means from that one variable. Without it, `IS_PRODUCTION`
+`settings.py` decides what "production" means from that one variable.
+
+> **This happened, and the symptom is misleading.** `check --deploy` came back with six
+> warnings — `DEBUG` on, all three secure-cookie settings off, an insecure `SECRET_KEY` — which
+> reads like six problems and is one: `IS_PRODUCTION` was false, because the `.env` had been
+> uploaded to `tmp/` instead of the application root. `settings.py` reads exactly one path,
+> `BASE_DIR/.env`, meaning **next to `manage.py` and nowhere else**. A file anywhere else is
+> not an error; everything just silently defaults. If several security warnings appear at once,
+> check the file's location before changing any setting. Without it, `IS_PRODUCTION`
 is false and the site silently runs in development mode: **the email backend prints to a log
 instead of sending**, required settings stop being enforced, and `DEBUG` defaults to on. If
 password-reset or OTP emails have "not been arriving", this is the first thing to check. Note
@@ -99,7 +116,7 @@ the migrations that do arrive with the appointment work — but the habit is the
 
 ---
 
-## 3. The database: yes, use cPanel's MySQL
+## 3. The database: MySQL is the destination, SQLite is the interim
 
 Your instinct is right, and there is a harder reason than convenience.
 
@@ -119,6 +136,119 @@ the code change was small: a driver in `requirements.txt`, a fallback shim in
 without it MySQL silently truncates a value too long for its column).
 
 **Do it during this deployment, not after.** Right now there are no appointments to move.
+
+### 3.1 Blocked for now — the host's MySQL is too old
+
+cPanel is offering MySQL 5.x. Django 4.2 will not talk to it. The minimums are read straight
+out of `django/db/backends/*/features.py`, not from documentation:
+
+| Backend    | Django 4.2 requires |
+| ---------- | ------------------- |
+| MySQL      | **8.0+**      |
+| MariaDB    | **10.4+**     |
+| PostgreSQL | **12+**       |
+| SQLite     | 3.21+               |
+
+Django checks the server version when it first connects and raises `NotSupportedError`. There
+is no flag to override it, and no partial mode — the site simply will not start.
+
+**Confirm the version before abandoning MySQL.** cPanel labels MariaDB as "MySQL" in several
+places, and MariaDB's version numbers are not MySQL's: a panel reading "5.5" is often MariaDB
+10.x underneath, which *is* supported. In phpMyAdmin, or a shell:
+
+```sql
+SELECT VERSION();
+```
+
+If that returns something like `10.6.16-MariaDB`, you are fine and §3 applies unchanged. If it
+genuinely returns `5.x` and is not MariaDB 10.4+, the options are, in rough order of effort:
+
+1. **Ask the host to move the account to a newer MySQL/MariaDB.** Usually a support ticket
+   rather than a migration; many hosts run several versions and put new accounts on the newest.
+2. **Check whether PostgreSQL is offered.** Django 4.2 needs 12+, `dj-database-url` already
+   parses `postgres://`, and the only code change is `psycopg2-binary` in `requirements.txt`
+   instead of `mysqlclient`. Everything in this runbook works the same way.
+3. **A managed database elsewhere.** Works, but adds network latency to every query from a
+   shared host, and outbound connections on those ports are often firewalled. Check both before
+   committing.
+
+**Until one of those lands, deploy on SQLite.** That is a real option here rather than a
+compromise to feel bad about: production has been running on SQLite all along, has six accounts
+and no appointments, and the CMS is a low-write workload. What follows says exactly what
+changes.
+
+### 3.2 The SQLite path
+
+**It makes the deployment simpler, not harder.** There is no database to create, no export and
+no import — the migrated database file *is* the deliverable. Concretely, against §4:
+
+| Step                                   | On the SQLite path                                                                                                            |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| **A5** (`dumpdata`)            | **Skip.** Nothing needs exporting; you upload the file itself                                                           |
+| **Part B** (create the database) | **Skip entirely**                                                                                                       |
+| **C2** (upload)                  | Upload the**migrated `backups/rehearsal.sqlite3`** alongside the bundle, not `prod_data.json`                       |
+| **C4** (`.env`)                | Leave`DATABASE_URL` **blank**, and set `DATABASE_CONN_MAX_AGE=0`, `DATABASE_CONN_HEALTH_CHECKS=false`             |
+| **C6** (migrate + loaddata)      | `migrate` only, and it should report **no migrations to apply** — Part A already ran them. **No `loaddata`** |
+
+Blank `DATABASE_URL` is not a special case in the code; `settings.py` falls back to
+`BASE_DIR/db.sqlite3` when it is empty, which is the same path production uses today.
+
+**Two things to do on the server that MySQL would have given you for free.**
+
+Put the file in place under the right name, keeping the original next to it:
+
+```bash
+cd /home/agkimed1/agki_medical_lab_website
+mv db.sqlite3 db.sqlite3.pre-deploy          # the running database, kept
+mv rehearsal.sqlite3 db.sqlite3              # the one you migrated in Part A
+```
+
+**Confirm Django is actually on SQLite before the next command**, or it fails against the
+database you were trying to get away from:
+
+```bash
+python manage.py shell -c "
+from django.conf import settings
+d = settings.DATABASES['default']
+print(d['ENGINE'], d['NAME'])
+"
+```
+
+Expect `django.db.backends.sqlite3` and `/home/agkimed1/agki_medical_lab_website/db.sqlite3`. A `NotSupportedError: MySQL 8 or later
+is required (found 5.7.44)` here means `DATABASE_URL` is still set — in `.env`, or in cPanel's
+environment-variable panel, which reaches the shell through the virtualenv's activate script.
+Check both: `echo $DATABASE_URL` and `grep DATABASE_URL .env`.
+
+Then switch it to WAL journalling — once, permanently:
+
+```bash
+python manage.py shell -c "
+from django.db import connection
+print(connection.cursor().execute('PRAGMA journal_mode=WAL;').fetchone()[0])
+"
+```
+
+It should print `wal`. This is a property of the **file**, not of a connection, so it survives
+restarts and every later deploy; you never need to run it again. Under the default journalling
+a writer blocks readers outright, which on a multi-worker Passenger setup is what produces
+`database is locked` on an otherwise idle site. WAL lets readers carry on while a write is in
+flight. The settings file separately raises the lock wait from SQLite's default 5 seconds to 20,
+so a contended write waits rather than failing in front of a visitor.
+
+**What this costs, stated plainly.**
+
+- **Concurrent writes stay the weak point.** WAL and the longer timeout make `database is locked` unlikely at this traffic level; they do not make it impossible.
+- **The appointment redesign cannot ship on this.** Phase 4 claims a slot with
+  `select_for_update()`, and SQLite raises `NotSupportedError` — no timeout or journal mode
+  changes that. The CMS deployment is unaffected, but **the database question has to be
+  resolved before the booking work goes live**, which makes it a scheduling dependency rather
+  than a preference.
+- **Backups are yours to take.** No cPanel database backup covers a file in a home directory.
+  Add `db.sqlite3` to whatever backup you keep of `media/`.
+
+When the database question is resolved, §4 Part A already produces exactly what a MySQL or
+PostgreSQL cutover needs — re-run A5 against the by-then-current SQLite file and follow Part B
+onward. Nothing done here has to be undone.
 
 ---
 
@@ -264,7 +394,11 @@ touches them: the duplicate slot pair, and the two orphan `Rating` rows. They ma
 the appointment work, whose migrations refuse to run until somebody resolves them. Leaving them
 is the right call — do not tidy production data this deployment does not need.
 
-**A5. Export.** The export and the import have both been run end to end against this data: 164
+**A5. Export.** — **skipped on the SQLite path (§3.2):** the migrated
+`backups/rehearsal.sqlite3` is itself what you upload, so there is nothing to export. Stop
+after A4 and go to C1.
+
+The export and the import have both been run end to end against this data: 164
 objects out, 164 objects in, accounts intact.
 
 **One line, deliberately.** A backslash continues a line in bash but is just an argument in
@@ -333,8 +467,10 @@ so.
 
 ### Part B — create the database (in cPanel)
 
-1. **MySQL® Databases** → create a database, e.g. `cpuser_agki`.
-2. Create a user, e.g. `cpuser_agki`, with a long generated password. **Do not use `@ : / #`
+> **Skip this whole part on the SQLite path (§3.2).** There is no database to create.
+
+1. **MySQL® Databases** → create a database, e.g. `agkimed1_medical_db`.
+2. Create a user, e.g. `agkimed1_admin`, with a long generated password. **Do not use `@ : / #`
    in it** — they have to be percent-encoded inside a URL, and that is a needless trap.
 3. Add the user to the database with **ALL PRIVILEGES**.
 4. Note the final names: cPanel prefixes both with your account name.
@@ -401,6 +537,8 @@ contains `.env` looks exactly like one that does not. What it leaves out, and wh
    live in the server's `media/` and are deliberately not in the bundle (§4.1); extracting
    *over* the directory keeps them.
 2. **`backups/prod_data.json`** → into the application directory too. C6 loads it from there.
+   **On the SQLite path (§3.2):** upload **`backups/rehearsal.sqlite3`** instead — that file is
+   the database, and §3.2 says what to rename it to once it is up there.
 
 Extraction **merges**, it does not mirror: files deleted in this version still linger on the
 server afterwards. Harmless here — nothing imports them once `urls.py` and the templates are
@@ -419,7 +557,7 @@ and the top of its card shows a line beginning `source /home/…/bin/activate`, 
 button. Paste that into Terminal. It looks like:
 
 ```bash
-source /home/cpuser/virtualenv/agki/3.12/bin/activate && cd /home/cpuser/agki
+source /home/agkimed1/virtualenv/agki_medical_lab_website/3.12/bin/activate && cd /home/agkimed1/agki_medical_lab_website
 ```
 
 The three variables are your cPanel username, the **Application root** you set when the app was
@@ -487,6 +625,11 @@ DJANGO_SECRET_KEY=<the key you just generated>
 DJANGO_ALLOWED_HOSTS=agkimedicallaboratory.co.tz,www.agkimedicallaboratory.co.tz
 SITE_URL=https://agkimedicallaboratory.co.tz
 DATABASE_URL=mysql://DBUSER:DBPASSWORD@localhost:3306/DBNAME
+# On the SQLite path (§3.2), leave DATABASE_URL empty instead - settings.py then
+# falls back to BASE_DIR/db.sqlite3, which is where production already is:
+#   DATABASE_URL=
+#   DATABASE_CONN_MAX_AGE=0
+#   DATABASE_CONN_HEALTH_CHECKS=false
 
 # ─── Strongly recommended, even though the defaults are already right ───────
 # Explicit because these are the ones you want to be able to read off the file
@@ -553,17 +696,16 @@ and `account_emailaddress`. Nothing is lost by leaving them empty — but any "S
 Google" button on the site is inert and will send visitors to a Google error page. Either
 configure the credentials or remove the buttons; do not leave it looking like a working option.
 
-
 **Deliberately not in the file above.** Every one of these is read by `settings.py`, and every
 one already defaults to the right production value — so setting them adds a line to get wrong
 without changing behaviour:
 
-| Variable | Default | Why that is fine |
-| --- | --- | --- |
-| `DJANGO_SITE_ID` | `1` | Production has exactly one `django_site` row, id 1. But see D3 — its *domain* is wrong |
-| `DJANGO_STATIC_URL`, `DJANGO_MEDIA_URL` | `/static/`, `/media/` | Match the `.htaccess` rules in C9 |
-| `DJANGO_STATIC_ROOT`, `DJANGO_MEDIA_ROOT` | `BASE_DIR/static`, `BASE_DIR/media` | Correct while the app root is the project root. Set `DJANGO_MEDIA_ROOT` only if you ever move `media/` outside the directory a deploy replaces (§2.4) |
-| `SOCIALACCOUNT_*`, `ACCOUNT_UNIQUE_EMAIL` | as in `.env.example` | Only reachable through OAuth, which is not configured |
+| Variable                                      | Default                                 | Why that is fine                                                                                                                                          |
+| --------------------------------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DJANGO_SITE_ID`                            | `1`                                   | Production has exactly one`django_site` row, id 1. But see D3 — its *domain* is wrong                                                                |
+| `DJANGO_STATIC_URL`, `DJANGO_MEDIA_URL`   | `/static/`, `/media/`               | Match the`.htaccess` rules in C9                                                                                                                        |
+| `DJANGO_STATIC_ROOT`, `DJANGO_MEDIA_ROOT` | `BASE_DIR/static`, `BASE_DIR/media` | Correct while the app root is the project root. Set`DJANGO_MEDIA_ROOT` only if you ever move `media/` outside the directory a deploy replaces (§2.4) |
+| `SOCIALACCOUNT_*`, `ACCOUNT_UNIQUE_EMAIL` | as in`.env.example`                   | Only reachable through OAuth, which is not configured                                                                                                     |
 
 And one that is in the **dev `.env`** but is **not a setting at all**: a stray
 `UB_CLIENT_SECRET=`, a truncated leftover of `GITHUB_CLIENT_SECRET`. `settings.py` never reads
@@ -579,8 +721,16 @@ in the working copy.)
 python manage.py check --deploy
 ```
 
-Cheap, and it catches a mistyped `DATABASE_URL` or a missing `DJANGO_ENVIRONMENT` *before* a
-half-finished migration does.
+**Expect exactly one warning: `security.W004`**, about `SECURE_HSTS_SECONDS`. That one is
+deliberate (see C4). *Anything else is a failure*, not something to note and move past.
+
+In particular, seeing `W008`, `W012`, `W016` and `W018` together is not four problems — it is
+`IS_PRODUCTION` being false, and §2.1 says where to look. `W009` alongside them confirms it:
+`SECRET_KEY` can only fall back to its insecure default when `IS_PRODUCTION` is false, because
+`env_value()` raises instead of falling back in production.
+
+Note this command does **not** open a database connection, so it passing says nothing about
+`DATABASE_URL`. C6 is where that gets tested.
 
 ---
 
@@ -593,6 +743,11 @@ python manage.py loaddata prod_data.json      # the file you uploaded in C2
 
 `migrate` runs against the empty MySQL database and builds every table. `loaddata` then puts
 production's 164 rows into it. Expect "Installed 164 object(s) from 1 fixture(s)".
+
+> **On the SQLite path (§3.2):** run `migrate` only — **no `loaddata`**. It should report *no
+> migrations to apply*, because Part A already applied them to the file you just uploaded. If it
+> starts applying migrations instead, you are pointed at the wrong file: most likely the old
+> `db.sqlite3` is still in place and the rename in §3.2 has not happened.
 
 ---
 
@@ -616,18 +771,42 @@ touch tmp/restart.txt
 
 ---
 
-**C9 · in cPanel — make Apache serve `/static/` and `/media/`** (§2.3 — Django will not). In
-the document root's `.htaccess`, *above* the Passenger rules:
+**C9 · on the server — let the web server serve `/static/` and `/media/`** (§2.3 — Django
+will not, once `DEBUG=False`).
 
-```apache
-RewriteEngine On
-RewriteRule ^static/(.*)$  /home/cpuser/app/static/$1  [L]
-RewriteRule ^media/(.*)$   /home/cpuser/app/media/$1   [L]
+**Symlink them into the document root.** This is the approach that works, and it needs no
+configuration file at all — LiteSpeed serves any file that exists in the document root before
+the request reaches Django:
+
+```bash
+ln -s /home/agkimed1/agki_medical_lab_website/static /home/agkimed1/public_html/static
+ln -s /home/agkimed1/agki_medical_lab_website/media  /home/agkimed1/public_html/media
+ls -la /home/agkimed1/public_html/ | grep -E "static|media"
 ```
 
-Exact paths depend on how the Python app was set up. If cPanel's layout makes this awkward, the
-alternative is symlinks from the document root into `static/` and `media/`. **Verify by loading
-an image, not by reading the config.**
+> **Not rewrite rules.** An earlier draft of this step gave `RewriteRule` directives to paste
+> into `.htaccess`. Two things were wrong with it. They are **Apache configuration, not shell
+> commands** — pasted into a terminal they produce `bash: RewriteEngine: command not found`.
+> And they would not have worked from `.htaccess` anyway: a substitution beginning with `/` is
+> treated as a URL path, and mapping one to a directory *outside* the document root needs an
+> `Alias` directive, which shared hosting does not give you. Symlinks sidestep both problems.
+
+> **Leave `/home/agkimed1/public_html/.htaccess` alone.** On this stack it contains only
+> CloudLinux's environment-variable block, marked `DO NOT REMOVE OR MODIFY` — and it is what
+> carries the app's environment. There are no Passenger directives in it to order things around.
+
+**Verify with real files, not by reading config.** A directory returns 404 whether or not
+routing works, so test actual files:
+
+```bash
+curl -sI https://agkimedicallaboratory.co.tz/static/admin/css/base.css | head -1
+curl -sI https://agkimedicallaboratory.co.tz/media/cms/awards/AFD.png | head -1
+```
+
+Both `200` is the pass. `403` means symlink following is disabled; `404` on static means the
+web server is routing everything to Django; `404` on media only means the media upload did not
+land, which is a different problem with a different fix — which is why they are tested
+separately.
 
 ### Part D — after the first successful load
 
@@ -674,17 +853,17 @@ and to the one person who cannot get in to report it.
 
 Check the things that fail silently, not the ones that fail loudly.
 
-| # | Check                                                                                      | Why this one                                                                           |
-| - | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
-| 1 | `python manage.py check --deploy` reports no ERRORs                                      | Catches a`DEBUG` or `ALLOWED_HOSTS` left wrong                                     |
-| 2 | The homepage loads over HTTPS with**images visible**                                 | Proves §2.3 and §2.4 — the two most common silent breakages                         |
-| 3 | `/admin/` loads and shows the **Website Content** section                          | Proves the cms migrations ran                                                          |
-| 4 | Sign in as the Content Editor → lands on`/admin/`, sees only Website Content            | Proves the group and the sign-in routing                                               |
-| 5 | Contact form → a real email**arrives in the inbox**                                 | Proves`DJANGO_ENVIRONMENT` and SMTP together. A log line is not proof.               |
-| 6 | Public doctor list shows**all five doctors**, Kyla and Dr. Magembe included          | Proves the`role` cleanup landed. This is the one thing you can see from the outside. |
-| 7 | Row counts match the export                                                                | `CustomUser` 6, `Profile` 4, `AvailableSlot` 25, `LogEntry` 115, `Item` 1    |
-| 8 | **Every account still has `is_active=True`** and no new `OtpToken` rows appeared | §2.5. The one check that catches a silent import doing damage                         |
-| 9 | Request a password reset → the emailed link points at **agkimedicallaboratory.co.tz**, not `example.com` | Proves D3. This is only visible in the email body, so nothing else catches it |
+| # | Check                                                                                                            | Why this one                                                                           |
+| - | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| 1 | `python manage.py check --deploy` reports no ERRORs                                                            | Catches a`DEBUG` or `ALLOWED_HOSTS` left wrong                                     |
+| 2 | The homepage loads over HTTPS with**images visible**                                                       | Proves §2.3 and §2.4 — the two most common silent breakages                         |
+| 3 | `/admin/` loads and shows the **Website Content** section                                                | Proves the cms migrations ran                                                          |
+| 4 | Sign in as the Content Editor → lands on`/admin/`, sees only Website Content                                  | Proves the group and the sign-in routing                                               |
+| 5 | Contact form → a real email**arrives in the inbox**                                                       | Proves`DJANGO_ENVIRONMENT` and SMTP together. A log line is not proof.               |
+| 6 | Public doctor list shows**all five doctors**, Kyla and Dr. Magembe included                                | Proves the`role` cleanup landed. This is the one thing you can see from the outside. |
+| 7 | Row counts match the export                                                                                      | `CustomUser` 6, `Profile` 4, `AvailableSlot` 25, `LogEntry` 115, `Item` 1    |
+| 8 | **Every account still has `is_active=True`** and no new `OtpToken` rows appeared                       | §2.5. The one check that catches a silent import doing damage                         |
+| 9 | Request a password reset → the emailed link points at**agkimedicallaboratory.co.tz**, not `example.com` | Proves D3. This is only visible in the email body, so nothing else catches it          |
 
 ---
 
