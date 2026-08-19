@@ -167,6 +167,19 @@ DATABASES = {
     )
 }
 
+if DATABASES["default"]["ENGINE"].endswith("sqlite3"):
+    # SQLite locks the *whole file* for the duration of a write, and Passenger
+    # runs several worker processes against that one file. The default wait is
+    # 5 seconds, after which a concurrent write gives up with
+    # "database is locked" — an error the visitor sees, for a delay they would
+    # not have noticed. Twenty seconds turns almost all of those into a pause.
+    #
+    # This is a mitigation, not a fix. The fix is a database server; see the
+    # deployment runbook §3. Note in particular that `select_for_update()`
+    # raises `NotSupportedError` on SQLite whatever the timeout, so the
+    # appointment booking flow cannot ship against it.
+    DATABASES["default"].setdefault("OPTIONS", {}).setdefault("timeout", 20)
+
 if DATABASES["default"]["ENGINE"].endswith("mysql"):
     # Two settings that MySQL gets wrong by default, both silently.
     #
