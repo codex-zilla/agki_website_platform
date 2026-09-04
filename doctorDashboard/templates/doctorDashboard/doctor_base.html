@@ -5,7 +5,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Doctor Dashboard - MediBook</title>
+    {% comment %}
+    Every console page used to be titled "Doctor Dashboard - MediBook": one
+    hardcoded string, so twelve browser tabs and twelve history entries all
+    read the same, and none of them was AGKI's.
+
+    `page_title` comes from the view rather than from a `{% templatetag
+    openblock %} block {% templatetag closeblock %}`, because it is needed in
+    two places - here and as the `<h1>` in the top bar - and a template block
+    can only be rendered once. Two blocks would mean writing each page's title
+    twice and letting the copies drift; the view already holds the one thing
+    that makes two of these titles conditional (`sees_every_doctor`), so it is
+    where the string belongs.
+    {% endcomment %}
+    <title>{{ page_title|default:"Dashboard" }} · AGKI Doctor Console</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -45,94 +58,81 @@
             padding: 0;
             z-index: 1000;
             transition: all 0.3s;
-            overflow-y: auto;
+            /* A column, so the footer can sit at the bottom with `margin-top:
+               auto` and the menu can scroll on its own. `overflow-y: auto` on
+               the whole aside would have scrolled the collapse control out of
+               reach on a short window. */
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
         }
+
+        .sidebar-menu { overflow-y: auto; }
 
         .sidebar.collapsed {
             width: 70px;
         }
 
         .sidebar-header {
-            padding: 1.5rem;
+            padding: 1.35rem 1.5rem;
             border-bottom: 1px solid rgba(255,255,255,0.1);
             display: flex;
             align-items: center;
-            justify-content: space-between;
         }
 
+        /* A link now, not a `<div>`: the brand is the way back to the
+           dashboard on every other page, which is where a person looks for it
+           first. Anchors bring their own colour and underline, so both are
+           set here rather than left to the browser. */
         .sidebar-logo {
-            font-size: 1.5rem;
-            font-weight: bold;
+            font-size: 1.35rem;
+            font-weight: 700;
             display: flex;
             align-items: center;
             gap: 0.75rem;
+            color: #fff;
+            text-decoration: none;
+            min-width: 0;
+        }
+
+        .sidebar-logo:hover { color: var(--accent-green); }
+
+        /* The mark is a dark circular badge, so it needs no plate behind it on
+           the green gradient. `alt=""` in the markup rather than a repeat of
+           "AGKI": the word is right beside it, and a screen reader reading it
+           twice is worse than not reading the image at all. */
+        .sidebar-logo-mark {
+            width: 38px;
+            height: 38px;
+            object-fit: contain;
+            border-radius: 50%;
+            flex: 0 0 auto;
+        }
+
+        .logo-text {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.15;
+            letter-spacing: 0.04em;
+        }
+
+        .logo-text small {
+            font-size: 0.6rem;
+            font-weight: 500;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.62);
         }
 
         .sidebar.collapsed .logo-text {
             display: none;
         }
 
-        .sidebar-toggle {
-            background: rgba(255,255,255,0.1);
-            border: none;
-            color: white;
-            width: 35px;
-            height: 35px;
-            border-radius: 8px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s;
-        }
+        /* `.sidebar-toggle` (a 35px square beside the brand) went with the
+           control it styled - the collapse button is `.collapse-toggle` at the
+           foot of the sidebar now, where it reads as an action on the sidebar
+           rather than part of the logo. */
 
-        .sidebar-toggle:hover {
-            background: rgba(255,255,255,0.2);
-        }
-
-        /* Doctor Profile in Sidebar */
-        .doctor-profile-sidebar {
-            padding: 1.5rem;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            text-align: center;
-        }
-
-        .sidebar.collapsed .doctor-profile-sidebar {
-            padding: 1rem 0.5rem;
-        }
-
-        .doctor-avatar-sidebar {
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            border: 3px solid rgba(255,255,255,0.3);
-            object-fit: cover;
-            margin-bottom: 1rem;
-        }
-
-        .sidebar.collapsed .doctor-avatar-sidebar {
-            width: 45px;
-            height: 45px;
-            margin-bottom: 0.5rem;
-        }
-
-        .doctor-name-sidebar {
-            font-weight: 700;
-            font-size: 1.1rem;
-            margin-bottom: 0.25rem;
-        }
-
-        .doctor-specialty-sidebar {
-            font-size: 0.9rem;
-            opacity: 0.9;
-        }
-
-        .sidebar.collapsed .doctor-name-sidebar,
-        .sidebar.collapsed .doctor-specialty-sidebar {
-            display: none;
-        }
-
-        /* Sidebar Menu */
         .sidebar-menu {
             padding: 1rem 0;
         }
@@ -220,17 +220,17 @@
         .top-navbar {
             background: white;
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            padding: 1rem 2rem;
+            padding: 0.85rem 2rem;
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            gap: 1rem;
             position: sticky;
             top: 0;
             z-index: 999;
         }
 
         .page-title {
-            font-size: 1.8rem;
+            font-size: 1.3rem;
             font-weight: 700;
             color: var(--primary-green);
         }
@@ -238,7 +238,12 @@
         .top-navbar-right {
             display: flex;
             align-items: center;
-            gap: 1.5rem;
+            gap: 1rem;
+            /* Pushed right by itself now that the bar is a plain flex row with
+               a gap - the burger and the heading sit at the start, this at the
+               end, and nothing needs  to arrange three
+               children. */
+            margin-left: auto;
         }
 
         .notification-icon {
@@ -674,23 +679,72 @@
             color: var(--dark-text);
         }
 
-        /* Responsive */
-        @media (max-width: 992px) {
+        /* --- Responsive -------------------------------------------------
+           Four widths rather than two, each with a reason:
+
+             >= 1200   full sidebar. Everything fits.
+             992-1199  icon rail. Content gets its width back before anything
+                       has to be dropped - the step that was missing, so a
+                       laptop ran a 260px sidebar beside a squeezed table.
+             577-991   drawer + overlay. A tablet has no room for a permanent
+                       rail beside real content.
+             <= 576    drawer, and the name leaves the top bar. A 38px burger,
+                       the page title, the bell and the avatar fit 360px
+                       without wrapping; the name is what goes, because the
+                       avatar already answers "whose session is this".
+           ----------------------------------------------------------------- */
+        @media (max-width: 1199px) and (min-width: 992px) {
+            .sidebar:not(.mobile-open) { width: 70px; }
+            .sidebar:not(.mobile-open) .logo-text,
+            .sidebar:not(.mobile-open) .menu-item-text,
+            .sidebar:not(.mobile-open) .menu-section-title { display: none; }
+            .sidebar:not(.mobile-open) .menu-item { justify-content: center; padding: 0.75rem; }
+            /* The rail is collapsed whether or not the class says so, so the
+               arrow points the way it does when it is. */
+            .sidebar:not(.mobile-open) .collapse-toggle i { transform: rotate(180deg); }
+            .sidebar:not(.mobile-open) ~ .main-content { margin-left: 70px; }
+        }
+
+        @media (max-width: 991px) {
             .sidebar {
                 transform: translateX(-100%);
+            }
+
+            /* The collapsed state is remembered across pages now, and a
+               remembered 70px rail would open the mobile drawer as a strip of
+               unlabelled icons. The drawer is always the full sidebar; the
+               control that sets the state is hidden at this width anyway. */
+            .sidebar.collapsed {
+                width: var(--sidebar-width);
+            }
+
+            .sidebar.collapsed .logo-text {
+                display: flex;
+            }
+
+            .sidebar.collapsed .menu-item-text {
+                display: inline;
+            }
+
+            .sidebar.collapsed .menu-section-title {
+                display: block;
             }
 
             .sidebar.mobile-open {
                 transform: translateX(0);
             }
 
-            .main-content {
+            .main-content,
+            .sidebar.collapsed ~ .main-content {
                 margin-left: 0;
             }
 
+            /* No `!important`: this rule now comes after the base one. */
             .mobile-menu-toggle {
-                display: block !important;
+                display: block;
             }
+
+            .sidebar-foot { display: none; }
 
             .calendar-grid {
                 gap: 0.5rem;
@@ -707,29 +761,162 @@
             }
 
             .top-navbar {
-                padding: 1rem;
+                padding: 0.75rem 1rem;
+                gap: 0.6rem;
             }
 
             .page-title {
-                font-size: 1.3rem;
+                font-size: 1.05rem;
             }
+
+            .user-menu-name { display: none; }
 
             .stats-grid {
                 grid-template-columns: 1fr;
             }
         }
 
+        /* The base animates the sidebar, the content margin and every card on
+           load. None of that is information, so none of it should be forced on
+           somebody who has asked their system for less motion. */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.001ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.001ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
+
+        /* Declared **before** the media query that shows it. It used to sit
+           after, which is the only reason the rule in the query needed
+           `!important` - a specificity fight with itself. */
         .mobile-menu-toggle {
             display: none;
             background: var(--primary-green);
             color: white;
             border: none;
-            width: 40px;
-            height: 40px;
+            width: 38px;
+            height: 38px;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 1.2rem;
+            font-size: 1.1rem;
+            flex: 0 0 auto;
         }
+
+        /* --- the page heading in the bar ------------------------------- */
+        .page-heading { min-width: 0; }
+        .page-section {
+            font-size: 0.62rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: #7d8a82;
+            line-height: 1.4;
+        }
+        .top-navbar .page-title {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin: 0;
+        }
+
+        /* --- the sidebar footer --------------------------------------- */
+        .sidebar-foot {
+            margin-top: auto;
+            padding: 0.5rem 0.75rem 1rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.12);
+        }
+        .sidebar-menu { flex: 1 1 auto; }
+        /* The arrow points the way the click will move the sidebar: left
+           while it is open, right once it is collapsed. It used to keep
+           pointing left after collapsing, which reads as "collapse further".
+           The turn is animated so the button is visibly the same control that
+           just acted, rather than a different icon appearing in its place -
+           and `prefers-reduced-motion` neutralises the transition through the
+           blanket rule at the end of this stylesheet. */
+        .collapse-toggle i {
+            transition: transform 0.25s ease;
+        }
+
+        .sidebar.collapsed .collapse-toggle i {
+            transform: rotate(180deg);
+        }
+
+        .collapse-toggle {
+            width: 100%;
+            background: none;
+            border: 0;
+            font: inherit;
+            cursor: pointer;
+            text-align: left;
+        }
+
+        /* --- the account menu ----------------------------------------- */
+        .user-menu-wrap { position: relative; }
+        .user-menu {
+            background: none;
+            border: 1px solid transparent;
+            font: inherit;
+            cursor: pointer;
+        }
+        .user-menu:focus-visible { border-color: var(--primary-green); }
+        .user-menu-name { font-weight: 600; }
+        .user-dropdown {
+            position: absolute;
+            right: 0;
+            top: calc(100% + 0.5rem);
+            width: 210px;
+            background: #fff;
+            border: 1px solid #dde5df;
+            border-radius: 10px;
+            box-shadow: 0 12px 30px rgba(22, 28, 24, 0.14);
+            padding: 0.35rem;
+            z-index: 1100;
+        }
+        .user-dropdown-head {
+            padding: 0.5rem 0.6rem 0.6rem;
+            border-bottom: 1px solid #eef2ee;
+            margin-bottom: 0.35rem;
+        }
+        .user-dropdown-head strong {
+            display: block;
+            font-size: 0.88rem;
+            color: #1c221e;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .user-dropdown-head span { font-size: 0.74rem; color: #6b7770; }
+        .user-dropdown a {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.5rem 0.6rem;
+            border-radius: 7px;
+            font-size: 0.87rem;
+            color: #4a554d;
+            text-decoration: none;
+        }
+        .user-dropdown a:hover { background: #e9f2ea; color: var(--primary-green); }
+        .user-dropdown a.danger { color: #a32020; }
+        .user-dropdown a.danger:hover { background: #fae8e8; color: #a32020; }
+        .user-dropdown hr { border: 0; border-top: 1px solid #eef2ee; margin: 0.35rem 0; }
+
+        /* --- skip link -------------------------------------------------- */
+        .skip-link {
+            position: absolute;
+            left: -9999px;
+            top: 0;
+            z-index: 1200;
+            background: var(--primary-green);
+            color: #fff;
+            padding: 0.6rem 1rem;
+            border-radius: 0 0 8px 0;
+            font-weight: 600;
+        }
+        .skip-link:focus { left: 0; color: #fff; }
+
+        :focus-visible { outline: 2px solid var(--accent-green); outline-offset: 2px; }
 
         .mobile-overlay {
             display: none;
@@ -749,22 +936,36 @@
 </head>
 <body>
     <!-- Sidebar -->
+    <a class="skip-link" href="#main-content">Skip to content</a>
+
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <div class="sidebar-logo">
-                <i class="fas fa-heartbeat"></i>
-                <span class="logo-text">MediBook</span>
-            </div>
-            <button class="sidebar-toggle" id="sidebarToggle">
-                <i class="fas fa-bars"></i>
-            </button>
+            <a class="sidebar-logo" href="{% url 'doctor_admin_dashboard' %}">
+                {% comment %}
+                Was `fa-heartbeat`, a Font Awesome icon that belongs to no
+                particular clinic. This is the same mark the public site puts
+                in its navbar, resolved the same way: the logo an administrator
+                uploaded in `SiteSettings`, falling back to the bundled file
+                when they have not uploaded one.
+                {% endcomment %}
+                <img class="sidebar-logo-mark" src="{{ console_logo_url }}"
+                     alt="" width="38" height="38">
+                <span class="logo-text">AGKI<small>Doctor console</small></span>
+            </a>
         </div>
 
-        <div class="doctor-profile-sidebar">
-            {% include "partials/avatar.html" with image=user.image alt=user.username css_class="doctor-avatar-sidebar" only %}
-            <div class="doctor-name-sidebar">{{user.get_full_name}}</div>
-            <div class="doctor-specialty-sidebar">{{user.role}}</div>
-        </div>
+        {% comment %}
+        An avatar, name and role block stood here. Removed at AGKI's request on
+        2026-09-01: it said the same thing as the top bar and could do nothing
+        about it, while the bar's copy sits beside the menu that acts on it. It
+        also printed `{{ user.role }}` - the stored value, "doctor", rather
+        than its label - and `get_full_name` with no fallback, so an account
+        with no name rendered a blank line. Deleting it fixed both by removing
+        the second place they could be wrong.
+
+        The collapse control moved out of the header too, to the foot of the
+        sidebar: beside the logo it read as part of the brand.
+        {% endcomment %}
 
         <nav class="sidebar-menu">
             <div class="menu-section-title">Main</div>
@@ -775,7 +976,16 @@
             <a href="{% url 'available_appointments' %}" class="menu-item {% if request.resolver_match.url_name == 'available_appointments' %}active{% endif %}" data-page="appointments">
                 <i class="fas fa-calendar-check"></i>
                 <span class="menu-item-text">Appointments</span>
-                <span class="menu-badge">12</span>
+                {% comment %}
+                Was a hardcoded `12`, on every page, for every account. Two
+                views computed a real count that no template read (design §10
+                dashboard #11). It comes from a context processor now, because
+                this sidebar renders on every page in the app and a per-view
+                number would be right on two of them (plan 5.13).
+                {% endcomment %}
+                {% if sidebar_waiting_count %}
+                <span class="menu-badge" title="Appointments still waiting on somebody">{{ sidebar_waiting_count }}</span>
+                {% endif %}
             </a>
 
             <div class="menu-section-title">Management</div>
@@ -792,15 +1002,26 @@
                 <span class="menu-item-text">Reports</span>
             </a> -->
 
+            {% comment %}
+            Staff administration is `role=admin` only, and the view enforces
+            that independently — this is the courtesy, not the gate. Shown to
+            everyone before, so a doctor's sidebar offered a page that answered
+            403 (same pattern as the ecommerce link below).
+            {% endcomment %}
+            {% if user.role == 'admin' or user.is_superuser %}
             <div class="menu-section-title">Administration</div>
             <a href="{% url 'doctors' %}" class="menu-item {% if request.resolver_match.url_name == 'doctors' %}active{% endif %}" data-page="doctors">
                 <i class="fas fa-user-md"></i>
-                <span class="menu-item-text">Doctors</span>
+                <span class="menu-item-text">Staff</span>
             </a>
-            <a href="#" class="menu-item {% if request.resolver_match.url_name == 'all_appointments' %}active{% endif %}" data-page="appointments">
-                <i class="fas fa-calendar-check"></i>
-                <span class="menu-item-text">All Appointments</span>
-            </a>
+            {% endif %}
+            {% comment %}
+            An "All Appointments" link pointing at `#` used to sit here. The
+            page it wanted already exists: `available_appointments` shows every
+            doctor's appointments to an administrator and the account's own to
+            a doctor (plan 5.10, design §4.2 point 3), so the link above is the
+            whole feature. Removed rather than left pointing at nothing.
+            {% endcomment %}
 
             {% comment %} Ecommerce is superuser-only (design §4.4). Hidden rather than
                shown-and-403'd, so a doctor never sees a control they cannot
@@ -820,35 +1041,82 @@
                 <i class="fas fa-user-md"></i>
                 <span class="menu-item-text">My Profile</span>
             </a>
-            <a href="{% url 'logout' %}" class="menu-item" data-page="logout">
-                <i class="fas fa-sign-out-alt"></i>
-                <span class="menu-item-text">Logout</span>
-            </a>
+            {% comment %}
+            Sign out moved into the account menu in the top bar (AGKI's
+            decision, 2026-09-01). One home for account actions, and it stays
+            reachable when the sidebar is collapsed to icons - which this
+            sidebar item was not, since its label disappears with the rail.
+            {% endcomment %}
         </nav>
+
+        <div class="sidebar-foot">
+            <button class="menu-item collapse-toggle" id="sidebarToggle" type="button"
+                    aria-expanded="true" aria-controls="sidebar">
+                <i class="fas fa-angles-left"></i>
+                <span class="menu-item-text">Collapse</span>
+            </button>
+        </div>
     </aside>
 
     <!-- Mobile Overlay -->
     <div class="mobile-overlay" id="mobileOverlay"></div>
 
     <!-- Main Content -->
-    <main class="main-content">
+    <main class="main-content" id="main-content">
         <!-- Top Navigation -->
         <nav class="top-navbar">
-            <div style="display: flex; align-items: center; gap: 1rem;">
-                <button class="mobile-menu-toggle" id="mobileMenuToggle">
-                    <i class="fas fa-bars"></i>
-                </button>
-                <h1 class="page-title">Dashboard</h1>
+            <button class="mobile-menu-toggle" id="mobileMenuToggle" type="button"
+                    aria-expanded="false" aria-controls="sidebar" aria-label="Open the menu">
+                <i class="fas fa-bars"></i>
+            </button>
+            {% comment %}
+            `<h1 class="page-title">Dashboard</h1>` was hardcoded here with no
+            block to override it, so Appointments, Availability and Profile all
+            announced themselves as the Dashboard - in the `<h1>`, which is the
+            first thing a screen reader reads.
+            {% endcomment %}
+            <div class="page-heading">
+                <div class="page-section">{{ page_section|default:"Console" }}</div>
+                <h1 class="page-title">{{ page_title|default:"Dashboard" }}</h1>
             </div>
             <div class="top-navbar-right">
-                <div class="notification-icon">
+                {% comment %}
+                Was a hardcoded `8`. It counts what *this* account has to
+                answer — not the patient's turn, which would nag a doctor about
+                somebody else's inaction — and is hidden entirely at zero,
+                because a bell permanently showing a number is a bell nobody
+                reads.
+                {% endcomment %}
+                <a href="{% url 'available_appointments' %}" class="notification-icon" title="Appointments waiting on you">
                     <i class="fas fa-bell"></i>
-                    <span class="notification-badge">8</span>
-                </div>
-                <div class="user-menu">
-                    {% include "partials/avatar.html" with image=user.image alt=user.username css_class="user-avatar-top" only %}
-                    <span style="font-weight: 600;">{{user.get_full_name}}</span>
-                    <i class="fas fa-chevron-down"></i>
+                    {% if sidebar_action_count %}
+                    <span class="notification-badge">{{ sidebar_action_count }}</span>
+                    {% endif %}
+                </a>
+                {% comment %}
+                This was a `<div>` with an avatar, a name and a chevron-down,
+                plus a `:hover` style - everything that says "click me for
+                options" - and no dropdown, no link and no handler. It is a
+                real menu now, and the one thing a doctor looks there for,
+                Sign out, has moved into it from the sidebar.
+                {% endcomment %}
+                <div class="user-menu-wrap">
+                    <button class="user-menu" id="userMenuBtn" type="button"
+                            aria-expanded="false" aria-haspopup="true" aria-controls="userMenu">
+                        {% include "partials/avatar.html" with image=user.image alt=user.username css_class="user-avatar-top" only %}
+                        <span class="user-menu-name">{{ user.get_full_name|default:user.username }}</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <div class="user-dropdown" id="userMenu" hidden>
+                        <div class="user-dropdown-head">
+                            <strong>{{ user.get_full_name|default:user.username }}</strong>
+                            <span>{{ user.get_role_display|default:"Staff" }}</span>
+                        </div>
+                        <a href="{% url 'profile' %}"><i class="fas fa-user-md"></i> My profile</a>
+                        <a href="{% url 'profile_edit' %}"><i class="fas fa-pen"></i> Edit profile</a>
+                        <hr>
+                        <a href="{% url 'logout' %}" class="danger"><i class="fas fa-sign-out-alt"></i> Sign out</a>
+                    </div>
                 </div>
             </div>
         </nav>
@@ -861,108 +1129,119 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Sidebar Toggle
-        const sidebar = document.getElementById('sidebar');
-        const sidebarToggle = document.getElementById('sidebarToggle');
-        const mobileMenuToggle = document.getElementById('mobileMenuToggle');
-        const mobileOverlay = document.getElementById('mobileOverlay');
+        // ------------------------------------------------------------------
+        // Everything below line 917 of the version this replaces was dead.
+        // `setInterval(updateStats, 60000)` referenced a function defined
+        // **nowhere**, so evaluating the name threw `ReferenceError` and every
+        // statement after it never ran: the resize handler, every Bootstrap
+        // tooltip in the console, the clock, the load animation and both
+        // keyboard shortcuts. The two listeners registered above it kept
+        // working, which is exactly why nobody noticed.
+        //
+        // Gone with it, and not restored: a `Ctrl+N` shortcut that popped
+        // `alert('Opening new appointment form...')`, a `printAppointments`
+        // nothing called, a `checkPendingAppointments` that counted DOM nodes
+        // and logged to the console, and a clock for an element no page has.
+        // ------------------------------------------------------------------
+        (function () {
+            "use strict";
 
-        sidebarToggle.addEventListener('click', function() {
-            sidebar.classList.toggle('collapsed');
-        });
+            var sidebar = document.getElementById('sidebar');
+            var sidebarToggle = document.getElementById('sidebarToggle');
+            var mobileMenuToggle = document.getElementById('mobileMenuToggle');
+            var mobileOverlay = document.getElementById('mobileOverlay');
+            var userMenuBtn = document.getElementById('userMenuBtn');
+            var userMenu = document.getElementById('userMenu');
 
-        // Mobile menu toggle
-        mobileMenuToggle.addEventListener('click', function() {
-            sidebar.classList.add('mobile-open');
-            mobileOverlay.classList.add('show');
-        });
+            // ---- collapse, remembered ------------------------------------
+            // It forgot on every navigation, so a doctor who prefers the rail
+            // re-collapsed it on every page.
+            var STORE = 'agki-sidebar-collapsed';
 
-        mobileOverlay.addEventListener('click', function() {
-            sidebar.classList.remove('mobile-open');
-            mobileOverlay.classList.remove('show');
-        });
+            function setCollapsed(on) {
+                sidebar.classList.toggle('collapsed', on);
+                if (sidebarToggle) {
+                    sidebarToggle.setAttribute('aria-expanded', on ? 'false' : 'true');
+                    var label = sidebarToggle.querySelector('.menu-item-text');
+                    if (label) { label.textContent = on ? 'Expand' : 'Collapse'; }
+                }
+                try { window.localStorage.setItem(STORE, on ? '1' : '0'); } catch (e) {}
+            }
 
+            try {
+                if (window.localStorage.getItem(STORE) === '1') { setCollapsed(true); }
+            } catch (e) {}
 
+            if (sidebarToggle) {
+                sidebarToggle.addEventListener('click', function () {
+                    setCollapsed(!sidebar.classList.contains('collapsed'));
+                });
+            }
 
-        // Update stats every 60 seconds
-        setInterval(updateStats, 60000);
+            // ---- the drawer ----------------------------------------------
+            function openDrawer() {
+                sidebar.classList.add('mobile-open');
+                mobileOverlay.classList.add('show');
+                mobileMenuToggle.setAttribute('aria-expanded', 'true');
+            }
 
-        // Responsive handling
-        function handleResize() {
-            if (window.innerWidth > 992) {
+            function closeDrawer() {
                 sidebar.classList.remove('mobile-open');
                 mobileOverlay.classList.remove('show');
+                mobileMenuToggle.setAttribute('aria-expanded', 'false');
             }
-        }
+            window.closeDrawer = closeDrawer;
 
-        window.addEventListener('resize', handleResize);
+            mobileMenuToggle.addEventListener('click', openDrawer);
+            mobileOverlay.addEventListener('click', closeDrawer);
 
-        // Initialize tooltips (Bootstrap)
-        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'));
-        tooltipTriggerList.map(function (tooltipTriggerEl) {
-            return new bootstrap.Tooltip(tooltipTriggerEl);
-        });
-
-        // Real-time clock
-        function updateClock() {
-            const now = new Date();
-            const timeString = now.toLocaleTimeString('en-US', { 
-                hour: '2-digit', 
-                minute: '2-digit'
+            // The handler that never ran: rotate a phone to landscape with the
+            // drawer open and it stayed open over a layout that no longer had
+            // room for it.
+            window.addEventListener('resize', function () {
+                if (window.innerWidth > 991) { closeDrawer(); }
             });
-            // Update clock if element exists
-            const clockElement = document.getElementById('currentTime');
-            if (clockElement) {
-                clockElement.textContent = timeString;
+
+            // ---- the account menu ----------------------------------------
+            function closeMenu() {
+                if (!userMenu) { return; }
+                userMenu.hidden = true;
+                userMenuBtn.setAttribute('aria-expanded', 'false');
             }
-        }
 
-        updateClock();
-        setInterval(updateClock, 1000);
+            if (userMenuBtn && userMenu) {
+                userMenuBtn.addEventListener('click', function (event) {
+                    event.stopPropagation();
+                    var open = userMenu.hidden;
+                    userMenu.hidden = !open;
+                    userMenuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+                });
+                document.addEventListener('click', function (event) {
+                    if (!userMenu.contains(event.target)) { closeMenu(); }
+                });
+            }
 
-        // Page load animation
-        window.addEventListener('load', function() {
-            document.querySelectorAll('.stat-card, .card').forEach((element, index) => {
-                element.style.opacity = '0';
-                element.style.transform = 'translateY(20px)';
-                setTimeout(() => {
-                    element.style.transition = 'all 0.5s ease';
-                    element.style.opacity = '1';
-                    element.style.transform = 'translateY(0)';
-                }, index * 100);
+            document.addEventListener('keydown', function (event) {
+                if (event.key !== 'Escape') { return; }
+                closeMenu();
+                closeDrawer();
             });
-        });
+        }());
 
-        // Handle keyboard shortcuts
-        document.addEventListener('keydown', function(e) {
-            // Ctrl/Cmd + K to toggle sidebar
-            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-                e.preventDefault();
-                sidebar.classList.toggle('collapsed');
-            }
-            
-            // Ctrl/Cmd + N for new appointment
-            if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
-                e.preventDefault();
-                alert('Opening new appointment form...');
-            }
-        });
+        // Kept out of the block above so the page still runs if this throws:
+        // Bootstrap is a CDN script, and a console behind a slow connection
+        // should not lose its navigation because a tooltip library did not
+        // arrive. This is what the old `updateStats` line failed to be.
+        try {
+            document.querySelectorAll('[title]').forEach(function (el) {
+                new bootstrap.Tooltip(el);
+            });
+        } catch (e) {}
 
-        // Check for pending appointments that need attention
-        function checkPendingAppointments() {
-            const pendingCount = document.querySelectorAll('.status-badge.pending').length;
-            if (pendingCount > 0) {
-                console.log(`${pendingCount} appointments need confirmation`);
-                // Show notification if needed
-            }
-        }
+        mobileOverlay.addEventListener('click', closeDrawer);
 
-        checkPendingAppointments();
 
-        // Print functionality for appointments
-        function printAppointments() {
-            window.print();
-        }
+
     </script>
 </body>
 </html>

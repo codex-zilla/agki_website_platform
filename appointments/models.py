@@ -1,9 +1,11 @@
-import random
+import secrets
 import string
+from datetime import datetime
 
+from django.conf import settings as django_settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
-from django.db import models
+from django.db import IntegrityError, models, transaction
 from django.utils import timezone
 
 from cms.models import SingletonModel
@@ -11,10 +13,38 @@ from useraccount.models import CustomUser
 
 
 class AvailableSlot(models.Model):
+    """A time a doctor will work, and the ways they will work it.
+
+    The three `offers_` flags arrived with the single-confirmation flow (AGKI,
+    2026-09-03). Before it, a patient could ask for any of the three modes and
+    the doctor accepted or rejected the choice in a second round; now the
+    patient picks at booking, so the offer has to be true before it is made.
+    A doctor who never travels should not be asked, and a patient should not
+    pick something that was always going to be refused.
+
+    Three booleans rather than a list in one column because SQLite has no array
+    type, and a comma-separated string is a parser plus a validator plus a
+    migration the day somebody writes to it by hand. Each flag is a column the
+    database can index and the admin can show as a checkbox.
+    """
+
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     date = models.DateField()
     time = models.TimeField()
     is_booked = models.BooleanField(default=False)
+
+    #: Default `True` on all three, which is what every existing slot meant:
+    #: before this change any mode could be asked for on any slot.
+    offers_online = models.BooleanField(
+        default=True, verbose_name="Online video call"
+    )
+    offers_provider_travels = models.BooleanField(
+        default=True, verbose_name="I travel to the patient"
+    )
+    offers_patient_travels = models.BooleanField(
+        default=True, verbose_name="The patient comes to me"
+    )
+
     updated_at = models.DateTimeField(auto_now=True)  # ← auto updated field
     created_at = models.DateTimeField(auto_now_add=True)  # ← auto created field
 
@@ -24,9 +54,90 @@ class AvailableSlot(models.Model):
         # identical slots mean two bookable rows for one real appointment.
         unique_together = [("user", "date", "time")]
 
+    #: Which flag carries which mode. A dict rather than three `if`s so that
+    #: adding a mode means adding one line here and one column, and every
+    #: reader - the booking form, the console, the admin - follows.
+    MODE_FLAGS = {
+        "online": "offers_online",
+        "provider_travels": "offers_provider_travels",
+        "patient_travels": "offers_patient_travels",
+    }
+
+    @property
+    def offered_modes(self):
+        """The modes this slot may be booked for, as `(value, label)`.
+
+        Ordered by `Appointment.Mode` rather than by this dict, so the patient
+        always sees them in the same order as everywhere else.
+        """
+        return [
+            (value, label)
+            for value, label in Appointment.Mode.choices
+            if getattr(self, self.MODE_FLAGS[value], False)
+        ]
+
+    def offers(self, mode):
+        """Is `mode` on offer here? Unknown modes are not."""
+        flag = self.MODE_FLAGS.get(mode)
+        return bool(flag) and getattr(self, flag, False)
+
+    @property
+    def starts_at(self):
+        """The slot's start as a single moment.
+
+        `date` and `time` are stored separately, so every "is this slot still
+        bookable / has it expired" question had to recombine them by hand.
+        Doing it once here is what stops one caller comparing an aware
+        datetime with a naive one and quietly getting the wrong answer.
+        """
+        moment = datetime.combine(self.date, self.time)
+        if django_settings.USE_TZ:
+            moment = timezone.make_aware(moment, timezone.get_current_timezone())
+        return moment
+
+    def is_bookable(self, settings=None, now=None):
+        """Can a patient still book this slot?
+
+        Not merely "is it free": a slot closer than `MINIMUM_BOOKING_NOTICE`
+        is refused, because a booking made minutes before its own slot would
+        be created already past its confirmation deadline (design §6.1).
+        """
+        settings = settings or AppointmentSettings.load()
+        return not self.is_booked and self.starts_at >= settings.earliest_bookable_start(now)
+
     def __str__(self):
         status = "Booked" if self.is_booked else "Available"
         return f"{self.date} at {self.time} - {status}"
+
+
+class InvalidTransition(Exception):
+    """A move the state machine refuses (design §5).
+
+    Deliberately not a `ValidationError`: this is not a user typing something
+    wrong, it is code asking for a state change the flow does not have. Views
+    catch it to render "this appointment has already been answered"; a bare
+    escape is a 500, which is the right outcome for a genuine programming
+    mistake.
+    """
+
+
+#: How many references to try before giving up. Each attempt is one INSERT,
+#: and at any realistic number of bookings a second attempt is already
+#: unlikely - this is a bound on a pathological case, not an expected cost.
+BOOKING_REFERENCE_ATTEMPTS = 12
+
+
+def new_booking_reference(when=None):
+    """`AGKI-<year>-<five digits>`.
+
+    `secrets` rather than `random`: a booking reference is half of what opens a
+    patient's record (design §8.1), and `random` is a Mersenne Twister whose
+    next output can be derived from enough previous ones. Nobody needs to
+    predict the next reference AGKI will issue.
+    """
+    year = (when or timezone.now()).year
+    digits = "".join(secrets.choice(string.digits) for _ in range(5))
+    return f"AGKI-{year}-{digits}"
 
 
 class Appointment(models.Model):
@@ -123,21 +234,286 @@ class Appointment(models.Model):
 
     # `age` was dropped in migration 0021: never collected, always null.
 
+    # --- the state machine (design §5, plan 4.1) ----------------------------
+    #
+    # Everything below is data rather than a pile of `if` statements in views,
+    # for one reason: "confirm" has to mean the same thing in the dashboard,
+    # the admin, the expiry cron and any future API. A view that assigns
+    # `status` directly is a view that can skip a gate, forget the audit row
+    # or forget to tell the patient — and all three fail silently.
+
+    #: Which moves are legal. A state absent from a set is refused, so the
+    #: illegal ones (PENDING_TIME straight to CONFIRMED, skipping both gates)
+    #: are refused by omission rather than by a check somebody has to remember.
+    #: One confirmation, not two (AGKI, 2026-09-03). The patient now chooses
+    #: the mode on the booking form - from the modes that slot actually offers
+    #: - so the doctor sees the time and the mode together and answers once.
+    #:
+    #: `PENDING_MODE` and `MODE_PROPOSED` stay in `Status` because
+    #: `AppointmentTransition` rows recorded them and history is append-only;
+    #: they keep a way forward here so that any row still sitting in one - a
+    #: migration that missed it, a fixture, a shell session - can be settled
+    #: rather than stranded.
+    TRANSITIONS = {
+        Status.PENDING_TIME: {
+            Status.CONFIRMED,         # doctor confirms the time and the mode
+            Status.TIME_DECLINED,     # doctor declines it
+            Status.CANCELLED,
+            Status.EXPIRED,
+        },
+        Status.PENDING_MODE: {
+            Status.CONFIRMED,
+            Status.TIME_DECLINED,
+            Status.CANCELLED,
+            Status.EXPIRED,
+        },
+        Status.MODE_PROPOSED: {
+            Status.CONFIRMED,
+            Status.TIME_DECLINED,
+            Status.CANCELLED,
+            Status.EXPIRED,
+        },
+        Status.CONFIRMED: {
+            Status.COMPLETED,
+            Status.NO_SHOW,
+            Status.CANCELLED,
+        },
+        # Terminal. TIME_DECLINED is an ending, not a pause: the slot is freed
+        # and offered to somebody else, so there is nothing left to revive.
+        Status.TIME_DECLINED: set(),
+        Status.COMPLETED: set(),
+        Status.CANCELLED: set(),
+        Status.NO_SHOW: set(),
+        Status.EXPIRED: set(),
+    }
+
+    #: States in which the slot is no longer spoken for. COMPLETED and NO_SHOW
+    #: are absent on purpose — that time was used (or held) and re-offering it
+    #: after the fact would be inventing availability that never existed.
+    FREES_SLOT = {Status.TIME_DECLINED, Status.CANCELLED, Status.EXPIRED}
+
+    #: Non-terminal states, i.e. the ones a patient may still cancel from.
+    CANCELLABLE = {
+        Status.PENDING_TIME, Status.PENDING_MODE,
+        Status.MODE_PROPOSED, Status.CONFIRMED,
+    }
+
+    #: Events keyed by the *move*, not the destination, because arriving at
+    #: PENDING_MODE means two different things: "your time is confirmed, choose
+    #: how to meet" the first time, and "the doctor could not do that mode,
+    #: please pick another" the second. One event for both would send the
+    #: wrong message on the branch the patient is most likely to be confused by.
+    TRANSITION_EVENTS = {
+        (Status.PENDING_TIME, Status.CONFIRMED): "appointment.confirmed",
+        (Status.PENDING_TIME, Status.TIME_DECLINED): "appointment.time_declined",
+        # The legacy states, for a row that escaped migration 0027. They send
+        # the same message as the live path rather than a special one: what the
+        # patient needs to hear does not depend on which flow their booking
+        # started under.
+        (Status.PENDING_MODE, Status.CONFIRMED): "appointment.confirmed",
+        (Status.PENDING_MODE, Status.TIME_DECLINED): "appointment.time_declined",
+        (Status.MODE_PROPOSED, Status.CONFIRMED): "appointment.confirmed",
+        (Status.MODE_PROPOSED, Status.TIME_DECLINED): "appointment.time_declined",
+    }
+    #: Events that depend only on where the appointment ended up. NO_SHOW is
+    #: absent deliberately: there is nobody useful to tell. The patient did not
+    #: turn up, and the doctor is the one who recorded it.
+    STATUS_EVENTS = {
+        Status.CANCELLED: "appointment.cancelled",
+        Status.EXPIRED: "appointment.expired",
+        Status.COMPLETED: "appointment.completed",
+    }
+
+    #: One confirmation stamps both columns: the time and the mode are settled
+    #: in the same act now, and two columns that always hold the same value are
+    #: better than one column that half the reporting still looks for.
+    TRANSITION_TIMESTAMPS = {
+        (Status.PENDING_TIME, Status.CONFIRMED): ("time_confirmed_at", "mode_confirmed_at"),
+        (Status.PENDING_MODE, Status.CONFIRMED): ("time_confirmed_at", "mode_confirmed_at"),
+        (Status.MODE_PROPOSED, Status.CONFIRMED): ("mode_confirmed_at",),
+    }
+    STATUS_TIMESTAMPS = {
+        Status.CANCELLED: "cancelled_at",
+        Status.EXPIRED: "expired_at",
+    }
+
+    #: What must be true before an appointment may be CONFIRMED, as messages
+    #: rather than booleans, so the dashboard can show the doctor which one
+    #: they have not satisfied.
+    MISSING_MODE = "This appointment has no meeting mode yet, so there is nothing to confirm."
+    MISSING_MEETING_URL = (
+        "An online appointment needs a meeting link. Confirming without one "
+        "leaves both sides thinking it is settled with no way to meet."
+    )
+
+    def confirmation_problem(self):
+        """Why this appointment cannot be confirmed yet, or None.
+
+        Decision B, and the reason it is here rather than only in the
+        dashboard form: an "online appointment" with no link is worse than an
+        unconfirmed one, because both sides think it is settled. A rule that
+        only the form enforces is one the admin, a shell session and any
+        future API walk straight past — the same argument that put
+        `full_clean()` inside `AppointmentSettings.save()`.
+        """
+        if not self.appointmentMode:
+            return self.MISSING_MODE
+        if self.appointmentMode == self.Mode.ONLINE and not self.meeting_url:
+            return self.MISSING_MEETING_URL
+        return None
+
+    def check_confirmable(self):
+        problem = self.confirmation_problem()
+        if problem:
+            raise InvalidTransition(f"{self.bookingID}: {problem}")
+
+    def transition_to(self, new_status, actor=None, note="", event=None, **event_extra):
+        """Move to `new_status`, or refuse. The only supported way to do it.
+
+        Validates the move, stamps the matching timestamp, frees the slot where
+        that is what the new state means, writes the append-only audit row and
+        emits the notification event — in one transaction, so a booking cannot
+        end up half-moved or, worse, emailed about a state it never reached.
+
+        `actor=None` means nobody with an account did it: the patient, or the
+        expiry job. Say which in `note` — an audit that cannot tell a doctor's
+        silence from a patient's is worse than no audit (design §6.1).
+
+        Returns the `AppointmentTransition` it wrote.
+        """
+        # Imported here rather than at module level: `notifications` reads
+        # `NotificationLog` from this module, so a top-level import would be
+        # circular.
+        from .notifications import notify
+
+        now = timezone.now()
+        with transaction.atomic():
+            # Re-read the status under a lock instead of trusting the copy in
+            # memory. Two doctors on the same appointment, or a doctor racing
+            # the expiry cron, would otherwise both pass a check against a
+            # value that stopped being true while the page was open.
+            current = (
+                type(self).objects.select_for_update()
+                .filter(pk=self.pk)
+                .values_list("status", flat=True)
+                .first()
+            )
+            if current is None:
+                raise InvalidTransition(
+                    f"Appointment {self.bookingID} no longer exists."
+                )
+            self.status = current
+
+            if new_status not in self.TRANSITIONS.get(current, set()):
+                raise InvalidTransition(
+                    f"{self.bookingID}: cannot move from {current!r} to "
+                    f"{new_status!r}. Legal moves from {current!r}: "
+                    f"{', '.join(sorted(self.TRANSITIONS.get(current, set()))) or 'none (terminal)'}."
+                )
+
+            if new_status == self.Status.CONFIRMED:
+                self.check_confirmable()
+
+            from_status = current
+            self.status = new_status
+            stamp = (
+                self.TRANSITION_TIMESTAMPS.get((from_status, new_status))
+                or self.STATUS_TIMESTAMPS.get(new_status)
+            )
+            if stamp:
+                for field in (stamp,) if isinstance(stamp, str) else stamp:
+                    setattr(self, field, now)
+            self.save()
+
+            if new_status in self.FREES_SLOT and self.slot.is_booked:
+                self.slot.is_booked = False
+                self.slot.save(update_fields=["is_booked"])
+
+            record = AppointmentTransition.objects.create(
+                appointment=self,
+                from_status=from_status,
+                to_status=new_status,
+                actor=actor,
+                note=note[:255],
+            )
+
+            # `event` overrides the map, for the one case where the same
+            # move means two different things to the patient: a confirmation
+            # the doctor changed the meeting mode on is still
+            # PENDING_TIME -> CONFIRMED, but "confirmed" and "confirmed, though
+            # not the way you asked" are not the same message (plan 12.1). The
+            # map stays the default so no caller has to know an event name to
+            # do the ordinary thing.
+            event = event or (
+                self.TRANSITION_EVENTS.get((from_status, new_status))
+                or self.STATUS_EVENTS.get(new_status)
+            )
+            if event:
+                notify(event, self, **event_extra)
+
+        return record
+
+    def can_be_cancelled(self, settings=None, now=None):
+        """May the patient still cancel? Status *and* the cut-off (decision 9).
+
+        Both halves matter: cancelling something already cancelled is
+        meaningless, and cancelling twenty minutes before the slot leaves the
+        doctor holding an hour nobody can rebook.
+        """
+        if self.status not in self.CANCELLABLE:
+            return False
+        settings = settings or AppointmentSettings.load()
+        return (now or timezone.now()) <= self.slot.starts_at - settings.cancellation_cutoff
+
     def save(self, *args, **kwargs):
         is_new = self.pk is None  # check if appointment is being created
 
-        # Generate booking ID if not already set
-        if not self.bookingID:
-            current_year = timezone.now().year
-            random_digits = ''.join(random.choices(string.digits, k=5))
-            self.bookingID = f"AGKI-{current_year}-{random_digits}"
-
-        super().save(*args, **kwargs)
+        if self.bookingID:
+            super().save(*args, **kwargs)
+        else:
+            self._save_with_a_new_reference(*args, **kwargs)
 
         # If new appointment created, mark slot as booked
         if is_new:
             self.slot.is_booked = True
             self.slot.save(update_fields=['is_booked'])
+
+    def _save_with_a_new_reference(self, *args, **kwargs):
+        """Save under a reference nobody else holds.
+
+        The reference used to be five digits generated once, with `unique=True`
+        underneath and nothing in between: two patients drawing the same number
+        meant an `IntegrityError` out of `save()`, which is a 500 on the
+        booking form for the second of them. Five digits is 100,000 values, so
+        by the birthday bound a **50% chance of at least one collision arrives
+        at about 370 bookings in a year** - not a remote possibility, a
+        scheduled one. It surfaced in `TransitionTests`, which creates enough
+        appointments in one run to hit it.
+
+        Retried rather than pre-checked alone, because a pre-check is a race:
+        two requests can both find a number free and then both insert it. The
+        `IntegrityError` is caught, the number is checked, and only a genuine
+        clash is retried - `Appointment.slot`'s OneToOne raises the same
+        exception class, and that one is the last guard against double-booking
+        a slot (design §10 #6). Retrying it would turn a refusal into a loop.
+        """
+        for _ in range(BOOKING_REFERENCE_ATTEMPTS):
+            self.bookingID = new_booking_reference()
+            try:
+                # Its own atomic block: without one, a failed INSERT marks the
+                # surrounding transaction as broken and the retry cannot run.
+                with transaction.atomic():
+                    super().save(*args, **kwargs)
+            except IntegrityError:
+                if Appointment.objects.filter(bookingID=self.bookingID).exists():
+                    continue
+                raise
+            return
+
+        raise IntegrityError(
+            "Could not find a free booking reference after %d attempts."
+            % BOOKING_REFERENCE_ATTEMPTS
+        )
 
     def __str__(self):
         return f"Appointment for {self.fullName} on {self.created_at}"
@@ -170,6 +546,21 @@ class AppointmentTransition(models.Model):
 
     class Meta:
         ordering = ["created_at", "id"]
+
+    @property
+    def to_status_label(self):
+        """The human label for `to_status`.
+
+        `to_status` is a plain CharField rather than one with `choices`, so
+        that a row written years ago still reads back as whatever it said even
+        if the state machine is later renamed — an audit trail that rewrites
+        itself is not one. That costs the automatic `get_..._display`, hence
+        this, and the fallback for a value no longer in the enum.
+        """
+        try:
+            return Appointment.Status(self.to_status).label
+        except ValueError:
+            return self.to_status
 
     def __str__(self):
         return f"{self.appointment.bookingID}: {self.from_status or '-'} -> {self.to_status}"
@@ -342,6 +733,14 @@ class AppointmentSettings(SingletonModel):
             "booking can be made is the window in which it can be undone."
         ),
     )
+    booking_horizon_days = models.PositiveIntegerField(
+        default=30,
+        help_text=(
+            "How far ahead the public booking page offers slots. The old "
+            "hard-coded 5 days meant a patient could not book past the day "
+            "after tomorrow, however far ahead doctors published."
+        ),
+    )
 
     class Meta:
         verbose_name = "Appointment settings"
@@ -384,6 +783,15 @@ class AppointmentSettings(SingletonModel):
     @property
     def cancellation_cutoff(self):
         return timezone.timedelta(minutes=self.cancellation_cutoff_minutes)
+
+    def earliest_bookable_start(self, now=None):
+        """The earliest slot start a patient may book right now (decision D).
+
+        One place, so the page that *offers* slots and the view that *accepts*
+        one cannot disagree — offering a slot the server will then refuse is
+        the failure this exists to prevent (design §6.1).
+        """
+        return (now or timezone.now()) + self.minimum_booking_notice
 
     def __str__(self):
         return "Appointment settings"

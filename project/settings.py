@@ -143,6 +143,21 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                # The staff console's sidebar badges. Every page in that app
+                # renders the sidebar, so a per-view value would be right on
+                # two pages and stale on the rest (plan 5.13). Returns nothing
+                # for anonymous visitors and for accounts with no console role.
+                'doctorDashboard.context_processors.dashboard_badges',
+                # The AGKI mark in the console sidebar. Resolves the uploaded
+                # `SiteSettings.logo` exactly as the public navbar does, and
+                # lazily, so a page that does not render it pays nothing.
+                'doctorDashboard.context_processors.console_brand',
+                # `SiteSettings` for the patient booking flow - its header
+                # logo, its footer phone number and address. `app.views` still
+                # passes its own for the public site and wins, since view
+                # context overrides a processor. Lazy: pages that never read
+                # it pay nothing.
+                'cms.context_processors.site_settings',
             ],
         },
     },

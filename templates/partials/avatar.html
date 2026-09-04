@@ -7,7 +7,7 @@ page (implementation plan 1.1). `doctors.html` was the one template in the
 codebase that got this right; this is that pattern, factored out so the next
 template gets it for free instead of re-deriving it.
 
-    {% include "partials/avatar.html" with image=user.image alt=user.username css_class="doctor-avatar-sidebar" only %}
+    {% include "partials/avatar.html" with image=user.image alt=user.username css_class="user-avatar-top" only %}
 
     image      an ImageField value. Falsy (no file) selects the fallback.
     alt        alt text. Also the fallback's accessible label.

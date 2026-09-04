@@ -2,1499 +2,904 @@
 {% load slot_filters %}
 {% load static %}
 {% block content %}
-<!-- Dashboard Content -->
-<div class="dashboard-content">
-    <!-- Page Header -->
-    <div class="card">
-        <div class="card-header">
-            <div>
-                <h2 class="card-title">
-                    <i class="fas fa-clock"></i>
-                    My Availability Schedule
-                </h2>
-                <p style="margin: 0.5rem 0 0 0; color: #666; font-size: 0.9rem;">
-                    Manage your available time slots for patient appointments
-                </p>
-            </div>
-            <button class="card-action" onclick="openAddAvailabilityModal()">
-                <i class="fas fa-plus-circle"></i>
-                Add Availability
-            </button>
+{% comment %}
+Rebuilt to the design agreed with AGKI on 2026-08-31 (plan 11.1). What it
+replaces, and why each part moved:
+
+  * **The Add Availability button did nothing.** Its overlay used
+    `.modal-overlay` / `.modal-container`, which are styled inside
+    `doctor_appointment_details.html` and `appointment_details.html` - in those
+    pages' own <style> blocks, which never reached this one. Nothing here or in
+    the base defined them and Bootstrap has no such classes, so the overlay was
+    an unstyled block: the add form sat permanently visible at the foot of the
+    page and `classList.add('show')` had no rule to trigger. 26 of the 80
+    classes this page used had no CSS anywhere. Everything it needs is now
+    defined below, in this file, where a reader can see it.
+  * **Three stacked blocks became one control bar**, and four large stat cards
+    became a strip of four numbers, so the calendar is above the fold.
+  * **The duplicated list is gone.** The page rendered a calendar and then every
+    slot in the period again underneath it - one queryset drawn twice, roughly
+    double the height, and two places to keep in step. Detail now opens for the
+    day you click.
+  * **Every day has a `+`.** `openAddAvailabilityModal(date)` always took a date
+    and prefilled the field with it; nothing had ever passed one.
+  * **A booked slot goes somewhere** rather than saying "Booked" and stopping.
+{% endcomment %}
+
+<div class="dashboard-content av">
+
+    <div class="av-bar">
+        <div class="av-title">
+            <p>Publish the times patients can book with you.</p>
+        </div>
+
+        <div class="av-period">
+            <a class="av-step" href="?view={{ view_mode }}&start={{ prev_start|date:'Y-m-d' }}"
+               title="Previous {{ view_mode }}" aria-label="Previous {{ view_mode }}">&lsaquo;</a>
+            <span class="av-now">{{ period_label }}</span>
+            <a class="av-step" href="?view={{ view_mode }}&start={{ next_start|date:'Y-m-d' }}"
+               title="Next {{ view_mode }}" aria-label="Next {{ view_mode }}">&rsaquo;</a>
+            {% if not is_current_period %}
+            <a class="av-today" href="?view={{ view_mode }}">Today</a>
+            {% endif %}
+        </div>
+
+        <div class="av-seg">
+            <a href="?view=week&start={{ period_start|date:'Y-m-d' }}"
+               class="{% if view_mode == 'week' %}on{% endif %}">Week</a>
+            <a href="?view=month&start={{ period_start|date:'Y-m-d' }}"
+               class="{% if view_mode == 'month' %}on{% endif %}">Month</a>
+        </div>
+
+        <div class="av-actions">
+            {% comment %}
+            "Add one time" stood here beside Publish. Removed at AGKI's request
+            on 2026-08-31, and it was doing less than it looked: adding a single
+            time already belongs to a day, and every day carries its own `+`.
+            The toolbar copy asked for the date a second time, which is exactly
+            what the locked field was introduced to stop.
+            {% endcomment %}
+            <button type="button" class="av-btn" onclick="openPublishModal()">Publish times</button>
         </div>
     </div>
 
-    <!-- Quick Stats -->
-    <div class="stats-grid" style="margin-top: 2rem;">
-        <div class="stat-card">
-            <div class="stat-icon blue">
-                <i class="fas fa-calendar-alt"></i>
-            </div>
-            <div class="stat-info">
-                <div class="stat-label">Total Slots This Week</div>
-                <div class="stat-value">{{ stats.total_slots }}</div>
-            </div>
-        </div>
+    {% if messages %}
+    <div class="av-messages">
+        {% for message in messages %}
+        <div class="av-message {{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
 
-        <div class="stat-card">
-            <div class="stat-icon green">
-                <i class="fas fa-calendar-check"></i>
-            </div>
-            <div class="stat-info">
-                <div class="stat-label">Available Slots</div>
-                <div class="stat-value">{{ stats.available_slots }}</div>
-            </div>
+    <div class="av-metrics">
+        <div class="av-metric">
+            <div class="n">{{ stats.total_slots }}</div>
+            <div class="k">Published</div>
         </div>
-
-        <div class="stat-card">
-            <div class="stat-icon orange">
-                <i class="fas fa-user-clock"></i>
-            </div>
-            <div class="stat-info">
-                <div class="stat-label">Booked Slots</div>
-                <div class="stat-value">{{ stats.booked_slots }}</div>
-            </div>
+        <div class="av-metric ok">
+            <div class="n">{{ stats.bookable_slots }}</div>
+            <div class="k">Bookable</div>
         </div>
-
-        <div class="stat-card">
-            <div class="stat-icon red">
-                <i class="fas fa-percentage"></i>
-            </div>
-            <div class="stat-info">
-                <div class="stat-label">Utilization Rate</div>
-                <div class="stat-value">{{ stats.utilization_rate }}%</div>
-            </div>
+        <div class="av-metric warn">
+            <div class="n">{{ stats.booked_slots }}</div>
+            <div class="k">Booked</div>
+        </div>
+        <div class="av-metric">
+            {% comment %}
+            A count, where this used to show "Utilisation 25%". A ratio tells a
+            doctor nothing they can act on; the number of published times that
+            can no longer be booked is one they can clear.
+            {% endcomment %}
+            <div class="n">{{ stats.too_late_slots }}</div>
+            <div class="k">Too late</div>
         </div>
     </div>
 
-    <!-- View Toggle -->
-    <div class="view-toggle-container">
-        <div class="view-toggle">
-            <button class="toggle-btn" data-view="week" onclick="switchView('week')">
-                <i class="fas fa-calendar-week"></i>
-                Week View
-            </button>
-            <button class="toggle-btn active" data-view="list" onclick="switchView('list')">
-                <i class="fas fa-list"></i>
-                List View
-            </button>
-        </div>
-        <div class="date-navigation">
-            <button class="nav-btn" onclick="previousPeriod()">
-                <i class="fas fa-chevron-left"></i>
-            </button>
-            <span class="current-period">
-                {{ start_of_week|date:"M d" }} - {{ end_of_week|date:"M d, Y" }}
-            </span>
-            <button class="nav-btn" onclick="nextPeriod()">
-                <i class="fas fa-chevron-right"></i>
-            </button>
-            <button class="nav-btn today-btn" onclick="goToToday()">
-                <i class="fas fa-calendar-day"></i>
-                Today
-            </button>
-        </div>
-    </div>
+    <div class="av-cal {% if view_mode == 'month' %}is-month{% endif %}">
+        {% for label in "Mon,Tue,Wed,Thu,Fri,Sat,Sun"|split:"," %}
+        <div class="av-dow">{{ label }}</div>
+        {% endfor %}
 
-    <!-- List View -->
-    <div class="list-view-container" id="listView">
-        {% if available_slots %}
-            {% regroup available_slots by date as slots_by_date %}
-            
-            {% for date_group in slots_by_date %}
-            <div class="date-card">
-                <div class="date-header">
-                    <div class="date-title">
-                        <h3>{{ date_group.grouper|date:"l, F j, Y" }}</h3>
-                        <span class="slot-count">{{ date_group.list|length }} slot{{ date_group.list|length|pluralize }}</span>
-                    </div>
-                    <div class="date-actions">
-                        <button class="btn-icon" onclick="addSlotForDate('{{ date_group.grouper|date:"Y-m-d" }}')" title="Add Slot">
-                            <i class="fas fa-plus"></i>
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="slots-container">
-                    {% for slot in date_group.list %}
-                    <div class="slot-card {% if slot.is_booked %}booked{% else %}available{% endif %}" 
-                         onclick="openSlotDetails(this, '{{ slot.id }}')"
-                         data-date="{{ slot.date|date:'Y-m-d' }}"
-                         data-time="{{ slot.time|time:'H:i' }}">
-                        <div class="slot-time">
-                            <i class="fas fa-clock"></i>
-                            {{ slot.time|time:"g:i A" }}
-                        </div>
-                        <div class="slot-info">
-                            <div class="slot-status">
-                                {% if slot.is_booked %}
-                                <i class="fas fa-user-check"></i>
-                                <span>Booked</span>
-                                {% else %}
-                                <i class="fas fa-check-circle"></i>
-                                <span>Available</span>
-                                {% endif %}
-                            </div>
-                            {% if slot.is_booked and slot.patient %}
-                            <div class="slot-patient">
-                                <i class="fas fa-user"></i>
-                                {{ slot.patient.get_full_name|default:"Patient" }}
-                            </div>
-                            {% endif %}
-                        </div>
-                        <div class="slot-actions">
-                            {% if not slot.is_booked %}
-                            <button class="btn-icon small" onclick="event.stopPropagation(); deleteSlot('{{ slot.id }}')" title="Delete Slot">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
+        {% for week in weeks %}
+        {% for day in week %}
+        <div class="av-day{% if not day.in_period %} outside{% endif %}{% if day.is_today %} today{% endif %}{% if day.is_past %} past{% endif %}"
+             data-date="{{ day.date|date:'Y-m-d' }}"
+             data-label="{{ day.date|date:'l, j F Y' }}">
+            <div class="av-dnum">{{ day.date|date:"j" }}</div>
+
+            {% if view_mode == 'month' %}
+            {% comment %}
+            Counts, not chips. A month cell is about a third the height of a
+            week cell; seven chips do not fit, and truncating to "+3 more"
+            makes a month impossible to scan. Clicking the day opens the same
+            detail panel the week view uses.
+            {% endcomment %}
+            {% if day.slots %}
+            <button type="button" class="av-counts" onclick="openDay(this.closest('.av-day'))">
+                {% if day.free_count %}<span class="c free">{{ day.free_count }} free</span>{% endif %}
+                {% if day.booked_count %}<span class="c taken">{{ day.booked_count }} booked</span>{% endif %}
+                {% if day.late_count %}<span class="c late">{{ day.late_count }} late</span>{% endif %}
+            </button>
+            {% endif %}
+            {% else %}
+            {% for slot in day.slots %}
+            <button type="button"
+                    class="av-chip {% if slot.is_booked %}taken{% elif slot.is_bookable_now %}free{% else %}late{% endif %}"
+                    onclick="openDay(this.closest('.av-day'))"
+                    title="{% if slot.is_booked %}Booked by {{ slot.linked_appointment.fullName }}{% elif slot.is_bookable_now %}Bookable{% else %}Published, but too close now to be booked{% endif %}">
+                <span class="t">{{ slot.time|time:"g:i A" }}</span>
+                {% if slot.is_booked and slot.linked_appointment %}
+                <span class="g">{{ slot.linked_appointment.fullName|slice:":1" }}</span>
+                {% endif %}
+            </button>
             {% endfor %}
-        {% else %}
-            <div class="empty-state">
-                <div class="empty-icon">
-                    <i class="fas fa-calendar-times"></i>
-                </div>
-                <h3>No Availability Slots</h3>
-                <p>You haven't added any availability slots for this period.</p>
-                <button class="btn-primary" onclick="openAddAvailabilityModal()">
-                    <i class="fas fa-plus-circle"></i>
-                    Add Your First Slot
-                </button>
-            </div>
-        {% endif %}
-    </div>
+            {% endif %}
 
-    <!-- Week View (Hidden by default) -->
-    <div class="week-view-container" id="weekView" style="display: none;">
-        <!-- Week view content -->
-        <div class="schedule-container">
-            <div class="schedule-header">
-                <div class="time-column-header">Time</div>
-                {% for day_name, day_slots in slots_by_day.items %}
-                <div class="day-header">
-                    <div class="day-name">{{ day_name }}</div>
-                    {% if day_slots.0 %}
-                    <div class="day-date">{{ day_slots.0.date|date:"M d" }}</div>
+            <button type="button" class="av-add" title="Add a time on this day"
+                    onclick="openAddAvailabilityModal('{{ day.date|date:'Y-m-d' }}', '{{ day.date|date:'l, j F Y' }}')">+</button>
+
+            {% comment %}
+            The day's detail travels with the day, so the panel below needs no
+            second query and cannot disagree with the calendar - which is the
+            failure the removed list view invited.
+            {% endcomment %}
+            <template class="av-day-data">
+                {% for slot in day.slots %}
+                <div class="av-row">
+                    <span class="time">{{ slot.time|time:"g:i A" }}</span>
+                    {% if slot.is_booked %}
+                    <span class="pill taken">Booked</span>
+                    {% elif slot.is_bookable_now %}
+                    <span class="pill free">Bookable</span>
+                    {% else %}
+                    <span class="pill late">Too close to book</span>
+                    {% endif %}
+                    {% if sees_every_doctor %}
+                    <span class="who">{{ slot.user.get_full_name|default:slot.user.username }}</span>
+                    {% endif %}
+                    {% if slot.linked_appointment %}
+                    <span class="who">{{ slot.linked_appointment.fullName }} &middot;
+                        {{ slot.linked_appointment.get_reasonVisit_display }} &middot;
+                        {{ slot.linked_appointment.bookingID }}</span>
+                    <a class="act" href="{% url 'doctor_appointment_details' slot.linked_appointment.id %}">Open appointment &rarr;</a>
+                    {% else %}
+                    {% comment %}
+                    Delete is offered only when there is no appointment. The
+                    database refuses the other case (`on_delete=PROTECT`, plan
+                    2.9) whatever the status says, because a cancelled
+                    patient's record still points at the slot - so a button
+                    here would be one that can only ever produce an error.
+                    {% endcomment %}
+                    <form method="post" action="{% url 'delete_availability' slot.id %}"
+                          onsubmit="return confirm('Remove this time?');">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <button type="submit" class="act danger">Remove</button>
+                    </form>
                     {% endif %}
                 </div>
                 {% endfor %}
-            </div>
-            
-            <div class="schedule-grid">
-                <div class="time-column">
-                    <!-- Time slots from 8 AM to 5 PM -->
-                    {% for hour in "8,9,10,11,12,13,14,15,16,17"|split:"," %}
-                    <div class="time-slot">{{ hour }}:00</div>
-                    {% endfor %}
-                </div>
-                
-                {% for day_name, day_slots in slots_by_day.items %}
-                <div class="day-column">
-                    {% for hour in "8,9,10,11,12,13,14,15,16,17"|split:"," %}
-                        {% with hour_slot=day_slots|get_slot_by_hour:hour %}
-                            {% if hour_slot %}
-                            <div class="slot-item {% if hour_slot.is_booked %}booked{% else %}available{% endif %}" 
-                                 onclick="openSlotDetails(this, '{{ hour_slot.id }}')"
-                                 data-date="{{ hour_slot.date|date:'Y-m-d' }}"
-                                 data-time="{{ hour_slot.time|time:'H:i' }}">
-                                <div class="slot-time">{{ hour_slot.time|time:"g:i A" }}</div>
-                                <div class="slot-status">
-                                    {% if hour_slot.is_booked %}
-                                    <i class="fas fa-user-check"></i>
-                                    <span>Booked</span>
-                                    {% else %}
-                                    <i class="fas fa-check-circle"></i>
-                                    <span>Available</span>
-                                    {% endif %}
-                                </div>
-                                {% if hour_slot.is_booked and hour_slot.patient %}
-                                <div class="slot-patient">{{ hour_slot.patient.get_full_name|default:"Patient" }}</div>
-                                {% endif %}
-                            </div>
-                            {% else %}
-                            <div class="empty-slot"></div>
-                            {% endif %}
-                        {% endwith %}
-                    {% endfor %}
-                </div>
-                {% endfor %}
-            </div>
+            </template>
         </div>
-        
-        <!-- Legend -->
-        <div class="legend-container">
-            <div class="legend-item">
-                <div class="legend-color available-color"></div>
-                <span>Available</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-color booked-color"></div>
-                <span>Booked</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-color empty-color"></div>
-                <span>No Availability</span>
-            </div>
-        </div>
+        {% endfor %}
+        {% endfor %}
     </div>
+
+    <div class="av-legend">
+        <span><i class="sw free"></i>Bookable</span>
+        <span><i class="sw taken"></i>Booked</span>
+        <span><i class="sw late"></i>Published, too close to book</span>
+    </div>
+
+    <div class="av-drawer" id="avDrawer" hidden>
+        <div class="av-drawer-head">
+            <strong id="avDrawerDay"></strong>
+            <span id="avDrawerCount"></span>
+            <button type="button" class="av-drawer-close" onclick="closeDay()" aria-label="Close">&times;</button>
+        </div>
+        <div id="avDrawerRows"></div>
+    </div>
+
+    {% if not slots_by_date %}
+    <div class="av-empty">
+        <h3>Nothing published for {{ period_label }}</h3>
+        <p>Patients can only book times you have added.</p>
+        <button type="button" class="av-btn" onclick="openPublishModal()">Publish times</button>
+    </div>
+    {% endif %}
 </div>
 
-<!-- Add Availability Modal -->
-<div class="modal-overlay" id="addAvailabilityModal">
-    <div class="modal-container">
-        <div class="modal-header">
-            <h3>
-                <i class="fas fa-plus-circle"></i>
-                Add Availability Slot
-            </h3>
-            <button class="modal-close" onclick="closeAddAvailabilityModal()">
-                <i class="fas fa-times"></i>
-            </button>
+<!-- Add one time -------------------------------------------------------- -->
+<div class="av-overlay" id="addAvailabilityModal">
+    <div class="av-sheet" role="dialog" aria-modal="true" aria-labelledby="addTitle">
+        <div class="av-sheet-head">
+            <h3 id="addTitle">Add one time</h3>
+            <button type="button" class="av-sheet-close" onclick="closeAddAvailabilityModal()" aria-label="Close">&times;</button>
         </div>
         <form action="{% url 'add_doctor_availability' %}" method="post">
             {% csrf_token %}
-            <div class="modal-body">
-                <div class="form-group">
-                    <label class="form-label">
-                        <i class="fas fa-calendar"></i>
-                        Select Date
-                    </label>
-                    <input type="date" name="date" class="form-control" id="availabilityDate">
+            <div class="av-sheet-body">
+                <div class="av-field">
+                    <label for="availabilityDate">Date</label>
+                    {% comment %}
+                    `readonly`, not `disabled`, when the day is already chosen:
+                    a disabled input is not submitted, so disabling it would
+                    post no date at all. The picker is suppressed and the field
+                    is styled as settled, but the value still travels.
+                    {% endcomment %}
+                    <input type="date" name="date" id="availabilityDate" required>
+                    <p class="av-hint locked-note" id="availabilityDayNote" hidden></p>
                 </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label">
-                            <i class="fas fa-clock"></i>
-                            Start Time
-                        </label>
-                        <input type="time" name="time" class="form-control" id="startTime">
-                    </div>
-                    <!-- <div class="form-group">
-                        <label class="form-label">
-                            <i class="fas fa-clock"></i>
-                            End Time
-                        </label>
-                        <input type="time" class="form-control" id="endTime">
-                    </div> -->
-                </div>
-
-                <!-- <div class="form-group">
-                    <label class="form-label">
-                        <i class="fas fa-redo"></i>
-                        Repeat Pattern
-                    </label>
-                    <select class="form-control" id="repeatPattern" onchange="toggleRepeatOptions()">
-                        <option value="none">Does not repeat</option>
-                        <option value="daily">Daily</option>
-                        <option value="weekly">Weekly</option>
-                        <option value="monthly">Monthly</option>
+                <div class="av-field">
+                    <label for="startTime">Time</label>
+                    <select name="time" id="startTime" required>
+                        <option value="" selected disabled>Choose a time</option>
+                        {% for value, label in time_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
                     </select>
                 </div>
-
-                <div id="repeatOptions" style="display: none;">
-                    <div class="form-group">
-                        <label class="form-label">
-                            <i class="fas fa-calendar-alt"></i>
-                            Repeat Until
-                        </label>
-                        <input type="date" class="form-control" id="repeatUntil">
-                    </div>
-
-                    <div id="weeklyOptions" style="display: none;">
-                        <label class="form-label">
-                            <i class="fas fa-calendar-week"></i>
-                            Repeat On
-                        </label>
-                        <div class="weekday-selector">
-                            <label class="weekday-checkbox">
-                                <input type="checkbox" value="monday">
-                                <span>Mon</span>
-                            </label>
-                            <label class="weekday-checkbox">
-                                <input type="checkbox" value="tuesday">
-                                <span>Tue</span>
-                            </label>
-                            <label class="weekday-checkbox">
-                                <input type="checkbox" value="wednesday">
-                                <span>Wed</span>
-                            </label>
-                            <label class="weekday-checkbox">
-                                <input type="checkbox" value="thursday">
-                                <span>Thu</span>
-                            </label>
-                            <label class="weekday-checkbox">
-                                <input type="checkbox" value="friday">
-                                <span>Fri</span>
-                            </label>
-                            <label class="weekday-checkbox">
-                                <input type="checkbox" value="saturday">
-                                <span>Sat</span>
-                            </label>
-                            <label class="weekday-checkbox">
-                                <input type="checkbox" value="sunday">
-                                <span>Sun</span>
-                            </label>
-                        </div>
+                <div class="av-field">
+                    {% comment %}
+                    What you will do at this time, not just when (plan 12.1).
+                    The patient picks one of these when they book, so the
+                    doctor answers once instead of twice - which means the
+                    offer has to be true before it is made. Ticked by default,
+                    because that is what every time published before this
+                    change meant.
+                    {% endcomment %}
+                    <label>Ways you can meet</label>
+                    <div class="av-dows">
+                        <label><input type="checkbox" name="offers_online" value="1" checked><span>Online call</span></label>
+                        <label><input type="checkbox" name="offers_provider_travels" value="1" checked><span>I travel</span></label>
+                        <label><input type="checkbox" name="offers_patient_travels" value="1" checked><span>They come</span></label>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label class="form-label">
-                        <i class="fas fa-comment"></i>
-                        Notes (Optional)
-                    </label>
-                    <textarea class="form-control" id="slotNotes" rows="3" placeholder="Add any notes about this availability slot..."></textarea>
-                </div> -->
-
-                <div class="alert-info">
-                    <i class="fas fa-info-circle"></i>
-                    <span>Availability slots will be visible to patients for booking appointments.</span>
-                </div>
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <p class="av-hint">Patients see this time as bookable until somebody takes it.</p>
             </div>
-            <div class="modal-footer">
-                <button class="btn-secondary" onclick="closeAddAvailabilityModal()">Cancel</button>
-                <button class="btn-primary" type="submit">
-                    <i class="fas fa-save"></i>
-                    Save Availability
-                </button>
+            <div class="av-sheet-foot">
+                <button type="button" class="av-btn ghost" onclick="closeAddAvailabilityModal()">Cancel</button>
+                <button type="submit" class="av-btn">Add time</button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- Slot Details Modal -->
-<div class="modal-overlay" id="slotDetailsModal">
-    <div class="modal-container modal-small">
-        <div class="modal-header">
-            <h3>
-                <i class="fas fa-info-circle"></i>
-                Slot Details
-            </h3>
-            <button class="modal-close" onclick="closeSlotDetailsModal()">
-                <i class="fas fa-times"></i>
-            </button>
+<!-- Publish times (bulk) ------------------------------------------------ -->
+<div class="av-overlay" id="publishModal">
+    <div class="av-sheet wide" role="dialog" aria-modal="true" aria-labelledby="publishTitle">
+        <div class="av-sheet-head">
+            <h3 id="publishTitle">Publish times</h3>
+            <button type="button" class="av-sheet-close" onclick="closePublishModal()" aria-label="Close">&times;</button>
         </div>
-        <div class="modal-body">
-            <div class="slot-details-content">
-                <div class="detail-item">
-                    <label>Date:</label>
-                    <span id="detailDate">October 20, 2025</span>
+        <form action="{% url 'publish_availability' %}" method="post" id="publishForm">
+            {% csrf_token %}
+            <div class="av-sheet-body av-two">
+                <div>
+                    <div class="av-field">
+                        <label for="bulkFrom">From</label>
+                        <input type="date" name="start_date" id="bulkFrom" required>
+                    </div>
+                    <div class="av-field">
+                        <label for="bulkUntil">Until</label>
+                        <input type="date" name="end_date" id="bulkUntil" required>
+                    </div>
+                    <div class="av-field">
+                        <label>On these days</label>
+                        <div class="av-dows" id="bulkDays">
+                            <label><input type="checkbox" name="weekdays" value="0" checked><span>Mon</span></label>
+                            <label><input type="checkbox" name="weekdays" value="1" checked><span>Tue</span></label>
+                            <label><input type="checkbox" name="weekdays" value="2" checked><span>Wed</span></label>
+                            <label><input type="checkbox" name="weekdays" value="3" checked><span>Thu</span></label>
+                            <label><input type="checkbox" name="weekdays" value="4" checked><span>Fri</span></label>
+                            <label><input type="checkbox" name="weekdays" value="5"><span>Sat</span></label>
+                            <label><input type="checkbox" name="weekdays" value="6"><span>Sun</span></label>
+                        </div>
+                    </div>
                 </div>
-                <div class="detail-item">
-                    <label>Time:</label>
-                    <span id="detailTime">08:00 - 09:00 AM</span>
-                </div>
-                <div class="detail-item">
-                    <label>Status:</label>
-                    <span id="detailStatus" class="status-badge available">Available</span>
-                </div>
-                <div class="detail-item" id="patientDetail" style="display: none;">
-                    <label>Patient:</label>
-                    <span id="detailPatient"></span>
+
+                <div>
+                    <div class="av-field">
+                        {% comment %}
+                        What you will do at this time, not just when (plan 12.1).
+                        The patient picks one of these when they book, so the
+                        doctor answers once instead of twice - which means the
+                        offer has to be true before it is made. Ticked by default,
+                        because that is what every time published before this
+                        change meant.
+                        {% endcomment %}
+                        <label>Ways you can meet</label>
+                        <div class="av-dows">
+                            <label><input type="checkbox" name="offers_online" value="1" checked><span>Online call</span></label>
+                            <label><input type="checkbox" name="offers_provider_travels" value="1" checked><span>I travel</span></label>
+                            <label><input type="checkbox" name="offers_patient_travels" value="1" checked><span>They come</span></label>
+                        </div>
+                    </div>
+
+                    <div class="av-field">
+                        <label>At these times</label>
+                        <div class="av-times" id="bulkTimeList"></div>
+                        {% comment %}
+                        The field the server reads is this hidden, comma-separated
+                        one - the chips above are a convenience over it. Typing
+                        "09:00,09:30" into it works with JavaScript switched off,
+                        which is why `BulkAvailabilityForm.times` parses text
+                        rather than taking a formset.
+                        {% endcomment %}
+                        <input type="hidden" name="times" id="bulkTimes">
+                    </div>
+                    <div class="av-field">
+                        <label for="bulkNewTime">Add a time</label>
+                        <div class="av-addtime">
+                            <select id="bulkNewTime">
+                                <option value="" selected disabled>Choose a time</option>
+                                {% for value, label in time_choices %}
+                                <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="button" class="av-btn ghost" onclick="addBulkTime()">Add</button>
+                        </div>
+                    </div>
+                    <div class="av-preview" id="bulkPreview">
+                        <div class="big" id="bulkCount">0 times</div>
+                        <p id="bulkExplain">Choose dates, days and times.</p>
+                    </div>
                 </div>
             </div>
-        </div>
-        <div class="modal-footer">
-            <button class="btn-secondary" onclick="closeSlotDetailsModal()">Close</button>
-            <button class="btn-danger" id="deleteSlotBtn" onclick="deleteSlot()">
-                <i class="fas fa-trash"></i>
-                Delete Slot
-            </button>
-        </div>
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <div class="av-sheet-foot">
+                <button type="button" class="av-btn ghost" onclick="closePublishModal()">Cancel</button>
+                <button type="submit" class="av-btn" id="bulkSubmit">Publish</button>
+            </div>
+        </form>
     </div>
 </div>
 
 <style>
-    /* View Toggle */
-    .view-toggle-container {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin: 2rem 0 1.5rem;
-        flex-wrap: wrap;
-        gap: 1rem;
-    }
-
-    .view-toggle {
-        display: flex;
-        background: white;
-        border-radius: 10px;
-        padding: 0.25rem;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-    }
-
-    .toggle-btn {
-        padding: 0.75rem 1.5rem;
-        border: none;
-        background: transparent;
-        color: #666;
-        font-weight: 600;
-        cursor: pointer;
-        border-radius: 8px;
-        transition: all 0.3s;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    .toggle-btn.active {
-        background: var(--gradient-green);
-        color: white;
-    }
-
-    .toggle-btn:hover:not(.active) {
-        background: #f0f0f0;
-    }
-
-    .date-navigation {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        background: white;
-        padding: 0.5rem 1rem;
-        border-radius: 10px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-    }
-
-    .nav-btn {
-        background: #f0f0f0;
-        border: none;
-        width: 40px;
-        height: 40px;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: all 0.3s;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--dark-text);
-    }
-
-    .nav-btn:hover {
-        background: var(--primary-green);
-        color: white;
-    }
-
-    .today-btn {
-        width: auto;
-        padding: 0 1rem;
-        gap: 0.5rem;
-    }
-
-    .current-period {
-        font-weight: 700;
-        color: var(--dark-text);
-        min-width: 200px;
-        text-align: center;
-    }
-
-    /* List View Styles */
-    .list-view-container {
-        display: flex;
-        flex-direction: column;
-        gap: 1.5rem;
-    }
-
-    .date-card {
-        background: white;
-        border-radius: 12px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        overflow: hidden;
-    }
-
-    .date-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 1.25rem 1.5rem;
-        background: #f8f9fa;
-        border-bottom: 1px solid #e0e0e0;
-    }
-
-    .date-title h3 {
-        margin: 0;
-        font-size: 1.2rem;
-        color: var(--dark-text);
-    }
-
-    .slot-count {
-        font-size: 0.9rem;
-        color: #666;
-        margin-top: 0.25rem;
-        display: block;
-    }
-
-    .date-actions {
-        display: flex;
-        gap: 0.5rem;
-    }
-
-    .btn-icon {
-        background: white;
-        border: 1px solid #e0e0e0;
-        width: 40px;
-        height: 40px;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: all 0.3s;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--dark-text);
-    }
-
-    .btn-icon:hover {
-        background: var(--primary-green);
-        color: white;
-        border-color: var(--primary-green);
-    }
-
-    .slots-container {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-        gap: 1rem;
-        padding: 1.5rem;
-    }
-
-    .slot-card {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 1rem;
-        border-radius: 10px;
-        cursor: pointer;
-        transition: all 0.3s;
-        border-left: 4px solid;
-    }
-
-    .slot-card.available {
-        background: linear-gradient(135deg, #e8f5e9 0%, #f1f8f4 100%);
-        border-left-color: #4caf50;
-    }
-
-    .slot-card.booked {
-        background: linear-gradient(135deg, #fff3e0 0%, #fff8f0 100%);
-        border-left-color: #ff9800;
-    }
-
-    .slot-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-
-    .slot-time {
-        font-weight: 600;
-        color: var(--dark-text);
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    .slot-info {
-        display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
-    }
-
-    .slot-status {
-        font-size: 0.85rem;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        gap: 0.35rem;
-    }
-
-    .slot-card.available .slot-status {
-        color: #2e7d32;
-    }
-
-    .slot-card.booked .slot-status {
-        color: #e65100;
-    }
-
-    .slot-patient {
-        font-size: 0.8rem;
-        color: #666;
-        display: flex;
-        align-items: center;
-        gap: 0.35rem;
-    }
-
-    .slot-actions {
-        display: flex;
-        gap: 0.25rem;
-    }
-
-    .btn-icon.small {
-        width: 32px;
-        height: 32px;
-        font-size: 0.8rem;
-    }
-
-    /* Empty State */
-    .empty-state {
-        text-align: center;
-        padding: 3rem 2rem;
-        background: white;
-        border-radius: 12px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-    }
-
-    .empty-icon {
-        font-size: 4rem;
-        color: #e0e0e0;
-        margin-bottom: 1.5rem;
-    }
-
-    .empty-state h3 {
-        margin: 0 0 1rem;
-        color: var(--dark-text);
-    }
-
-    .empty-state p {
-        color: #666;
-        margin-bottom: 2rem;
-    }
-
-    /* Week View Styles */
-    .week-view-container {
-        /* Your existing week view styles */
-    }
-
-    .schedule-container {
-        overflow-x: auto;
-    }
-
-    .schedule-header {
-        display: grid;
-        grid-template-columns: 100px repeat(7, 1fr);
-        gap: 1px;
-        background: #e0e0e0;
-        border-radius: 12px 12px 0 0;
-        overflow: hidden;
-    }
-
-    .time-column-header {
-        background: var(--gradient-green);
-        color: white;
-        padding: 1rem;
-        font-weight: 700;
-        text-align: center;
-    }
-
-    .day-header {
-        background: white;
-        padding: 1rem;
-        text-align: center;
-    }
-
-    .day-name {
-        font-weight: 700;
-        color: var(--dark-text);
-        margin-bottom: 0.25rem;
-    }
-
-    .day-date {
-        font-size: 0.85rem;
-        color: #666;
-    }
-
-    .schedule-grid {
-        display: grid;
-        grid-template-columns: 100px repeat(7, 1fr);
-        gap: 1px;
-        background: #e0e0e0;
-        min-height: 500px;
-    }
-
-    .time-column {
-        background: #f8f9fa;
-        display: flex;
-        flex-direction: column;
-    }
-
-    .time-slot {
-        height: 80px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.85rem;
-        color: #666;
-        font-weight: 600;
-        border-bottom: 1px solid #e0e0e0;
-    }
-
-    .day-column {
-        background: white;
-        display: flex;
-        flex-direction: column;
-    }
-
-    .slot-item {
-        height: 80px;
-        padding: 0.75rem;
-        cursor: pointer;
-        transition: all 0.3s;
-        border-bottom: 1px solid #f0f0f0;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        position: relative;
-    }
-
-    .slot-item:hover {
-        transform: scale(1.02);
-        z-index: 10;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    }
-
-    .slot-item.available {
-        background: linear-gradient(135deg, #e8f5e9 0%, #f1f8f4 100%);
-        border-left: 4px solid #4caf50;
-    }
-
-    .slot-item.booked {
-        background: linear-gradient(135deg, #fff3e0 0%, #fff8f0 100%);
-        border-left: 4px solid #ff9800;
-    }
-
-    .slot-time {
-        font-size: 0.85rem;
-        font-weight: 600;
-        color: var(--dark-text);
-        margin-bottom: 0.25rem;
-    }
-
-    .slot-status {
-        font-size: 0.75rem;
-        display: flex;
-        align-items: center;
-        gap: 0.35rem;
-        font-weight: 600;
-    }
-
-    .slot-item.available .slot-status {
-        color: #2e7d32;
-    }
-
-    .slot-item.booked .slot-status {
-        color: #e65100;
-    }
-
-    .slot-patient {
-        font-size: 0.75rem;
-        color: #666;
-        margin-top: 0.25rem;
-        display: flex;
-        align-items: center;
-        gap: 0.35rem;
-    }
-
-    .empty-slot {
-        height: 80px;
-        background: #fafafa;
-        border-bottom: 1px solid #f0f0f0;
-    }
-
-    /* Legend */
-    .legend-container {
-        display: flex;
-        gap: 2rem;
-        margin-top: 1.5rem;
-        padding: 1rem;
-        background: white;
-        border-radius: 10px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        justify-content: center;
-        flex-wrap: wrap;
-    }
-
-    .legend-item {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-    }
-
-    .legend-color {
-        width: 30px;
-        height: 20px;
-        border-radius: 4px;
-    }
-
-    .available-color {
-        background: linear-gradient(135deg, #e8f5e9 0%, #f1f8f4 100%);
-        border-left: 4px solid #4caf50;
-    }
-
-    .booked-color {
-        background: linear-gradient(135deg, #fff3e0 0%, #fff8f0 100%);
-        border-left: 4px solid #ff9800;
-    }
-
-    .empty-color {
-        background: #fafafa;
-        border: 1px solid #e0e0e0;
-    }
-
-    /* Modal Styles */
-    .modal-overlay {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.6);
-        z-index: 2000;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .modal-overlay.show {
-        display: flex;
-    }
-
-    .modal-container {
-        background: white;
-        border-radius: 16px;
-        width: 90%;
-        max-width: 600px;
-        max-height: 90vh;
-        overflow-y: auto;
-        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-        animation: modalSlideIn 0.3s ease;
-    }
-
-    .modal-container.modal-small {
-        max-width: 450px;
-    }
-
-    @keyframes modalSlideIn {
-        from {
-            transform: translateY(-50px);
-            opacity: 0;
-        }
-        to {
-            transform: translateY(0);
-            opacity: 1;
-        }
-    }
-
-    .modal-header {
-        padding: 1.5rem;
-        border-bottom: 1px solid #e0e0e0;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-
-    .modal-header h3 {
-        font-size: 1.3rem;
-        font-weight: 700;
-        color: var(--primary-green);
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        margin: 0;
-    }
-
-    .modal-close {
-        background: #f0f0f0;
-        border: none;
-        width: 35px;
-        height: 35px;
-        border-radius: 50%;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.3s;
-        color: #666;
-    }
-
-    .modal-close:hover {
-        background: #e0e0e0;
-        color: #333;
-    }
-
-    .modal-body {
-        padding: 1.5rem;
-    }
-
-    .modal-footer {
-        padding: 1.5rem;
-        border-top: 1px solid #e0e0e0;
-        display: flex;
-        justify-content: flex-end;
-        gap: 1rem;
-    }
-
-    /* Form Styles */
-    .form-group {
-        margin-bottom: 1.5rem;
-    }
-
-    .form-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1rem;
-    }
-
-    .form-label {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        font-weight: 600;
-        color: var(--dark-text);
-        margin-bottom: 0.5rem;
-    }
-
-    .form-control {
-        width: 100%;
-        padding: 0.75rem;
-        border: 2px solid #e0e0e0;
-        border-radius: 8px;
-        font-size: 1rem;
-        transition: border-color 0.3s;
-        font-family: inherit;
-    }
-
-    .form-control:focus {
-        outline: none;
-        border-color: var(--primary-green);
-    }
-
-    .weekday-selector {
-        display: grid;
-        grid-template-columns: repeat(7, 1fr);
-        gap: 0.5rem;
-        margin-top: 0.75rem;
-    }
-
-    .weekday-checkbox {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        cursor: pointer;
-    }
-
-    .weekday-checkbox input[type="checkbox"] {
-        display: none;
-    }
-
-    .weekday-checkbox span {
-        padding: 0.75rem 0.5rem;
-        border: 2px solid #e0e0e0;
-        border-radius: 8px;
-        text-align: center;
-        width: 100%;
-        font-weight: 600;
-        transition: all 0.3s;
-        font-size: 0.85rem;
-    }
-
-    .weekday-checkbox input[type="checkbox"]:checked + span {
-        background: var(--gradient-green);
-        color: white;
-        border-color: var(--primary-green);
-    }
-
-    .weekday-checkbox:hover span {
-        border-color: var(--primary-green);
-    }
-
-    .alert-info {
-        background: #e3f2fd;
-        border-left: 4px solid #2196F3;
-        padding: 1rem;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        color: #1565c0;
-        font-size: 0.9rem;
-        margin-top: 1.5rem;
-    }
-
-    .alert-info i {
-        font-size: 1.2rem;
-    }
-
-    /* Slot Details */
-    .slot-details-content {
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
-    }
-
-    .detail-item {
-        display: flex;
-        justify-content: space-between;
-        padding: 0.75rem;
-        background: #f8f9fa;
-        border-radius: 8px;
-    }
-
-    .detail-item label {
-        font-weight: 600;
-        color: #666;
-    }
-
-    .detail-item span {
-        font-weight: 600;
-        color: var(--dark-text);
-    }
-
-    /* Buttons */
-    .btn-primary {
-        background: var(--gradient-green);
-        color: white;
-        border: none;
-        padding: 0.75rem 1.5rem;
-        border-radius: 8px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.3s;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    .btn-primary:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(45, 90, 45, 0.3);
-    }
-
-    .btn-secondary {
-        background: #f0f0f0;
-        color: var(--dark-text);
-        border: 2px solid #e0e0e0;
-        padding: 0.75rem 1.5rem;
-        border-radius: 8px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.3s;
-    }
-
-    .btn-secondary:hover {
-        background: #e0e0e0;
-    }
-
-    .btn-danger {
-        background: #ffebee;
-        color: #c62828;
-        border: 2px solid #ef9a9a;
-        padding: 0.75rem 1.5rem;
-        border-radius: 8px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.3s;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    .btn-danger:hover {
-        background: #ef5350;
-        color: white;
-        border-color: #ef5350;
-    }
-
-    /* Responsive */
-    @media (max-width: 1200px) {
-        .schedule-grid {
-            min-width: 1000px;
-        }
-    }
-
-    @media (max-width: 768px) {
-        .view-toggle-container {
-            flex-direction: column;
-            align-items: stretch;
-        }
-
-        .date-navigation {
-            justify-content: space-between;
-        }
-
-        .current-period {
-            min-width: auto;
-        }
-
-        .slots-container {
-            grid-template-columns: 1fr;
-        }
-
-        .form-row {
-            grid-template-columns: 1fr;
-        }
-
-        .weekday-selector {
-            grid-template-columns: repeat(4, 1fr);
-        }
-
-        .modal-footer {
-            flex-direction: column;
-        }
-
-        .btn-primary,
-        .btn-secondary,
-        .btn-danger {
-            width: 100%;
-            justify-content: center;
-        }
-
-        .legend-container {
-            gap: 1rem;
-        }
-    }
-
-    @media (max-width: 576px) {
-        .stats-grid {
-            grid-template-columns: 1fr;
-        }
-
-        .modal-container {
-            width: 95%;
-            margin: 1rem;
-        }
-
-        .date-header {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 1rem;
-        }
-
-        .date-actions {
-            align-self: flex-end;
-        }
-    }
+/* ------------------------------------------------------------------------
+   Everything this page needs, defined here. The version this replaces used
+   26 classes that had no CSS in the page, the base, or Bootstrap - including
+   the ones its "Add Availability" overlay depended on, which is why that
+   button did nothing and the form sat permanently open at the foot of the
+   page. Names are prefixed `av-` so a class can never again be silently
+   supplied - or not supplied - by another page's <style> block.
+   ------------------------------------------------------------------------ */
+/* The overlays are siblings of `.av`, not children of it - a modal inside the
+   scrolling dashboard content would scroll with it. So the tokens are defined
+   on both, and that is not a tidiness point: with them on `.av` alone,
+   `.av-btn`'s `background: var(--av-brand)` was undefined inside a modal, the
+   declaration was dropped, and the Save button rendered as white text on a
+   white sheet. It was present, focusable and submittable - and invisible.
+   AGKI reported it as "the modal has no save button", which is exactly what
+   it looked like. Cancel survived only because its background is a literal. */
+.av, .av-overlay {
+    --av-ink: #1c221e;
+    --av-ink-2: #4a554d;
+    --av-muted: #6b7770;
+    --av-line: #dde5df;
+    --av-line-2: #c3d0c6;
+    --av-surface: #fff;
+    --av-surface-2: #f2f6f2;
+    --av-brand: var(--primary-green, #2d5a2d);
+    --av-brand-wash: #e9f2ea;
+    --av-ok: #1f7a4d;
+    --av-ok-wash: #e4f3ea;
+    --av-warn: #a35a00;
+    --av-warn-wash: #fbeeda;
+    --av-dim: #64706a;
+    --av-dim-wash: #e9ecea;
+    --av-bad: #a32020;
+    --av-bad-wash: #fae8e8;
+}
+
+/* --- control bar ------------------------------------------------------ */
+.av-bar {
+    display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+    padding-bottom: 1rem; border-bottom: 1px solid var(--av-line); margin-bottom: 1rem;
+}
+.av-title { margin-right: auto; }
+.av-title h2 { margin: 0; font-size: 1.35rem; letter-spacing: -.01em; color: var(--av-ink); }
+.av-title p { margin: .15rem 0 0; font-size: .85rem; color: var(--av-muted); }
+
+.av-period {
+    display: inline-flex; align-items: center; gap: .15rem;
+    background: var(--av-surface-2); border: 1px solid var(--av-line);
+    border-radius: 8px; padding: .2rem;
+}
+.av-step, .av-today {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 26px; height: 26px; padding: 0 .5rem;
+    border-radius: 6px; text-decoration: none;
+    color: var(--av-ink-2); font-size: 1rem; line-height: 1;
+}
+.av-today { font-size: .8rem; font-weight: 600; }
+.av-step:hover, .av-today:hover { background: #fff; color: var(--av-brand); }
+.av-now {
+    font-size: .86rem; font-weight: 600; color: var(--av-ink);
+    padding: 0 .5rem; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+
+.av-seg { display: inline-flex; border: 1px solid var(--av-line); border-radius: 8px; overflow: hidden; }
+.av-seg a {
+    padding: .4rem .85rem; font-size: .82rem; text-decoration: none;
+    color: var(--av-muted); background: #fff;
+}
+.av-seg a.on { background: var(--av-brand-wash); color: var(--av-brand); font-weight: 600; }
+
+.av-actions { display: flex; gap: .5rem; }
+.av-btn {
+    font: inherit; font-size: .86rem; font-weight: 600; cursor: pointer;
+    background: var(--av-brand); color: #fff; border: 1px solid var(--av-brand);
+    padding: .5rem .9rem; border-radius: 8px;
+}
+.av-btn:hover { filter: brightness(1.12); }
+.av-btn.ghost { background: #fff; color: var(--av-ink-2); border-color: var(--av-line-2); }
+.av-btn.ghost:hover { background: var(--av-surface-2); filter: none; }
+
+/* --- messages --------------------------------------------------------- */
+.av-messages { display: grid; gap: .5rem; margin-bottom: 1rem; }
+.av-message {
+    padding: .7rem 1rem; border-radius: 8px; font-size: .9rem;
+    background: var(--av-brand-wash); color: var(--av-brand);
+    border-left: 3px solid var(--av-brand);
+}
+.av-message.error { background: var(--av-bad-wash); color: var(--av-bad); border-left-color: var(--av-bad); }
+.av-message.warning { background: var(--av-warn-wash); color: var(--av-warn); border-left-color: var(--av-warn); }
+
+/* --- metric strip ----------------------------------------------------- */
+.av-metrics {
+    display: flex; gap: 2rem; flex-wrap: wrap;
+    padding-bottom: 1rem; border-bottom: 1px solid var(--av-line); margin-bottom: 1.25rem;
+}
+.av-metric .n {
+    font-size: 1.5rem; font-weight: 700; letter-spacing: -.02em; line-height: 1.1;
+    color: var(--av-ink); font-variant-numeric: tabular-nums;
+}
+.av-metric .k {
+    font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; color: var(--av-muted);
+}
+.av-metric.ok .n { color: var(--av-ok); }
+.av-metric.warn .n { color: var(--av-warn); }
+
+/* --- calendar --------------------------------------------------------- */
+.av-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.av-dow {
+    font-size: .68rem; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--av-muted); text-align: center; padding-bottom: .1rem;
+}
+.av-day {
+    border: 1px solid var(--av-line); border-radius: 8px; background: var(--av-surface);
+    min-height: 124px; padding: .35rem; display: flex; flex-direction: column; gap: 3px;
+}
+.av-cal.is-month .av-day { min-height: 82px; }
+.av-day.outside { background: var(--av-surface-2); opacity: .55; }
+.av-day.past { background: var(--av-surface-2); }
+.av-day.today { border-color: var(--av-brand); box-shadow: inset 0 0 0 1px var(--av-brand); }
+.av-dnum {
+    font-size: .72rem; color: var(--av-muted); text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+.av-day.today .av-dnum { color: var(--av-brand); font-weight: 700; }
+
+.av-chip {
+    display: flex; align-items: center; gap: .3rem; width: 100%;
+    font: inherit; font-size: .74rem; font-variant-numeric: tabular-nums;
+    border: 0; border-left: 3px solid transparent; border-radius: 5px;
+    padding: .18rem .3rem; cursor: pointer; text-align: left;
+}
+.av-chip .t { font-weight: 600; }
+.av-chip .g {
+    margin-left: auto; font-size: .64rem; opacity: .85;
+    width: 15px; height: 15px; border-radius: 50%;
+    display: inline-grid; place-items: center; background: rgba(0,0,0,.07);
+}
+.av-chip.free  { background: var(--av-ok-wash);   color: var(--av-ok);   border-left-color: var(--av-ok); }
+.av-chip.taken { background: var(--av-warn-wash); color: var(--av-warn); border-left-color: var(--av-warn); }
+/* Hatched as well as grey: state has to survive being read without colour. */
+.av-chip.late  {
+    background: var(--av-dim-wash); color: var(--av-dim); border-left-color: var(--av-dim);
+    background-image: repeating-linear-gradient(135deg, transparent 0 5px, rgba(100,112,106,.16) 5px 10px);
+}
+.av-chip:hover { filter: brightness(.96); }
+
+.av-counts {
+    display: flex; flex-direction: column; gap: 2px; width: 100%;
+    background: none; border: 0; padding: 0; cursor: pointer; font: inherit; text-align: left;
+}
+.av-counts .c { font-size: .68rem; border-radius: 4px; padding: .1rem .3rem; }
+.av-counts .c.free  { background: var(--av-ok-wash);   color: var(--av-ok); }
+.av-counts .c.taken { background: var(--av-warn-wash); color: var(--av-warn); }
+.av-counts .c.late  { background: var(--av-dim-wash);  color: var(--av-dim); }
+
+.av-add {
+    margin-top: auto; border: 1px dashed var(--av-line-2); background: none;
+    color: var(--av-muted); font: inherit; font-size: .78rem; line-height: 1.1;
+    border-radius: 5px; padding: .15rem; cursor: pointer;
+}
+.av-add:hover { border-color: var(--av-brand); color: var(--av-brand); background: var(--av-brand-wash); }
+
+.av-legend { display: flex; gap: 1.25rem; flex-wrap: wrap; margin-top: .9rem; font-size: .78rem; color: var(--av-muted); }
+.av-legend .sw { display: inline-block; width: 22px; height: 10px; border-radius: 3px; margin-right: .4rem; vertical-align: -1px; }
+.av-legend .sw.free  { background: var(--av-ok-wash);   border-left: 3px solid var(--av-ok); }
+.av-legend .sw.taken { background: var(--av-warn-wash); border-left: 3px solid var(--av-warn); }
+.av-legend .sw.late  {
+    background: var(--av-dim-wash); border-left: 3px solid var(--av-dim);
+    background-image: repeating-linear-gradient(135deg, transparent 0 4px, rgba(100,112,106,.2) 4px 8px);
+}
+
+/* --- day drawer ------------------------------------------------------- */
+.av-drawer {
+    margin-top: 1.5rem; padding-top: 1.1rem; border-top: 1px solid var(--av-line);
+}
+.av-drawer-head { display: flex; align-items: baseline; gap: .7rem; margin-bottom: .8rem; }
+.av-drawer-head strong { font-size: 1rem; color: var(--av-ink); }
+.av-drawer-head span { font-size: .84rem; color: var(--av-muted); }
+.av-drawer-close {
+    margin-left: auto; background: none; border: 0; font-size: 1.3rem; line-height: 1;
+    color: var(--av-muted); cursor: pointer; padding: 0 .2rem;
+}
+.av-row {
+    display: flex; align-items: center; gap: .8rem; flex-wrap: wrap;
+    padding: .6rem .85rem; border: 1px solid var(--av-line); border-radius: 8px;
+    background: #fff; margin-bottom: .4rem; font-size: .88rem;
+}
+.av-row .time { font-weight: 600; font-variant-numeric: tabular-nums; min-width: 52px; color: var(--av-ink); }
+.av-row .pill { font-size: .7rem; font-weight: 600; padding: .12rem .55rem; border-radius: 999px; }
+.av-row .pill.free  { background: var(--av-ok-wash);   color: var(--av-ok); }
+.av-row .pill.taken { background: var(--av-warn-wash); color: var(--av-warn); }
+.av-row .pill.late  { background: var(--av-dim-wash);  color: var(--av-dim); }
+.av-row .who { color: var(--av-ink-2); font-size: .84rem; }
+.av-row .act {
+    margin-left: auto; font-size: .82rem; font-weight: 600;
+    color: var(--av-brand); background: none; border: 0; cursor: pointer;
+    text-decoration: none; padding: 0;
+}
+.av-row .act.danger { color: var(--av-bad); }
+.av-row form { margin: 0 0 0 auto; }
+
+.av-empty {
+    text-align: center; padding: 2.5rem 1rem; color: var(--av-muted);
+    border: 1px dashed var(--av-line-2); border-radius: 10px; margin-top: 1.5rem;
+}
+.av-empty h3 { margin: 0 0 .3rem; color: var(--av-ink); font-size: 1.05rem; }
+.av-empty p { margin: 0 0 1rem; font-size: .9rem; }
+
+/* --- overlays --------------------------------------------------------- */
+.av-overlay {
+    display: none; position: fixed; inset: 0; z-index: 1200;
+    background: rgba(20, 28, 22, .55); padding: 1.5rem;
+    align-items: flex-start; justify-content: center; overflow-y: auto;
+}
+.av-overlay.show { display: flex; }
+.av-sheet {
+    background: #fff; border-radius: 12px; width: 100%; max-width: 420px;
+    margin-top: 6vh; box-shadow: 0 20px 60px rgba(0,0,0,.28); overflow: hidden;
+}
+.av-sheet.wide { max-width: 760px; }
+.av-sheet-head {
+    display: flex; align-items: center; gap: 1rem;
+    padding: 1rem 1.25rem; border-bottom: 1px solid var(--av-line);
+}
+.av-sheet-head h3 { margin: 0; font-size: 1.05rem; color: var(--av-ink); }
+.av-sheet-close {
+    margin-left: auto; background: none; border: 0; font-size: 1.4rem; line-height: 1;
+    color: var(--av-muted); cursor: pointer;
+}
+.av-sheet-body { padding: 1.25rem; }
+.av-sheet-body.av-two { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+.av-sheet-foot {
+    display: flex; justify-content: flex-end; gap: .5rem;
+    padding: 1rem 1.25rem; border-top: 1px solid var(--av-line); background: var(--av-surface-2);
+}
+.av-field { margin-bottom: 1rem; }
+.av-field label {
+    display: block; font-size: .68rem; letter-spacing: .09em; text-transform: uppercase;
+    color: var(--av-muted); margin-bottom: .35rem;
+}
+.av-field input[type="date"], .av-field select {
+    width: 100%; font: inherit; font-size: .9rem; color: var(--av-ink);
+    border: 1px solid var(--av-line-2); border-radius: 7px; padding: .5rem .6rem;
+    background: #fff;
+}
+.av-field input[readonly] {
+    background: var(--av-surface-2); color: var(--av-ink-2); cursor: default;
+}
+.av-field input[readonly]::-webkit-calendar-picker-indicator { display: none; }
+.av-hint.locked-note { margin-top: .35rem; color: var(--av-ink-2); font-weight: 600; }
+.av-hint { font-size: .82rem; color: var(--av-muted); margin: 0; }
+
+.av-dows { display: flex; gap: .3rem; flex-wrap: wrap; }
+.av-dows label { cursor: pointer; }
+.av-dows input { position: absolute; opacity: 0; pointer-events: none; }
+.av-dows span {
+    display: inline-block; border: 1px solid var(--av-line-2); border-radius: 6px;
+    padding: .3rem .55rem; font-size: .78rem; color: var(--av-muted); background: #fff;
+}
+.av-dows input:checked + span {
+    background: var(--av-brand-wash); border-color: var(--av-brand);
+    color: var(--av-brand); font-weight: 600;
+}
+.av-dows input:focus-visible + span { outline: 2px solid var(--av-brand); outline-offset: 2px; }
+
+.av-times { display: flex; gap: .3rem; flex-wrap: wrap; min-height: 30px; }
+.av-times .chip {
+    display: inline-flex; align-items: center; gap: .35rem;
+    background: var(--av-ok-wash); color: var(--av-ok); border-radius: 5px;
+    padding: .18rem .5rem; font-size: .78rem; font-weight: 600; font-variant-numeric: tabular-nums;
+}
+.av-times .chip button {
+    background: none; border: 0; color: inherit; cursor: pointer;
+    font-size: .9rem; line-height: 1; padding: 0; opacity: .7;
+}
+.av-times .none { font-size: .82rem; color: var(--av-muted); }
+.av-addtime { display: flex; gap: .4rem; }
+.av-addtime select { flex: 1; }
+
+.av-preview {
+    background: var(--av-brand-wash); border: 1px solid #b9dcb6;
+    border-radius: 8px; padding: .9rem 1rem;
+}
+.av-preview .big {
+    font-size: 1.5rem; font-weight: 700; letter-spacing: -.02em;
+    color: var(--av-brand); font-variant-numeric: tabular-nums; line-height: 1.15;
+}
+.av-preview p { margin: .25rem 0 0; font-size: .84rem; color: var(--av-ink-2); }
+
+@media (max-width: 900px) {
+    .av-bar { align-items: stretch; }
+    .av-title { margin-right: 0; width: 100%; }
+    .av-actions { width: 100%; }
+    .av-actions .av-btn { flex: 1; }
+    .av-sheet-body.av-two { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+    .av-cal { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .av-dow { display: none; }
+    .av-day { min-height: 96px; }
+    .av-day::before {
+        content: attr(data-label); font-size: .68rem; color: var(--av-muted);
+    }
+    .av-dnum { display: none; }
+    .av-day.outside { display: none; }
+}
 </style>
 
 <script>
-    // View Toggle Functionality
-    function switchView(view) {
-        const listView = document.getElementById('listView');
-        const weekView = document.getElementById('weekView');
-        const buttons = document.querySelectorAll('.toggle-btn');
-        
-        buttons.forEach(btn => {
-            if (btn.dataset.view === view) {
-                btn.classList.add('active');
+(function () {
+    "use strict";
+
+    // ---- overlays ------------------------------------------------------
+    function show(id, ready) {
+        var el = document.getElementById(id);
+        if (!el) { return; }
+        el.classList.add('show');
+        document.body.style.overflow = 'hidden';
+        if (ready) { ready(el); }
+    }
+    function hide(id) {
+        var el = document.getElementById(id);
+        if (!el) { return; }
+        el.classList.remove('show');
+        document.body.style.overflow = '';
+    }
+
+    window.openAddAvailabilityModal = function (date, label) {
+        show('addAvailabilityModal', function () {
+            var field = document.getElementById('availabilityDate');
+            var note = document.getElementById('availabilityDayNote');
+            var time = document.getElementById('startTime');
+            if (!field) { return; }
+
+            // The parameter this function always accepted and was never given.
+            // Every day in the calendar now passes its own date, so adding a
+            // time to the Thursday you are looking at does not mean typing
+            // the date again - and having chosen the day by clicking it, you
+            // are not asked to choose it a second time.
+            if (date) {
+                field.value = date;
+                field.readOnly = true;
+                if (note) {
+                    note.textContent = label || date;
+                    note.hidden = false;
+                }
+                if (time) { time.focus(); }
             } else {
-                btn.classList.remove('active');
+                // No UI path reaches this: the day `+` is the only caller and
+                // it always passes a date. It stays because the overlay is one
+                // element reused across every open, so a future caller that
+                // omitted the date would otherwise inherit the previous day's
+                // lock - a stale value in a field nobody can edit, which is a
+                // worse failure than the one this branch costs three lines to
+                // prevent.
+                field.readOnly = false;
+                if (note) { note.hidden = true; note.textContent = ''; }
+                field.focus();
             }
         });
-
-        if (view === 'list') {
-            listView.style.display = 'flex';
-            weekView.style.display = 'none';
-        } else {
-            listView.style.display = 'none';
-            weekView.style.display = 'block';
-        }
-    }
-
-    // Modal Functions
-    function openAddAvailabilityModal() {
-        document.getElementById('addAvailabilityModal').classList.add('show');
-        document.body.style.overflow = 'hidden';
-        
-        // Set default date to today
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('availabilityDate').value = today;
-    }
-
-    function closeAddAvailabilityModal() {
-        document.getElementById('addAvailabilityModal').classList.remove('show');
-        document.body.style.overflow = 'auto';
-        resetAvailabilityForm();
-    }
-
-    function openSlotDetailsModal() {
-        document.getElementById('slotDetailsModal').classList.add('show');
-        document.body.style.overflow = 'hidden';
-    }
-
-    function closeSlotDetailsModal() {
-        document.getElementById('slotDetailsModal').classList.remove('show');
-        document.body.style.overflow = 'auto';
-    }
-
-    // Close modals on overlay click
-    document.getElementById('addAvailabilityModal').addEventListener('click', function(e) {
-        if (e.target === this) {
-            closeAddAvailabilityModal();
-        }
-    });
-
-    document.getElementById('slotDetailsModal').addEventListener('click', function(e) {
-        if (e.target === this) {
-            closeSlotDetailsModal();
-        }
-    });
-
-    // Close modals on Escape key
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            closeAddAvailabilityModal();
-            closeSlotDetailsModal();
-        }
-    });
-
-    // Toggle Repeat Options
-    function toggleRepeatOptions() {
-        const repeatPattern = document.getElementById('repeatPattern').value;
-        const repeatOptions = document.getElementById('repeatOptions');
-        const weeklyOptions = document.getElementById('weeklyOptions');
-
-        if (repeatPattern !== 'none') {
-            repeatOptions.style.display = 'block';
-            
-            if (repeatPattern === 'weekly') {
-                weeklyOptions.style.display = 'block';
-            } else {
-                weeklyOptions.style.display = 'none';
-            }
-        } else {
-            repeatOptions.style.display = 'none';
-            weeklyOptions.style.display = 'none';
-        }
-    }
-
-    // Save Availability
-    function saveAvailability() {
-        const date = document.getElementById('availabilityDate').value;
-        const startTime = document.getElementById('startTime').value;
-        const endTime = document.getElementById('endTime').value;
-        const repeatPattern = document.getElementById('repeatPattern').value;
-        const notes = document.getElementById('slotNotes').value;
-
-        // Validation
-        if (!date || !startTime || !endTime) {
-            alert('Please fill in all required fields');
-            return;
-        }
-
-        if (startTime >= endTime) {
-            alert('End time must be after start time');
-            return;
-        }
-
-        // Collect weekly days if repeat is weekly
-        let repeatDays = [];
-        if (repeatPattern === 'weekly') {
-            const checkboxes = document.querySelectorAll('.weekday-checkbox input[type="checkbox"]:checked');
-            repeatDays = Array.from(checkboxes).map(cb => cb.value);
-            
-            if (repeatDays.length === 0) {
-                alert('Please select at least one day for weekly repeat');
-                return;
-            }
-        }
-
-        const repeatUntil = repeatPattern !== 'none' ? document.getElementById('repeatUntil').value : null;
-
-        // In production: Make API call to save availability
-        console.log('Saving availability:', {
-            date: date,
-            startTime: startTime,
-            endTime: endTime,
-            repeatPattern: repeatPattern,
-            repeatUntil: repeatUntil,
-            repeatDays: repeatDays,
-            notes: notes
+    };
+    window.closeAddAvailabilityModal = function () { hide('addAvailabilityModal'); };
+    window.openPublishModal = function () {
+        show('publishModal', function () {
+            var from = document.getElementById('bulkFrom');
+            if (from && !from.value) { from.value = todayISO(); }
+            var until = document.getElementById('bulkUntil');
+            if (until && !until.value) { until.value = addDaysISO(27); }
+            renderTimes();
         });
+    };
+    window.closePublishModal = function () { hide('publishModal'); };
 
-        alert('Availability slot(s) created successfully!');
+    document.querySelectorAll('.av-overlay').forEach(function (overlay) {
+        overlay.addEventListener('click', function (event) {
+            if (event.target === overlay) { overlay.classList.remove('show'); document.body.style.overflow = ''; }
+        });
+    });
+    document.addEventListener('keydown', function (event) {
+        if (event.key !== 'Escape') { return; }
         closeAddAvailabilityModal();
-
-        // Refresh the schedule view
-        // In production: reload data from backend
-    }
-
-    // Reset Form
-    function resetAvailabilityForm() {
-        document.getElementById('availabilityDate').value = '';
-        document.getElementById('startTime').value = '';
-        document.getElementById('endTime').value = '';
-        document.getElementById('repeatPattern').value = 'none';
-        document.getElementById('slotNotes').value = '';
-        document.getElementById('repeatOptions').style.display = 'none';
-        
-        // Uncheck all weekday checkboxes
-        document.querySelectorAll('.weekday-checkbox input[type="checkbox"]').forEach(cb => {
-            cb.checked = false;
-        });
-    }
-
-    // Add slot for specific date
-    function addSlotForDate(date) {
-        openAddAvailabilityModal();
-        document.getElementById('availabilityDate').value = date;
-    }
-
-    // Modified openSlotDetails function
-    function openSlotDetails(slotElement, slotId) {
-        const slotTime = slotElement.querySelector('.slot-time').textContent;
-        const isBooked = slotElement.classList.contains('booked');
-        const slotDate = slotElement.dataset.date;
-        const slotTimeValue = slotElement.dataset.time;
-
-        // Format date for display
-        const dateObj = new Date(slotDate + 'T' + slotTimeValue);
-        const formattedDate = dateObj.toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-        });
-
-        // Update modal content
-        document.getElementById('detailDate').textContent = formattedDate;
-        document.getElementById('detailTime').textContent = slotTime;
-        
-        if (isBooked) {
-            document.getElementById('detailStatus').className = 'status-badge booked';
-            document.getElementById('detailStatus').innerHTML = '<i class="fas fa-user-check"></i> Booked';
-            document.getElementById('patientDetail').style.display = 'flex';
-            document.getElementById('deleteSlotBtn').disabled = true;
-            document.getElementById('deleteSlotBtn').style.opacity = '0.5';
-            document.getElementById('deleteSlotBtn').style.cursor = 'not-allowed';
-        } else {
-            document.getElementById('detailStatus').className = 'status-badge available';
-            document.getElementById('detailStatus').innerHTML = '<i class="fas fa-check-circle"></i> Available';
-            document.getElementById('patientDetail').style.display = 'none';
-            document.getElementById('deleteSlotBtn').disabled = false;
-            document.getElementById('deleteSlotBtn').style.opacity = '1';
-            document.getElementById('deleteSlotBtn').style.cursor = 'pointer';
-        }
-
-        // Store slot ID for deletion
-        document.getElementById('deleteSlotBtn').dataset.slotId = slotId;
-
-        openSlotDetailsModal();
-    }
-
-    // Delete slot directly from list view
-    function deleteSlot(slotId) {
-        if (!slotId) {
-            slotId = document.getElementById('deleteSlotBtn').dataset.slotId;
-        }
-        
-        if (confirm('Are you sure you want to delete this availability slot?')) {
-            // Make API call to delete slot
-            fetch(`/delete-availability/${slotId}/`, {
-                method: 'DELETE',
-                headers: {
-                    'X-CSRFToken': getCookie('csrftoken'),
-                    'Content-Type': 'application/json',
-                },
-            })
-            .then(response => {
-                if (response.ok) {
-                    alert('Availability slot deleted successfully!');
-                    location.reload(); // Refresh the page
-                } else {
-                    alert('Error deleting slot');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Error deleting slot');
-            });
-        }
-    }
-
-    // CSRF token helper function
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
-
-    // Navigation
-    function previousPeriod() {
-        console.log('Navigate to previous period');
-        // In production: Update date range and reload data
-        alert('Loading previous week...');
-    }
-
-    function nextPeriod() {
-        console.log('Navigate to next period');
-        // In production: Update date range and reload data
-        alert('Loading next week...');
-    }
-
-    function goToToday() {
-        console.log('Navigate to today');
-        // In production: Reset to current week and reload data
-        alert('Jumping to current week...');
-    }
-
-    // Page load animation
-    window.addEventListener('load', function() {
-        const cards = document.querySelectorAll('.card, .stat-card');
-        cards.forEach((card, index) => {
-            card.style.opacity = '0';
-            card.style.transform = 'translateY(20px)';
-            setTimeout(() => {
-                card.style.transition = 'all 0.5s ease';
-                card.style.opacity = '1';
-                card.style.transform = 'translateY(0)';
-            }, index * 50);
-        });
-
-        // Animate slot items
-        setTimeout(() => {
-            const slots = document.querySelectorAll('.slot-card, .slot-item');
-            slots.forEach((slot, index) => {
-                slot.style.opacity = '0';
-                setTimeout(() => {
-                    slot.style.transition = 'opacity 0.3s ease';
-                    slot.style.opacity = '1';
-                }, index * 20);
-            });
-        }, 500);
+        closePublishModal();
+        closeDay();
     });
 
-    // Keyboard shortcuts
-    document.addEventListener('keydown', function(e) {
-        // Ctrl/Cmd + N for new availability
-        if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
-            e.preventDefault();
-            openAddAvailabilityModal();
-        }
-        
-        // Arrow keys for navigation
-        if (e.key === 'ArrowLeft' && !e.target.matches('input, textarea, select')) {
-            previousPeriod();
-        }
-        if (e.key === 'ArrowRight' && !e.target.matches('input, textarea, select')) {
-            nextPeriod();
-        }
-    });
-
-    // Auto-update current time indicator (optional)
-    function updateCurrentTimeIndicator() {
-        // In production: Add a visual indicator for current time in the schedule
-        console.log('Updating current time indicator');
+    function amPm(value) {
+        var parts = value.split(':');
+        var hour = parseInt(parts[0], 10);
+        var suffix = hour >= 12 ? 'PM' : 'AM';
+        var shown = hour % 12;
+        if (shown === 0) { shown = 12; }
+        return shown + ':' + parts[1] + ' ' + suffix;
     }
 
-    setInterval(updateCurrentTimeIndicator, 60000); // Update every minute
+    function todayISO() { return new Date().toISOString().split('T')[0]; }
+    function addDaysISO(n) {
+        var d = new Date();
+        d.setDate(d.getDate() + n);
+        return d.toISOString().split('T')[0];
+    }
+
+    var dateField = document.getElementById('availabilityDate');
+    if (dateField) { dateField.setAttribute('min', todayISO()); }
+
+    // ---- day drawer ----------------------------------------------------
+    // The rows are rendered by Django inside each day's <template> and moved
+    // here on click. No second query and no second source of truth: the panel
+    // cannot show something the calendar does not, which is the failure the
+    // duplicated list view invited.
+    window.openDay = function (dayEl) {
+        if (!dayEl) { return; }
+        var drawer = document.getElementById('avDrawer');
+        var rows = document.getElementById('avDrawerRows');
+        var data = dayEl.querySelector('.av-day-data');
+        if (!drawer || !rows || !data) { return; }
+
+        rows.innerHTML = '';
+        rows.appendChild(data.content.cloneNode(true));
+
+        var count = rows.querySelectorAll('.av-row').length;
+        document.getElementById('avDrawerDay').textContent = dayEl.dataset.label || '';
+        document.getElementById('avDrawerCount').textContent =
+            count + (count === 1 ? ' time' : ' times');
+        drawer.hidden = false;
+        drawer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+        document.querySelectorAll('.av-day.selected').forEach(function (d) {
+            d.classList.remove('selected');
+        });
+        dayEl.classList.add('selected');
+    };
+    window.closeDay = function () {
+        var drawer = document.getElementById('avDrawer');
+        if (drawer) { drawer.hidden = true; }
+    };
+
+    // ---- publish times -------------------------------------------------
+    var times = [];
+
+    window.addBulkTime = function () {
+        var input = document.getElementById('bulkNewTime');
+        if (!input || !input.value) { return; }
+        if (times.indexOf(input.value) === -1) {
+            times.push(input.value);
+            times.sort();
+        }
+        input.value = '';
+        renderTimes();
+    };
+
+    function removeTime(value) {
+        times = times.filter(function (t) { return t !== value; });
+        renderTimes();
+    }
+
+    function renderTimes() {
+        var list = document.getElementById('bulkTimeList');
+        var hidden = document.getElementById('bulkTimes');
+        if (!list || !hidden) { return; }
+
+        list.innerHTML = '';
+        if (!times.length) {
+            var none = document.createElement('span');
+            none.className = 'none';
+            none.textContent = 'No times yet — add one below.';
+            list.appendChild(none);
+        }
+        times.forEach(function (value) {
+            var chip = document.createElement('span');
+            chip.className = 'chip';
+            var label = document.createElement('span');
+            // 24-hour to the server, AM/PM to the person - the same split the
+            // <select> makes. `times` holds the values the form parses.
+            label.textContent = amPm(value);
+            var remove = document.createElement('button');
+            remove.type = 'button';
+            remove.textContent = '×';
+            remove.setAttribute('aria-label', 'Remove ' + value);
+            remove.addEventListener('click', function () { removeTime(value); });
+            chip.appendChild(label);
+            chip.appendChild(remove);
+            list.appendChild(chip);
+        });
+        hidden.value = times.join(',');
+        countPlanned();
+    }
+
+    function countPlanned() {
+        var from = document.getElementById('bulkFrom');
+        var until = document.getElementById('bulkUntil');
+        var big = document.getElementById('bulkCount');
+        var explain = document.getElementById('bulkExplain');
+        var submit = document.getElementById('bulkSubmit');
+        if (!from || !until || !big || !explain || !submit) { return; }
+
+        var days = Array.prototype.slice
+            .call(document.querySelectorAll('#bulkDays input:checked'))
+            .map(function (box) { return parseInt(box.value, 10); });
+
+        var start = from.value ? new Date(from.value + 'T00:00:00') : null;
+        var end = until.value ? new Date(until.value + 'T00:00:00') : null;
+
+        if (!start || !end || end < start || !days.length || !times.length) {
+            big.textContent = '0 times';
+            explain.textContent = 'Choose dates, days and times.';
+            submit.textContent = 'Publish';
+            return;
+        }
+
+        var matching = 0;
+        var cursor = new Date(start);
+        while (cursor <= end) {
+            // Sunday is 0 in JavaScript and 6 in Python's weekday(); the form
+            // values are Python's, so this converts rather than assuming.
+            var pythonDay = (cursor.getDay() + 6) % 7;
+            if (days.indexOf(pythonDay) !== -1) { matching += 1; }
+            cursor.setDate(cursor.getDate() + 1);
+        }
+
+        var total = matching * times.length;
+        big.textContent = total + (total === 1 ? ' time' : ' times');
+        explain.textContent = matching + (matching === 1 ? ' day' : ' days') +
+            ' × ' + times.length + (times.length === 1 ? ' time' : ' times') +
+            '. Times already published are skipped, and nothing is created until you confirm.';
+        submit.textContent = 'Publish ' + total + (total === 1 ? ' time' : ' times');
+    }
+
+    ['bulkFrom', 'bulkUntil'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) { el.addEventListener('change', countPlanned); }
+    });
+    document.querySelectorAll('#bulkDays input').forEach(function (box) {
+        box.addEventListener('change', countPlanned);
+    });
+    var newTime = document.getElementById('bulkNewTime');
+    if (newTime) {
+        // A <select> fires `change`, so adding is one action rather than
+        // "choose, then remember to press Add".
+        newTime.addEventListener('change', addBulkTime);
+    }
+
+    renderTimes();
+}());
 </script>
-
 {% endblock %}

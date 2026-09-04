@@ -1,1308 +1,451 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Appointment Details - MediBook</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <style>
-        :root {
-            --primary-green: #2d5a2d;
-            --light-green: #4a7c59;
-            --gradient-green: linear-gradient(135deg, #2d5a2d 0%, #4a7c59 100%);
-            --accent-green: #7cc576;
-            --light-bg: #f8f9fa;
-            --dark-text: #333;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            color: var(--dark-text);
-            line-height: 1.6;
-            background: var(--light-bg);
-        }
-
-        /* Navigation */
-        .navbar {
-            background: white;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            padding: 1rem 0;
-        }
-
-        .navbar-brand {
-            font-size: 1.8rem;
-            font-weight: bold;
-            color: var(--primary-green) !important;
-        }
-
-        .nav-link {
-            color: var(--dark-text) !important;
-            font-weight: 500;
-            margin: 0 0.5rem;
-        }
-
-        /* Header Section */
-        .page-header {
-            background: var(--gradient-green);
-            color: white;
-            padding: 2rem 0;
-            margin-bottom: 2rem;
-        }
-
-        .header-content {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 1rem;
-        }
-
-        .header-title-section h1 {
-            font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }
-
-        .booking-id-badge {
-            background: rgba(255,255,255,0.2);
-            padding: 0.5rem 1rem;
-            border-radius: 25px;
-            font-size: 0.95rem;
-            font-weight: 600;
-            display: inline-block;
-        }
-
-        .header-actions {
-            display: flex;
-            gap: 1rem;
-        }
-
-        .header-btn {
-            padding: 0.65rem 1.5rem;
-            border-radius: 8px;
-            font-weight: 600;
-            text-decoration: none;
-            transition: all 0.3s;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            border: 2px solid white;
-            color: white;
-            background: transparent;
-        }
-
-        .header-btn:hover {
-            background: white;
-            color: var(--primary-green);
-        }
-
-        /* Status Banner */
-        .status-banner {
-            background: white;
-            border-radius: 12px;
-            padding: 1.5rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            border-left: 5px solid var(--accent-green);
-        }
-
-        .status-banner.confirmed {
-            border-left-color: var(--accent-green);
-        }
-
-        .status-banner.pending {
-            border-left-color: #ffc107;
-        }
-
-        .status-banner.completed {
-            border-left-color: #17a2b8;
-        }
-
-        .status-banner.cancelled {
-            border-left-color: #dc3545;
-        }
-
-        .status-content {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 1rem;
-        }
-
-        .status-info {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .status-icon {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            color: white;
-        }
-
-        .status-icon.confirmed {
-            background: var(--accent-green);
-        }
-
-        .status-icon.pending {
-            background: #ffc107;
-        }
-
-        .status-icon.completed {
-            background: #17a2b8;
-        }
-
-        .status-text h3 {
-            font-size: 1.2rem;
-            font-weight: 700;
-            color: var(--dark-text);
-            margin-bottom: 0.25rem;
-        }
-
-        .status-text p {
-            color: #666;
-            margin: 0;
-            font-size: 0.95rem;
-        }
-
-        .countdown-timer {
-            text-align: center;
-            background: #f8f9fa;
-            padding: 1rem;
-            border-radius: 8px;
-        }
-
-        .countdown-label {
-            font-size: 0.85rem;
-            color: #666;
-            margin-bottom: 0.25rem;
-        }
-
-        .countdown-value {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--primary-green);
-        }
-
-        /* Progress Timeline */
-        .timeline-section {
-            background: white;
-            border-radius: 12px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        }
-
-        .section-header {
-            font-size: 1.4rem;
-            font-weight: 700;
-            color: var(--primary-green);
-            margin-bottom: 1.5rem;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .timeline {
-            position: relative;
-            padding-left: 3rem;
-        }
-
-        .timeline::before {
-            content: '';
-            position: absolute;
-            left: 15px;
-            top: 0;
-            bottom: 0;
-            width: 3px;
-            background: #e0e0e0;
-        }
-
-        .timeline-item {
-            position: relative;
-            margin-bottom: 2rem;
-            padding-bottom: 2rem;
-        }
-
-        .timeline-item:last-child {
-            margin-bottom: 0;
-            padding-bottom: 0;
-        }
-
-        .timeline-marker {
-            position: absolute;
-            left: -3rem;
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.9rem;
-            color: white;
-            z-index: 2;
-        }
-
-        .timeline-item.completed .timeline-marker {
-            background: var(--accent-green);
-        }
-
-        .timeline-item.active .timeline-marker {
-            background: var(--primary-green);
-            box-shadow: 0 0 0 4px rgba(45, 90, 45, 0.2);
-        }
-
-        .timeline-item.pending .timeline-marker {
-            background: #e0e0e0;
-            color: #999;
-        }
-
-        .timeline-content {
-            background: #f8f9fa;
-            padding: 1.25rem;
-            border-radius: 10px;
-            border-left: 3px solid transparent;
-        }
-
-        .timeline-item.completed .timeline-content {
-            border-left-color: var(--accent-green);
-        }
-
-        .timeline-item.active .timeline-content {
-            border-left-color: var(--primary-green);
-            background: #f0f8f0;
-        }
-
-        .timeline-title {
-            font-weight: 700;
-            color: var(--dark-text);
-            margin-bottom: 0.25rem;
-            font-size: 1.05rem;
-        }
-
-        .timeline-time {
-            font-size: 0.85rem;
-            color: #666;
-            margin-bottom: 0.5rem;
-        }
-
-        .timeline-description {
-            font-size: 0.9rem;
-            color: #666;
-            margin: 0;
-        }
-
-        /* Main Content Grid */
-        .content-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-            margin-bottom: 2rem;
-        }
-
-        /* Info Card */
-        .info-card {
-            background: white;
-            border-radius: 12px;
-            padding: 2rem;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        }
-
-        .info-card-header {
-            font-size: 1.3rem;
-            font-weight: 700;
-            color: var(--primary-green);
-            margin-bottom: 1.5rem;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .info-row {
-            display: flex;
-            align-items: flex-start;
-            margin-bottom: 1.5rem;
-            padding-bottom: 1.5rem;
-            border-bottom: 1px solid #f0f0f0;
-        }
-
-        .info-row:last-child {
-            margin-bottom: 0;
-            padding-bottom: 0;
-            border-bottom: none;
-        }
-
-        .info-icon {
-            width: 40px;
-            height: 40px;
-            background: var(--gradient-green);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            margin-right: 1rem;
-            flex-shrink: 0;
-        }
-
-        .info-content {
-            flex: 1;
-        }
-
-        .info-label {
-            font-size: 0.85rem;
-            color: #666;
-            margin-bottom: 0.25rem;
-            font-weight: 500;
-        }
-
-        .info-value {
-            font-weight: 600;
-            color: var(--dark-text);
-            font-size: 1rem;
-        }
-
-        .info-subtext {
-            font-size: 0.85rem;
-            color: #999;
-            margin-top: 0.15rem;
-        }
-
-        /* Doctor Profile Card */
-        .doctor-profile {
-            display: flex;
-            gap: 1.5rem;
-            background: #f8f9fa;
-            padding: 1.5rem;
-            border-radius: 10px;
-            margin-bottom: 1rem;
-        }
-
-        .doctor-avatar {
-            width: 80px;
-            height: 80px;
-            border-radius: 12px;
-            object-fit: cover;
-            border: 3px solid var(--accent-green);
-        }
-
-        .doctor-info h4 {
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: var(--primary-green);
-            margin-bottom: 0.25rem;
-        }
-
-        .doctor-specialty {
-            color: #666;
-            font-size: 0.95rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .doctor-rating {
-            color: #ffc107;
-            font-size: 0.9rem;
-        }
-
-        /* Action Buttons */
-        .action-buttons-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 1rem;
-            margin-top: 1.5rem;
-        }
-
-        .action-btn {
-            padding: 0.9rem;
-            border-radius: 10px;
-            font-weight: 600;
-            text-decoration: none;
-            text-align: center;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            border: 2px solid;
-            cursor: pointer;
-        }
-
-        .action-btn.primary {
-            background: var(--gradient-green);
-            color: white;
-            border-color: var(--primary-green);
-        }
-
-        .action-btn.primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(45, 90, 45, 0.3);
-        }
-
-        .action-btn.secondary {
-            background: white;
-            color: var(--primary-green);
-            border-color: var(--primary-green);
-        }
-
-        .action-btn.secondary:hover {
-            background: #f0f8f0;
-        }
-
-        .action-btn.danger {
-            background: white;
-            color: #dc3545;
-            border-color: #dc3545;
-        }
-
-        .action-btn.danger:hover {
-            background: #dc3545;
-            color: white;
-        }
-
-        /* Notes Section */
-        .notes-section {
-            background: #fff9e6;
-            border-left: 4px solid #ffc107;
-            padding: 1.5rem;
-            border-radius: 8px;
-            margin-top: 1.5rem;
-        }
-
-        .notes-title {
-            font-weight: 700;
-            color: var(--dark-text);
-            margin-bottom: 0.75rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .notes-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-
-        .notes-list li {
-            padding: 0.5rem 0;
-            color: #666;
-            font-size: 0.95rem;
-            display: flex;
-            align-items: flex-start;
-            gap: 0.75rem;
-        }
-
-        .notes-list li i {
-            color: #ffc107;
-            margin-top: 0.25rem;
-        }
-
-        /* Updates/Activity Feed */
-        .activity-feed {
-            background: white;
-            border-radius: 12px;
-            padding: 2rem;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        }
-
-        .activity-item {
-            display: flex;
-            gap: 1rem;
-            padding: 1rem;
-            background: #f8f9fa;
-            border-radius: 8px;
-            margin-bottom: 1rem;
-        }
-
-        .activity-item:last-child {
-            margin-bottom: 0;
-        }
-
-        .activity-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: var(--gradient-green);
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-
-        .activity-content {
-            flex: 1;
-        }
-
-        .activity-title {
-            font-weight: 600;
-            color: var(--dark-text);
-            margin-bottom: 0.25rem;
-        }
-
-        .activity-description {
-            font-size: 0.9rem;
-            color: #666;
-            margin-bottom: 0.25rem;
-        }
-
-        .activity-time {
-            font-size: 0.8rem;
-            color: #999;
-        }
-
-        /* Payment Status */
-        .payment-status {
-            background: white;
-            border-radius: 12px;
-            padding: 2rem;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        }
-
-        .payment-badge {
-            display: inline-block;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-weight: 600;
-            font-size: 0.9rem;
-        }
-
-        .payment-badge.paid {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .payment-badge.pending {
-            background: #fff3cd;
-            color: #856404;
-        }
-
-        .payment-details {
-            margin-top: 1.5rem;
-        }
-
-        .payment-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 0.75rem 0;
-            border-bottom: 1px solid #f0f0f0;
-        }
-
-        .payment-row:last-child {
-            border-bottom: none;
-            font-weight: 700;
-            font-size: 1.1rem;
-            color: var(--primary-green);
-        }
-
-        /* Responsive */
-        @media (max-width: 992px) {
-            .content-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .action-buttons-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .header-content {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-        }
-
-        @media (max-width: 576px) {
-            .page-header h1 {
-                font-size: 1.5rem;
-            }
-
-            .timeline {
-                padding-left: 2.5rem;
-            }
-
-            .timeline-marker {
-                left: -2.5rem;
-                width: 28px;
-                height: 28px;
-            }
-
-            .doctor-profile {
-                flex-direction: column;
-                align-items: center;
-                text-align: center;
-            }
-        }
-
-        /* Modal Styles */
-        .modal-content {
-            border-radius: 15px;
-            border: none;
-        }
-
-        .modal-header {
-            background: var(--gradient-green);
-            color: white;
-            border-radius: 15px 15px 0 0;
-        }
-
-        .modal-body {
-            padding: 2rem;
-        }
-    </style>
-</head>
-<body>
-    <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg sticky-top">
-        <div class="container">
-            <a class="navbar-brand" href="{% url 'appointment_home' %}">
-                <i class="fas fa-heartbeat"></i> MediBook
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'appointment_home' %}">Home</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'booking_id_lookup' %}">Trace an Appointment</a>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </nav>
-
-    <!-- Page Header -->
-    <div class="page-header">
-        <div class="container">
-            <div class="header-content">
-                <div class="header-title-section">
-                    <h1><i class="fas fa-calendar-check"></i> {{appointment.appointmentMode}} - {{appointment.reasonVisit}} - Appointment</h1>
-                    <span class="booking-id-badge">
-                        <i class="fas fa-hashtag"></i> {{appointment.bookingID}}
-                    </span>
-                </div>
-                <div class="header-actions">
-                    <a href="#" class="header-btn" id="printBtn">
-                        <i class="fas fa-print"></i> Print
-                    </a>
-                    <a href="#" class="header-btn" id="shareBtn">
-                        <i class="fas fa-share-alt"></i> Share
-                    </a>
-                </div>
-            </div>
-        </div>
+{% extends "appointments/patient_base.html" %}
+
+{% comment %}
+The patient's own record (plan 4.8), rehoused on the shared chrome in 11.11.
+
+The state logic below is unchanged — it is read from `status` and from the
+`AppointmentTransition` audit trail, which is what replaced a banner hardcoded
+to "Appointment Confirmed" and a four-step progress list with "In 2 days" typed
+into one of them.
+
+Three changes with the rehousing. The doctor card read
+`appointment.slot.user.qualifications`, the free-text field on `CustomUser`
+that plan 11.6 stopped writing to, so a doctor who picked their qualifications
+from the new list showed nothing here; it reads the profile's picked lists now,
+the same as the search page. Times read as AM/PM, matching the console and the
+rest of this flow. And the cancel confirmation is a `<details>` disclosure
+rather than a Bootstrap modal — no framework, no JavaScript, and it still
+cannot be triggered by accident.
+{% endcomment %}
+
+{% block page_css %}
+        .ad-head {
+            display: flex; flex-wrap: wrap; gap: .75rem 1.25rem;
+            align-items: flex-start; justify-content: space-between; margin-bottom: 1.25rem;
+        }
+        /* Same 44px as the button beside it. The height was coming from the
+           padding alone, so the code sat as a short pill against a full-height
+           control; `.pt-btn` sets `min-height: 44px` and this now matches it
+           rather than guessing at padding that happens to add up. The capsule
+           radius stays - it is a reference, not a second button, and the shape
+           is what says so. */
+        .ad-id {
+            display: inline-flex; align-items: center;
+            min-height: 44px; padding: .25rem 1.1rem;
+            font-variant-numeric: tabular-nums; letter-spacing: .05em;
+            border: 1px solid var(--line); border-radius: 999px;
+            font-size: .82rem; font-weight: 600; color: var(--green);
+            background: var(--panel);
+        }
+
+        .ad-status { border-left: 4px solid var(--dim); }
+        .ad-status.confirmed { border-left-color: var(--ok); }
+        .ad-status.pending { border-left-color: var(--warn); }
+        .ad-status.completed { border-left-color: var(--info); }
+        .ad-status.cancelled { border-left-color: var(--bad); }
+
+        .ad-status-top { display: flex; gap: .9rem; align-items: flex-start; }
+        .ad-status-top i { font-size: 1.35rem; margin-top: .15rem; }
+        .ad-status.confirmed .ad-status-top i { color: var(--ok); }
+        .ad-status.pending .ad-status-top i { color: var(--warn); }
+        .ad-status.completed .ad-status-top i { color: var(--info); }
+        .ad-status.cancelled .ad-status-top i { color: var(--bad); }
+        .ad-status h2 { margin-bottom: .3rem; }
+        .ad-status p { margin-bottom: .6rem; font-size: .95rem; }
+        .ad-status p:last-child { margin-bottom: 0; }
+
+        .ad-when {
+            margin-top: 1.1rem; padding-top: 1rem; border-top: 1px solid var(--line);
+            display: flex; flex-wrap: wrap; gap: .35rem 1rem; align-items: baseline;
+        }
+        .ad-when-label { font-size: .68rem; letter-spacing: .09em; text-transform: uppercase; color: var(--dim); }
+        .ad-when-value { font-weight: 700; color: var(--ink); }
+
+        .ad-layout { display: grid; gap: 1.25rem; align-items: start; margin-top: 1.25rem; }
+        @media (min-width: 940px) { .ad-layout { grid-template-columns: 1.4fr 1fr; } }
+
+        .ad-timeline { list-style: none; position: relative; margin-top: 1rem; }
+        .ad-event { display: flex; gap: .9rem; padding-bottom: 1.1rem; position: relative; }
+        .ad-event:last-child { padding-bottom: 0; }
+        .ad-event::before {
+            content: ""; position: absolute; left: 13px; top: 28px; bottom: 0;
+            width: 2px; background: var(--line);
+        }
+        .ad-event:last-child::before { display: none; }
+        .ad-event-dot {
+            width: 28px; height: 28px; border-radius: 50%; flex: 0 0 auto; z-index: 1;
+            display: grid; place-items: center; font-size: .7rem;
+            background: var(--green); color: #fff;
+        }
+        .ad-event.waiting .ad-event-dot { background: var(--panel-2); color: var(--dim); border: 1px solid var(--line); }
+        .ad-event.yours .ad-event-dot { background: #fff; color: var(--warn); border: 2px solid var(--warn); }
+        .ad-event-title { font-weight: 600; color: var(--ink); font-size: .95rem; }
+        .ad-event-time { font-size: .8rem; color: var(--dim); }
+        .ad-event-note { font-size: .88rem; color: var(--ink-2); margin-top: .2rem; }
+
+        .ad-rows { display: grid; gap: .85rem; margin-top: 1rem; }
+        .ad-row { display: flex; gap: .75rem; align-items: flex-start; }
+        .ad-row i { color: var(--green-mid); width: 18px; text-align: center; margin-top: .25rem; }
+        .ad-row-label { font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+        .ad-row-value { color: var(--ink); font-weight: 600; font-size: .93rem; word-break: break-word; }
+
+        .ad-doctor { display: flex; gap: .8rem; align-items: center; margin-top: 1rem; }
+        .ad-avatar {
+            width: 48px; height: 48px; border-radius: 10px; object-fit: cover;
+            flex: 0 0 auto; border: 1px solid var(--line);
+        }
+
+        .ad-cancel summary {
+            list-style: none; cursor: pointer; display: inline-flex;
+        }
+        .ad-cancel summary::-webkit-details-marker { display: none; }
+        .ad-cancel[open] summary { margin-bottom: 1rem; }
+        .ad-cancel-body {
+            border: 1px solid #e7c9c9; border-radius: 10px; background: #fdf6f6; padding: 1.1rem;
+        }
+
+        @media print {
+            .pt-header, .pt-footer, .pt-actions, .ad-cancel, .pt-skip { display: none !important; }
+            .pt-card { box-shadow: none; border: 1px solid #ddd; page-break-inside: avoid; }
+            body { background: #fff; }
+        }
+{% endblock %}
+
+{% block content %}
+
+<div class="ad-head">
+    <div>
+        <div class="pt-eyebrow">{{ page_section }}</div>
+        {% comment %}
+        The title used to lead with `appointment.appointmentMode`, which is
+        blank until round 3 — so every unsettled appointment was headed
+        " - lab_test - Appointment". The mode belongs in the status panel
+        below, once it exists.
+        {% endcomment %}
+        <h1 style="font-size: 1.6rem; color: var(--ink); line-height: 1.2;">
+            {{ appointment.get_reasonVisit_display }} — {{ appointment.slot.date|date:"j F Y" }}
+        </h1>
     </div>
+    <div class="pt-actions">
+        <span class="ad-id">{{ appointment.bookingID }}</span>
+        <button class="pt-btn ghost" type="button" id="ad-print">
+            <i class="fas fa-print"></i> Print
+        </button>
+    </div>
+</div>
 
-    <!-- Main Content -->
-    <div class="container" style="margin-bottom: 3rem;">
-        <!-- Status Banner -->
-        <div class="status-banner confirmed">
-            <div class="status-content">
-                {% if appointment_approval.is_approved %}
-                    <div class="status-info">
-                        <div class="status-icon confirmed">
-                            <i class="fas fa-check-circle"></i>
-                        </div>
-                        <div class="status-text">
-                            <h3>Appointment Confirmed</h3>
-                            <p>Your appointment is scheduled and confirmed. The doctor is expecting you.</p>
-                            <p>Reason for Visit - Consultation - Chest pain and shortness of breath</p>
-                        </div>
-                    </div>
-                {% else %}
-                    <div class="status-info">
-                        <div class="status-icon pending">
-                            <i class="fas fa-times-circle"></i>
-                        </div>
-                        <div class="status-text">
-                            <h3>Appointment Not Confirmed</h3>
-                            <p>Your appointment has not been confirmed yet. Please wait for the doctor's confirmation.</p>
-                            <p>Reason for Visit - Consultation - Chest pain and shortness of breath</p>
-                        </div>
-                    </div>
+{% include "appointments/partials/tracker.html" %}
+
+{% comment %}
+The real state, from `status`. What was here was a banner hardcoded to
+"confirmed" with a two-branch check on the old `AppointmentApproval` boolean
+underneath it — a model that could not express the flow AGKI actually runs, let
+alone cancelled, expired or declined (design §5).
+{% endcomment %}
+<div class="pt-card ad-status {{ banner_class }}">
+    <div class="ad-status-top">
+        {% if status == Status.CONFIRMED %}<i class="fas fa-check-circle"></i>
+        {% elif status == Status.COMPLETED %}<i class="fas fa-clipboard-check"></i>
+        {% elif banner_class == 'cancelled' %}<i class="fas fa-times-circle"></i>
+        {% else %}<i class="fas fa-hourglass-half"></i>{% endif %}
+        <div>
+            <h2>{{ appointment.get_status_display }}</h2>
+
+            {% if status == Status.PENDING_TIME %}
+            <p>
+                The doctor has been asked to confirm this time. We email you as
+                soon as they answer — there is nothing for you to do yet.
+            </p>
+            {% elif status == Status.PENDING_MODE %}
+            <p>
+                <strong>It is your turn.</strong> The time is confirmed; please
+                choose how you would like to meet so the doctor can confirm it.
+            </p>
+            {% elif status == Status.MODE_PROPOSED %}
+            <p>
+                You chose {{ appointment.get_appointmentMode_display }}. The
+                doctor is confirming it now, and we will email you their answer.
+            </p>
+            {% elif status == Status.CONFIRMED %}
+            <p>
+                Everything is settled: the time and
+                {{ appointment.get_appointmentMode_display|lower }}.
+            </p>
+            {% if appointment.meeting_url %}
+            <p>
+                Join the call here at the appointment time:
+                <a href="{{ appointment.meeting_url }}">{{ appointment.meeting_url }}</a>
+            </p>
+            {% endif %}
+            {% elif status == Status.TIME_DECLINED %}
+            <p>
+                The doctor could not take this time and it has been released.
+                {% if appointment.cancellation_reason %}
+                Reason given: {{ appointment.cancellation_reason }}
                 {% endif %}
+                You are welcome to
+                <a href="{% url 'search_results' %}">book another time</a>.
+            </p>
+            {% elif status == Status.EXPIRED %}
+            <p>
+                This appointment was not confirmed in time, so the slot was
+                released and offered to someone else.
+                <a href="{% url 'search_results' %}">Book another time</a>.
+            </p>
+            {% elif status == Status.CANCELLED %}
+            <p>
+                This appointment has been cancelled and the time released.
+                {% if appointment.cancellation_reason %}
+                Reason given: {{ appointment.cancellation_reason }}
+                {% endif %}
+            </p>
+            {% elif status == Status.COMPLETED %}
+            <p>Thank you for visiting AGKI.</p>
+            {% elif status == Status.NO_SHOW %}
+            <p>This appointment was recorded as missed.</p>
+            {% endif %}
 
-                <div class="countdown-timer">
-                    <div class="countdown-label">Appointment Time</div>
-                    <div class="countdown-value" style="font-size: 18px;">{{ appointment.slot.date|date:"l, d F Y" }} at {{ appointment.slot.time|time:"H:i" }}</div>
-                </div>
-            </div>
+            <p><strong>Reason for visit:</strong> {{ appointment.get_reasonVisit_display }}</p>
         </div>
+    </div>
 
-        <div class="row">
-            <div class="col-md-7">
-                <!-- Progress Timeline -->
-                <div class="timeline-section">
-                    <h2 class="section-header">
-                        <i class="fas fa-tasks"></i>
-                        Appointment Progress
-                    </h2>
-                    <div class="timeline">
-                        <div class="timeline-item completed">
-                            <div class="timeline-marker">
-                                <i class="fas fa-check"></i>
-                            </div>
-                            <div class="timeline-content">
-                                <div class="timeline-title">Appointment Booked</div>
-                                <div class="timeline-time">{{ appointment.created_at|date:"l, d F Y - H:i" }}</div>
-                                <p class="timeline-description">Your appointment has been successfully scheduled and booking confirmation was sent to your email.</p>
-                            </div>
-                        </div>
+    <div class="ad-when">
+        <span class="ad-when-label">Appointment time</span>
+        <span class="ad-when-value">
+            {{ appointment.slot.date|date:"l, j F Y" }} at {{ appointment.slot.time|date:"g:i A" }}
+        </span>
+    </div>
+</div>
 
-                        {% if appointment_approval.is_approved %}
-                        <div class="timeline-item completed">
-                            <div class="timeline-marker">
-                                <i class="fas fa-check"></i>
-                            </div>
-                            <div class="timeline-content">
-                                <div class="timeline-title">Confirmation Received</div>
-                                <div class="timeline-time">{{ appointment_approval.approved_at|date:"l, d F Y - H:i" }}</div>
-                                <p class="timeline-description">Doctor's office confirmed your appointment. Reminder notifications have been scheduled.</p>
-                            </div>
-                        </div>
+{% if patient_must_choose_mode %}
+{% comment %}
+A leftover from the two-round flow, and now an explanation rather than an
+action. Nothing reaches this state any more - migration 0027 moved every row
+out of it - but a restore from an old backup would, and a patient looking at
+one deserves better than a button to a page that no longer exists.
+{% endcomment %}
+<div class="pt-card" style="margin-top: 1.25rem; border-left: 4px solid var(--info);">
+    <h2>Nothing for you to do</h2>
+    <p class="pt-sub">
+        Booking has changed since you made this request: the doctor now confirms
+        the time and the way you meet together, so there is no second step for
+        you. They have everything they need.
+    </p>
+</div>
+{% endif %}
 
-                        <div class="timeline-item active">
-                            <div class="timeline-marker">
-                                <i class="fas fa-clock"></i>
-                            </div>
-                            <div class="timeline-content">
-                                <div class="timeline-title">Waiting for Appointment</div>
-                                <div class="timeline-time">In 2 days</div>
-                                <p class="timeline-description">Your appointment is coming up. You'll receive reminder notifications 1 hour before your scheduled time.</p>
-                            </div>
-                        </div>
+<div class="ad-layout">
+    <div>
+        <div class="pt-card">
+            <h2>Progress</h2>
+            {% comment %}
+            Built from `AppointmentTransition` rows — the append-only audit
+            trail (design §5) — rather than from a fixed list of four steps with
+            "In 2 days" typed into one of them. What happened is what is shown.
+            {% endcomment %}
+            <ol class="ad-timeline">
+                <li class="ad-event">
+                    <div class="ad-event-dot"><i class="fas fa-check"></i></div>
+                    <div>
+                        <div class="ad-event-title">Appointment requested</div>
+                        <div class="ad-event-time">{{ appointment.created_at|date:"l, j F Y — g:i A" }}</div>
+                        <p class="ad-event-note">We emailed you booking reference {{ appointment.bookingID }}.</p>
+                    </div>
+                </li>
 
-                        {% else %}
-                        <div class="timeline-item pending">
-                            <div class="timeline-marker">
-                                <i class="fas fa-clock"></i>
-                            </div>
-                            <div class="timeline-content">
-                                <div class="timeline-title">Awaiting Confirmation</div>
-                                <div class="timeline-time">Pending</div>
-                                <p class="timeline-description">Your appointment is awaiting confirmation from the doctor's office. You will be notified once confirmed.</p>
-                            </div>
-                        </div>
+                {% for transition in transitions %}
+                <li class="ad-event">
+                    <div class="ad-event-dot"><i class="fas fa-check"></i></div>
+                    <div>
+                        <div class="ad-event-title">{{ transition.to_status_label }}</div>
+                        <div class="ad-event-time">{{ transition.created_at|date:"l, j F Y — g:i A" }}</div>
+                        {% if transition.note %}
+                        <p class="ad-event-note">{{ transition.note }}</p>
                         {% endif %}
+                    </div>
+                </li>
+                {% endfor %}
 
-                        <div class="timeline-item pending">
-                            <div class="timeline-marker">
-                                <i class="fas fa-clipboard-check"></i>
-                            </div>
-                            {% if appointment_notes %}
-                            <div class="timeline-title">Appointment Complete</div>
-                            {% for note in appointment_notes %}
-                            <div class="timeline-content">
-                                <!-- <div class="timeline-title">{{note.created_at}}</div> -->
-                                <!-- <div class="timeline-time">{{note.created_at}}</div> -->
-                                <p class="timeline-description">{{note.note_text}}</p>
-                            </div>
-                            {% endfor %}
-                            {% else %}
-                            <div class="timeline-content">
-                                <div class="timeline-title">Appointment Complete</div>
-                                <div class="timeline-time">Pending</div>
-                                <p class="timeline-description">After your appointment, you'll receive a summary, prescriptions (if any), and follow-up instructions.</p>
-                            </div>
-                            {% endif %}
-                        </div>
+                {% if status == Status.PENDING_TIME or status == Status.MODE_PROPOSED %}
+                <li class="ad-event waiting">
+                    <div class="ad-event-dot"><i class="fas fa-clock"></i></div>
+                    <div>
+                        <div class="ad-event-title">Waiting for the doctor</div>
+                        <div class="ad-event-time">Pending</div>
+                        <p class="ad-event-note">We will email you as soon as they answer.</p>
                     </div>
-                </div>
-                 <!-- Payment Status -->
-                <!-- <div class="payment-status">
-                <h3 class="info-card-header">
-                    <i class="fas fa-credit-card"></i>
-                    Payment Information
-                </h3>
-                <span class="payment-badge pending">
-                    <i class="fas fa-clock"></i> Payment Due After Visit
-                </span>
-                <div class="payment-details">
-                    <div class="payment-row">
-                        <span>Consultation Fee</span>
-                        <span>$150.00</span>
+                </li>
+                {% elif status == Status.PENDING_MODE %}
+                <li class="ad-event yours">
+                    <div class="ad-event-dot"><i class="fas fa-hand-point-right"></i></div>
+                    <div>
+                        <div class="ad-event-title">Waiting for you</div>
+                        <div class="ad-event-time">Your turn</div>
+                        <p class="ad-event-note">Choose how you would like to meet.</p>
                     </div>
-                    <div class="payment-row">
-                        <span>Booking Fee</span>
-                        <span>$5.00</span>
-                    </div>
-                    <div class="payment-row">
-                        <span>Insurance Coverage (Est.)</span>
-                        <span style="color: var(--accent-green);">-$100.00</span>
-                    </div>
-                    <div class="payment-row">
-                        <span>Estimated Total</span>
-                        <span>$55.00</span>
-                    </div>
-                </div>
-                <div style="margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; font-size: 0.85rem; color: #666;">
-                    <i class="fas fa-info-circle"></i> You'll be charged after your appointment. Final amount may vary based on services provided.
-                </div>
-            </div> -->
-
-            </div>
-
-            <div class="col-md-5">
-                <!-- Patient Information -->
-                <div class="info-card" style="margin-bottom: 2rem;">
-                    <h3 class="info-card-header">
-                        <i class="fas fa-user"></i>
-                        Patient Information
-                    </h3>
-                    <div class="info-row">
-                        <div class="info-icon">
-                            <i class="fas fa-id-card"></i>
-                        </div>
-                        <div class="info-content">
-                            <div class="info-label">Patient Name</div>
-                            <div class="info-value">{{appointment.fullName}}</div>
-                        </div>
-                    </div>
-                    <div class="info-row">
-                        <div class="info-icon">
-                            <i class="fas fa-envelope"></i>
-                        </div>
-                        <div class="info-content">
-                            <div class="info-label">Email</div>
-                            <div class="info-value">{{appointment.email}}</div>
-                        </div>
-                    </div>
-                    <div class="info-row">
-                        <div class="info-icon">
-                            <i class="fas fa-phone"></i>
-                        </div>
-                        <div class="info-content">
-                            <div class="info-label">Phone</div>
-                            <div class="info-value">{{appointment.phone}}</div>
-                        </div>
-                    </div>
-                    <!-- <div class="info-row">
-                        <div class="info-icon">
-                            <i class="fas fa-shield-alt"></i>
-                        </div>
-                        <div class="info-content">
-                            <div class="info-label">Insurance</div>
-                            <div class="info-value">Blue Cross Blue Shield</div>
-                            <div class="info-subtext">Member ID: BC123456789</div>
-                        </div>
-                    </div> -->
-                </div>
-                <!-- Doctor Information -->
-                <div class="info-card">
-                    <h3 class="info-card-header">
-                        <i class="fas fa-info-circle"></i>
-                        Doctor Information
-                    </h3>
-
-                    <!-- Doctor Profile -->
-                    <div class="doctor-profile">
-                        {% include "partials/avatar.html" with image=appointment.slot.user.image alt=appointment.slot.user.get_full_name css_class="doctor-avatar" only %}
-                        <div class="doctor-info">
-                            <h4>{{ appointment.slot.user.get_full_name }}</h4>
-                            <div class="doctor-specialty">{{profile.expertise}} • {{profile.years_of_experience}} years experience</div>
-                            {% comment %} Rating display removed (decision 7): the table it
-                               read from has never had a row written to it, so
-                               this always rendered five stars and "No ratings
-                               yet" next to them. {% endcomment %}
-                        </div>
-                    </div>
-
-                    <div class="info-row">
-                        <div class="info-icon">
-                            <i class="fas fa-map-marker-alt"></i>
-                        </div>
-                        <div class="info-content">
-                            <div class="info-label">Location</div>
-                            <div class="info-value">{{profile.region}}</div>
-                            <div class="info-subtext">{{profile.location}}</div>
-                            <a href="#" style="color: var(--primary-green); font-size: 0.9rem; margin-top: 0.5rem; display: inline-block;">
-                                <i class="fas fa-directions"></i> Get Directions
-                            </a>
-                        </div>
-                    </div>
-
-                </div>
-                <!-- Important Notes -->
-                <div class="notes-section mb-5">
-                    <div class="notes-title">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        Important Reminders
-                    </div>
-                    <ul class="notes-list">
-                        <li>
-                            <i class="fas fa-check"></i>
-                            <span>Arrive 15 minutes early for check-in</span>
-                        </li>
-                        <!-- <li>
-                            <i class="fas fa-check"></i>
-                            <span>Bring your insurance card and valid ID</span>
-                        </li> -->
-                        <!-- <li>
-                            <i class="fas fa-check"></i>
-                            <span>Free parking available at the building</span>
-                        </li> -->
-                    </ul>
-                </div>
-                
-            </div>
+                </li>
+                {% endif %}
+            </ol>
         </div>
 
-
-        <!-- Action Buttons -->
-        <div class="info-card">
-            <h3 class="info-card-header">
-                <i class="fas fa-cog"></i>
-                Manage Appointment
-            </h3>
-            <div class="action-buttons-grid">
-                <button class="action-btn secondary" id="contactDoctorBtn">
-                    <i class="fas fa-comment-medical"></i> Contact Doctor
-                </button>
-                <button class="action-btn secondary" id="addToCalendarBtn">
-                    <i class="fas fa-calendar-plus"></i> Add to Calendar
-                </button>
-                <button class="action-btn secondary" id="rescheduleBtn">
-                    <i class="fas fa-calendar-alt"></i> Reschedule
-                </button>
-                <button class="action-btn danger" id="cancelBtn">
-                    <i class="fas fa-times-circle"></i> Cancel Appointment
-                </button>
+        {% if appointment_notes %}
+        <div class="pt-card">
+            <h2>Notes from the clinic</h2>
+            <div class="ad-rows">
+                {% for note in appointment_notes %}
+                <div class="ad-row">
+                    <i class="fas fa-notes-medical"></i>
+                    <div>
+                        <div class="ad-row-label">{{ note.created_at|date:"j F Y — g:i A" }}</div>
+                        <div class="ad-row-value" style="font-weight: 500;">{{ note.note_text }}</div>
+                    </div>
+                </div>
+                {% endfor %}
             </div>
         </div>
-
-        <!-- Help Section -->
-        <div class="info-card" style="margin-top: 2rem;">
-            <h3 class="info-card-header">
-                <i class="fas fa-question-circle"></i>
-                Need Help?
-            </h3>
-            <p style="color: #666; margin-bottom: 1.5rem;">Have questions about your appointment? We're here to help!</p>
-            <div class="action-buttons-grid">
-                <a href="tel:+15551234567" class="action-btn secondary">
-                    <i class="fas fa-phone"></i> Call Support
-                </a>
-                <a href="#" class="action-btn secondary" id="liveChatBtn">
-                    <i class="fas fa-comments"></i> Live Chat
-                </a>
-                <a href="mailto:support@medibook.com" class="action-btn secondary">
-                    <i class="fas fa-envelope"></i> Email Us
-                </a>
-                <a href="#" class="action-btn secondary">
-                    <i class="fas fa-book"></i> Help Center
-                </a>
-            </div>
-        </div>
+        {% endif %}
     </div>
 
-    <!-- Cancel Confirmation Modal -->
-    <div class="modal fade" id="cancelModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">
-                        <i class="fas fa-exclamation-triangle"></i> Cancel Appointment
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <p style="margin-bottom: 1.5rem;">Are you sure you want to cancel this appointment?</p>
-                    <div style="background: #fff3cd; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; border-left: 4px solid #ffc107;">
-                        <strong>Cancellation Policy:</strong><br>
-                        <small style="color: #666;">
-                            • Free cancellation up to 24 hours before appointment<br>
-                            • Cancellations within 24 hours may incur a $25 fee<br>
-                            • No-shows will be charged the full consultation fee
-                        </small>
+    <aside>
+        <div class="pt-card">
+            <h2>Your doctor</h2>
+            <div class="ad-doctor">
+                {% include "partials/avatar.html" with image=appointment.slot.user.image alt=appointment.slot.user.get_full_name css_class="ad-avatar" only %}
+                <div>
+                    <div class="ad-row-value">
+                        Dr. {{ appointment.slot.user.get_full_name|default:appointment.slot.user.username }}
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Reason for Cancellation (Optional)</label>
-                        <select class="form-select" id="cancelReason">
-                            <option value="">Select a reason</option>
-                            <option value="schedule-conflict">Schedule Conflict</option>
-                            <option value="feeling-better">Feeling Better</option>
-                            <option value="found-another">Found Another Doctor</option>
-                            <option value="personal">Personal Reasons</option>
-                            <option value="other">Other</option>
-                        </select>
+                    {% comment %}
+                    From the profile's picked lists, not from
+                    `slot.user.qualifications` — the free-text field 11.6
+                    stopped writing to, which this card read until 11.11.
+                    Rating display removed in an earlier phase (decision 7):
+                    the table it read from has never had a row written to it,
+                    so it always rendered five stars and "No ratings yet" next
+                    to them.
+                    {% endcomment %}
+                    <div class="pt-sub" style="font-size: .85rem;">
+                        {% for specialty in profile.specialties.all %}{{ specialty.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                        {% with quals=profile.qualifications.all %}
+                        {% if quals %}{% if profile.specialties.all %} • {% endif %}{% for q in quals %}{{ q.name }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}
+                        {% endwith %}
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Keep Appointment</button>
-                    <button type="button" class="btn btn-danger" id="confirmCancelBtn">
-                        <i class="fas fa-times-circle"></i> Yes, Cancel
-                    </button>
+            </div>
+
+            {% if profile.region or profile.location %}
+            <div class="ad-rows">
+                <div class="ad-row">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <div>
+                        <div class="ad-row-label">Based in</div>
+                        <div class="ad-row-value">
+                            {{ profile.region }}{% if profile.location %}<br>{{ profile.location }}{% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="pt-card">
+            <h2>Your details</h2>
+            <div class="ad-rows">
+                <div class="ad-row">
+                    <i class="fas fa-id-card"></i>
+                    <div>
+                        <div class="ad-row-label">Name</div>
+                        <div class="ad-row-value">{{ appointment.fullName }}</div>
+                    </div>
+                </div>
+                <div class="ad-row">
+                    <i class="fas fa-envelope"></i>
+                    <div>
+                        <div class="ad-row-label">Email</div>
+                        <div class="ad-row-value">{{ appointment.email }}</div>
+                    </div>
+                </div>
+                <div class="ad-row">
+                    <i class="fas fa-phone"></i>
+                    <div>
+                        <div class="ad-row-label">Phone</div>
+                        <div class="ad-row-value">{{ appointment.phone }}</div>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Reschedule Modal -->
-    <div class="modal fade" id="rescheduleModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">
-                        <i class="fas fa-calendar-alt"></i> Reschedule Appointment
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <p style="color: #666; margin-bottom: 1.5rem;">Select a new date and time for your appointment with Dr. Sarah Johnson.</p>
-                    <div style="background: #e7f3ff; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; border-left: 4px solid #2196F3;">
-                        <small style="color: #666;">
-                            <i class="fas fa-info-circle"></i> You can reschedule up to 24 hours before your appointment at no charge.
-                        </small>
-                    </div>
-                    <p style="text-align: center; padding: 2rem; color: #666;">
-                        <i class="fas fa-calendar-week" style="font-size: 3rem; color: var(--primary-green); margin-bottom: 1rem;"></i><br>
-                        This will redirect you to the available time slots page.
+        {% comment %}
+        One control, and it works. What was here: Contact Doctor, Add to
+        Calendar, Reschedule, Live Chat, Call Support and a Help Center — six
+        buttons, none of which had a view behind them, and a "Cancel" that
+        popped an alert saying the appointment had been cancelled while
+        changing nothing on the server (design §10 appointments #8).
+        {% endcomment %}
+        {% if can_cancel %}
+        <div class="pt-card">
+            <h2>Change of plans?</h2>
+            <p class="pt-sub" style="margin-bottom: 1rem;">
+                Appointments can be cancelled online up to {{ cancellation_notice }}
+                before the time. After that, please call us.
+            </p>
+
+            <details class="ad-cancel">
+                <summary class="pt-btn danger">
+                    <i class="fas fa-times-circle"></i> Cancel this appointment
+                </summary>
+                <div class="ad-cancel-body">
+                    <p style="font-size: .92rem; margin-bottom: 1rem;">
+                        The time will be released and offered to someone else, and
+                        this cannot be undone — you would have to book again.
                     </p>
+                    {% comment %}
+                    The "$25 fee / no-shows charged in full" cancellation policy
+                    that was here came with the MediBook template. AGKI charges
+                    nothing for this and there is no payment code anywhere in
+                    the system (design §8.4).
+                    {% endcomment %}
+                    <form method="post" action="{% url 'appointment_cancel' appointment.bookingID %}">
+                        {% csrf_token %}
+                        <div class="pt-field">
+                            <label for="ad-reason">Reason (optional)</label>
+                            <input class="pt-input" type="text" id="ad-reason" name="reason"
+                                   maxlength="255" placeholder="Helps us keep times free for other patients">
+                        </div>
+                        <button type="submit" class="pt-btn danger">
+                            <i class="fas fa-times-circle"></i> Yes, cancel it
+                        </button>
+                    </form>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn" style="background: var(--gradient-green); color: white;" id="confirmRescheduleBtn">
-                        <i class="fas fa-calendar-check"></i> View Available Times
-                    </button>
-                </div>
-            </div>
+            </details>
         </div>
-    </div>
+        {% endif %}
+    </aside>
+</div>
 
-    <!-- Footer -->
-    <footer style="background: #1a1a1a; color: white; padding: 2rem 0 1rem; margin-top: 3rem;">
-        <div class="container">
-            <div class="row">
-                <div class="col-md-4">
-                    <h5 style="color: var(--accent-green); margin-bottom: 1rem;">MediBook</h5>
-                    <p style="color: #ccc; font-size: 0.9rem;">Making healthcare accessible to everyone, everywhere.</p>
-                </div>
-                <div class="col-md-4">
-                    <h5 style="color: var(--accent-green); margin-bottom: 1rem;">Quick Links</h5>
-                    <a href="#" style="color: #ccc; text-decoration: none; display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">Help Center</a>
-                    <a href="#" style="color: #ccc; text-decoration: none; display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">Contact Support</a>
-                    <a href="#" style="color: #ccc; text-decoration: none; display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">FAQs</a>
-                </div>
-                <div class="col-md-4">
-                    <h5 style="color: var(--accent-green); margin-bottom: 1rem;">Legal</h5>
-                    <a href="#" style="color: #ccc; text-decoration: none; display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">Privacy Policy</a>
-                    <a href="#" style="color: #ccc; text-decoration: none; display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">Terms of Service</a>
-                </div>
-            </div>
-            <div style="text-align: center; padding-top: 2rem; margin-top: 2rem; border-top: 1px solid #333; color: #999;">
-                <p>&copy; 2025 MediBook. All rights reserved.</p>
-            </div>
-        </div>
-    </footer>
+{% endblock %}
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Countdown Timer
-        function updateCountdown() {
-            const appointmentDate = new Date('2025-10-11T09:00:00');
-            const now = new Date();
-            const diff = appointmentDate - now;
+{% block page_js %}
+{% comment %}
+All that survives of this page's JavaScript. What went with it: a countdown to
+a date typed into the source, a share payload naming a doctor who does not
+exist, a calendar export with a New York address hardcoded in it, two controls
+that only ever called alert(), and a cancel handler that faked the whole thing
+client-side — it repainted the status banner and told the patient a
+confirmation email had been sent, having contacted nobody.
 
-            if (diff > 0) {
-                const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-                const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-
-                let countdownText = '';
-                if (days > 0) {
-                    countdownText = `${days} day${days !== 1 ? 's' : ''} ${hours} hour${hours !== 1 ? 's' : ''}`;
-                } else if (hours > 0) {
-                    countdownText = `${hours} hour${hours !== 1 ? 's' : ''} ${minutes} minute${minutes !== 1 ? 's' : ''}`;
-                } else {
-                    countdownText = `${minutes} minute${minutes !== 1 ? 's' : ''}`;
-                }
-
-                document.getElementById('countdown').textContent = countdownText;
-            } else {
-                document.getElementById('countdown').textContent = 'Appointment time has passed';
-            }
+Cancelling is a real POST now. This note lives in a Django comment rather than
+a JavaScript one on purpose: a JS comment is served to the browser, and naming
+the removed demo content there would put it back on the page in the only sense
+that can be tested.
+{% endcomment %}
+<script>
+    (function () {
+        "use strict";
+        var button = document.getElementById('ad-print');
+        if (button) {
+            button.addEventListener('click', function () { window.print(); });
         }
-
-        // Update countdown every minute
-        updateCountdown();
-        setInterval(updateCountdown, 60000);
-
-        // Print functionality
-        document.getElementById('printBtn').addEventListener('click', function(e) {
-            e.preventDefault();
-            window.print();
-        });
-
-        // Share functionality
-        document.getElementById('shareBtn').addEventListener('click', async function(e) {
-            e.preventDefault();
-            
-            if (navigator.share) {
-                try {
-                    await navigator.share({
-                        title: 'My Appointment - MediBook',
-                        text: 'Appointment with Dr. Sarah Johnson on October 11, 2025 at 9:00 AM',
-                        url: window.location.href
-                    });
-                } catch (err) {
-                    console.log('Share cancelled');
-                }
-            } else {
-                // Fallback: copy link
-                navigator.clipboard.writeText(window.location.href);
-                alert('Link copied to clipboard!');
-            }
-        });
-
-        // Cancel appointment
-        const cancelModal = new bootstrap.Modal(document.getElementById('cancelModal'));
-        
-        document.getElementById('cancelBtn').addEventListener('click', function() {
-            cancelModal.show();
-        });
-
-        document.getElementById('confirmCancelBtn').addEventListener('click', function() {
-            const reason = document.getElementById('cancelReason').value;
-            
-            // Show loading state
-            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cancelling...';
-            this.disabled = true;
-
-            // Simulate API call
-            setTimeout(() => {
-                alert('Your appointment has been cancelled successfully. A confirmation email has been sent.');
-                cancelModal.hide();
-                // Redirect to home or appointments page
-                // window.location.href = 'index.html';
-                
-                // For demo, update the status
-                document.querySelector('.status-banner').classList.remove('confirmed');
-                document.querySelector('.status-banner').classList.add('cancelled');
-                document.querySelector('.status-banner').style.borderLeftColor = '#dc3545';
-                document.querySelector('.status-icon').classList.remove('confirmed');
-                document.querySelector('.status-icon').style.background = '#dc3545';
-                document.querySelector('.status-icon i').className = 'fas fa-times-circle';
-                document.querySelector('.status-text h3').textContent = 'Appointment Cancelled';
-                document.querySelector('.status-text p').textContent = 'Your appointment has been cancelled. A confirmation has been sent to your email.';
-                
-                this.innerHTML = '<i class="fas fa-times-circle"></i> Yes, Cancel';
-                this.disabled = false;
-            }, 1500);
-        });
-
-        // Reschedule appointment
-        const rescheduleModal = new bootstrap.Modal(document.getElementById('rescheduleModal'));
-        
-        document.getElementById('rescheduleBtn').addEventListener('click', function() {
-            rescheduleModal.show();
-        });
-
-        document.getElementById('confirmRescheduleBtn').addEventListener('click', function() {
-            // Redirect to search results page to select new time
-            alert('Redirecting to available time slots...');
-            // window.location.href = 'search-results.html?doctor=dr-sarah-johnson';
-        });
-
-        // Add to Calendar
-        document.getElementById('addToCalendarBtn').addEventListener('click', function() {
-            const appointmentDetails = {
-                title: 'Appointment with Dr. Sarah Johnson',
-                description: 'Cardiologist consultation - Booking ID: MB-2025-84729',
-                location: 'Manhattan Heart Center, 123 Park Ave, New York, NY 10016',
-                start: '2025-10-11T09:00:00',
-                end: '2025-10-11T09:30:00'
-            };
-
-            // Create dropdown menu for calendar options
-            const options = [
-                { name: 'Google Calendar', action: 'google' },
-                { name: 'Apple Calendar', action: 'apple' },
-                { name: 'Outlook', action: 'outlook' }
-            ];
-
-            const choice = confirm('Add to Google Calendar? (Cancel for more options)');
-            
-            if (choice) {
-                // Google Calendar
-                const googleUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(appointmentDetails.title)}&details=${encodeURIComponent(appointmentDetails.description)}&location=${encodeURIComponent(appointmentDetails.location)}&dates=${appointmentDetails.start.replace(/[-:]/g, '')}/${appointmentDetails.end.replace(/[-:]/g, '')}`;
-                window.open(googleUrl, '_blank');
-            } else {
-                alert('Calendar integration - You can download ICS file or choose other calendar options.');
-            }
-        });
-
-        // Contact Doctor
-        document.getElementById('contactDoctorBtn').addEventListener('click', function() {
-            alert('Opening messaging interface with Dr. Sarah Johnson\'s office...');
-            // window.location.href = 'messages.html?doctor=dr-sarah-johnson';
-        });
-
-        // Live Chat
-        document.getElementById('liveChatBtn').addEventListener('click', function(e) {
-            e.preventDefault();
-            alert('Opening live chat support...');
-            // Initialize chat widget
-        });
-
-        // Get booking ID from session storage or URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const bookingId = urlParams.get('id') || sessionStorage.getItem('currentBookingId') || 'MB-2025-84729';
-
-        // In production, fetch appointment details from API
-        async function fetchAppointmentDetails(bookingId) {
-            // Simulate API call
-            console.log('Fetching details for booking:', bookingId);
-            // const response = await fetch(`/api/appointments/${bookingId}`);
-            // const data = await response.json();
-            // Update page with actual data
-        }
-
-        // Load appointment details on page load
-        window.addEventListener('load', function() {
-            fetchAppointmentDetails(bookingId);
-        });
-
-        // Auto-refresh updates every 30 seconds
-        setInterval(function() {
-            // Fetch latest updates
-            console.log('Checking for updates...');
-            // In production: fetchAppointmentUpdates(bookingId);
-        }, 30000);
-
-        // Add print styles
-        const printStyles = document.createElement('style');
-        printStyles.textContent = `
-            @media print {
-                .navbar, .header-actions, .action-buttons-grid, footer, .modal {
-                    display: none !important;
-                }
-                .page-header {
-                    background: white !important;
-                    color: black !important;
-                }
-                .info-card, .timeline-section, .status-banner {
-                    box-shadow: none !important;
-                    border: 1px solid #ddd !important;
-                    page-break-inside: avoid;
-                }
-            }
-        `;
-        document.head.appendChild(printStyles);
-    </script>
-</body>
-</html>
+    }());
+</script>
+{% endblock %}

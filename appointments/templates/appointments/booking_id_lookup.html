@@ -1,642 +1,92 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Find Your Appointment - MediBook</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <style>
-        :root {
-            --primary-green: #2d5a2d;
-            --light-green: #4a7c59;
-            --gradient-green: linear-gradient(135deg, #2d5a2d 0%, #4a7c59 100%);
-            --accent-green: #7cc576;
-            --light-bg: #f8f9fa;
-            --dark-text: #333;
+{% extends "appointments/patient_base.html" %}
+
+{% comment %}
+The way back in (design §8.1), rehoused on the shared chrome in plan 11.11.
+
+The gate itself is unchanged: booking ID plus either the phone number or the
+date of birth on the booking, one message for every kind of failure, and a
+per-IP rate limit. Saying which part was wrong would confirm that a booking ID
+is real, which is the one thing an attacker working through guesses needs.
+
+The explanation of *why* one field accepts either value stays in a block
+comment. An earlier version of this page carried it as a one-line `{#…#}`
+comment spanning two lines, which the template lexer does not recognise — so
+the page served its own security reasoning to the public (plan 3.x).
+{% endcomment %}
+
+{% block page_css %}
+        .bl-wrap { max-width: 560px; margin: 0 auto; }
+        .bl-icon {
+            width: 54px; height: 54px; border-radius: 14px; margin-bottom: 1rem;
+            display: grid; place-items: center; font-size: 1.3rem;
+            background: var(--panel-2); color: var(--green);
         }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            color: var(--dark-text);
-            line-height: 1.6;
-            background: var(--light-bg);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* Navigation */
-        .navbar {
-            background: white;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            padding: 1rem 0;
-        }
-
-        .navbar-brand {
-            font-size: 1.8rem;
-            font-weight: bold;
-            color: var(--primary-green) !important;
-        }
-
-        .nav-link {
-            color: var(--dark-text) !important;
-            font-weight: 500;
-            margin: 0 0.5rem;
-        }
-
-        .btn-login {
-            border: 2px solid var(--primary-green);
-            color: var(--primary-green);
-            padding: 0.5rem 1.5rem;
-            border-radius: 25px;
-            font-weight: 600;
-            transition: all 0.3s;
-            text-decoration: none;
-            display: inline-block;
-        }
-
-        .btn-login:hover {
-            background: var(--primary-green);
-            color: white;
-        }
-
-        /* Main Container */
-        .lookup-container {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 3rem 15px;
-        }
-
-        .lookup-card {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-            max-width: 550px;
-            width: 100%;
-            overflow: hidden;
-            animation: fadeIn 0.6s ease-out;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .lookup-header {
-            background: var(--gradient-green);
-            padding: 2.5rem 2rem;
-            text-align: center;
-            color: white;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .lookup-header::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-        }
-
-        .lookup-icon {
-            width: 80px;
-            height: 80px;
-            background: white;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 1.5rem;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
-            position: relative;
-            z-index: 1;
-        }
-
-        .lookup-icon i {
-            font-size: 2.5rem;
-            color: var(--primary-green);
-        }
-
-        .lookup-title {
-            font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-            position: relative;
-            z-index: 1;
-        }
-
-        .lookup-subtitle {
-            font-size: 1rem;
-            opacity: 0.95;
-            position: relative;
-            z-index: 1;
-        }
-
-        .lookup-body {
-            padding: 2.5rem;
-        }
-
-        .info-message {
-            background: #e7f3ff;
-            border-left: 4px solid #2196F3;
-            padding: 1rem 1.25rem;
-            border-radius: 8px;
-            margin-bottom: 2rem;
-            display: flex;
-            align-items: flex-start;
-            gap: 1rem;
-        }
-
-        .info-message i {
-            color: #2196F3;
-            font-size: 1.5rem;
-            margin-top: 0.15rem;
-        }
-
-        .info-message-content {
-            flex: 1;
-        }
-
-        .info-message-title {
-            font-weight: 600;
-            color: var(--dark-text);
-            margin-bottom: 0.25rem;
-        }
-
-        .info-message-text {
-            font-size: 0.9rem;
-            color: #666;
-            margin: 0;
-        }
-
-        /* Form */
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .form-label {
-            font-weight: 600;
-            color: var(--dark-text);
-            margin-bottom: 0.75rem;
-            display: block;
-            font-size: 1rem;
-        }
-
-        .required {
-            color: #dc3545;
-        }
-
-        .input-wrapper {
-            position: relative;
-        }
-
-        .form-control {
-            padding: 1rem 1rem 1rem 3.5rem;
-            border: 2px solid #e0e0e0;
-            border-radius: 12px;
-            width: 100%;
-            font-size: 1.1rem;
-            font-weight: 600;
-            font-family: 'Courier New', monospace;
-            letter-spacing: 1px;
-            transition: all 0.3s;
-            text-transform: uppercase;
-        }
-
-        .form-control:focus {
-            outline: none;
-            border-color: var(--primary-green);
-            box-shadow: 0 0 0 0.25rem rgba(45, 90, 45, 0.15);
-        }
-
-        .form-control.is-invalid {
-            border-color: #dc3545;
-        }
-
-        .form-control.is-valid {
-            border-color: var(--accent-green);
-        }
-
-        .input-icon {
-            position: absolute;
-            left: 1.25rem;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--light-green);
-            font-size: 1.3rem;
-        }
-
-        .form-hint {
-            font-size: 0.85rem;
-            color: #666;
-            margin-top: 0.5rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .form-hint i {
-            color: var(--accent-green);
-        }
-
-        .error-message {
-            color: #dc3545;
-            font-size: 0.9rem;
-            margin-top: 0.5rem;
-            display: none;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .error-message.show {
-            display: flex;
-        }
-
-        /* Submit Button */
-        .submit-button {
-            width: 100%;
-            padding: 1.1rem;
-            background: var(--gradient-green);
-            color: white;
-            border: none;
-            border-radius: 12px;
-            font-weight: 700;
-            font-size: 1.1rem;
-            cursor: pointer;
-            transition: all 0.3s;
-            box-shadow: 0 4px 15px rgba(45, 90, 45, 0.3);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.75rem;
-        }
-
-        .submit-button:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(45, 90, 45, 0.4);
-        }
-
-        .submit-button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-
-        .submit-button .spinner {
-            display: none;
-            animation: spin 1s linear infinite;
-        }
-
-        .submit-button.loading .spinner {
-            display: inline-block;
-        }
-
-        .submit-button.loading .button-text {
-            display: none;
-        }
-
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-
-        /* Divider */
-        .divider {
-            display: flex;
-            align-items: center;
-            text-align: center;
-            margin: 2rem 0;
-            color: #999;
-            font-size: 0.9rem;
-        }
-
-        .divider::before,
-        .divider::after {
-            content: '';
-            flex: 1;
-            border-bottom: 1px solid #e0e0e0;
-        }
-
-        .divider span {
-            padding: 0 1rem;
-            font-weight: 500;
-        }
-
-        /* Alternative Options */
-        .alternative-options {
-            text-align: center;
-        }
-
-        .alternative-title {
-            font-size: 0.95rem;
-            color: #666;
-            margin-bottom: 1rem;
-        }
-
-        .alternative-buttons {
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-        }
-
-        .alt-button {
-            padding: 0.9rem;
-            background: white;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            color: var(--dark-text);
-            text-decoration: none;
-            font-weight: 600;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.75rem;
-        }
-
-        .alt-button:hover {
-            border-color: var(--primary-green);
-            background: #f8fff8;
-            color: var(--primary-green);
-            transform: translateX(5px);
-        }
-
-        .alt-button i {
-            font-size: 1.2rem;
-        }
-
-        /* Example Format */
-        .example-format {
-            background: #f8f9fa;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 1rem;
-            margin-top: 1rem;
-        }
-
-        .example-title {
-            font-size: 0.85rem;
-            color: #666;
-            margin-bottom: 0.5rem;
-            font-weight: 600;
-        }
-
-        .example-id {
-            font-family: 'Courier New', monospace;
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: var(--primary-green);
-            letter-spacing: 1px;
-        }
-
-        /* Footer */
-        .footer {
-            background: #1a1a1a;
-            color: white;
-            padding: 2rem 0 1rem;
-            margin-top: auto;
-        }
-
-        .footer-content {
-            text-align: center;
-            color: #999;
-        }
-
-        .footer-links {
-            display: flex;
-            justify-content: center;
-            gap: 2rem;
-            margin-bottom: 1rem;
-            flex-wrap: wrap;
-        }
-
-        .footer-link {
-            color: #ccc;
-            text-decoration: none;
-            font-size: 0.9rem;
-            transition: color 0.3s;
-        }
-
-        .footer-link:hover {
-            color: var(--accent-green);
-        }
-
-        /* Responsive */
-        @media (max-width: 576px) {
-            .lookup-title {
-                font-size: 1.6rem;
-            }
-
-            .lookup-subtitle {
-                font-size: 0.9rem;
-            }
-
-            .lookup-body {
-                padding: 2rem 1.5rem;
-            }
-
-            .form-control {
-                font-size: 1rem;
-                padding: 0.9rem 0.9rem 0.9rem 3rem;
-            }
-        }
-    </style>
-</head>
-<body>
-    <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg sticky-top">
-        <div class="container">
-            <a class="navbar-brand" href="{% url 'appointment_home' %}">
-                <i class="fas fa-heartbeat"></i> MediBook
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto align-items-center">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'appointment_home' %}">Home</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'booking_id_lookup' %}">Find Doctors</a>
-                    </li>
-                    <!-- <li class="nav-item ms-3">
-                        <a href="#" class="btn-login">Login / Sign Up</a>
-                    </li> -->
-                </ul>
-            </div>
-        </div>
-    </nav>
-
-    <!-- Main Container -->
-    <div class="lookup-container">
-        <div class="lookup-card">
-            <!-- Header -->
-            <div class="lookup-header">
-                <div class="lookup-icon">
-                    <i class="fas fa-calendar-check"></i>
-                </div>
-                <h1 class="lookup-title">Find Your Appointment</h1>
-                <p class="lookup-subtitle">Enter your booking ID to view and manage your appointment</p>
-            </div>
-
-            <!-- Body -->
-            <div class="lookup-body">
-                <!-- Info Message -->
-                <div class="info-message">
-                    <i class="fas fa-info-circle"></i>
-                    <div class="info-message-content">
-                        <div class="info-message-title">Need your Booking ID?</div>
-                        <p class="info-message-text">
-                            Check your confirmation email. Your Booking ID was sent when you made your appointment.
-                        </p>
-                    </div>
-                </div>
-
-                <form id="lookupForm" method="post">
-                    {% csrf_token %}
-                    <div class="form-group">
-                        <label for="bookingId" class="form-label">
-                            Booking ID <span class="required">*</span>
-                        </label>
-                        <div class="input-wrapper">
-                            <i class="fas fa-hashtag input-icon"></i>
-                            <input
-                                type="text"
-                                class="form-control"
-                                id="bookingId"
-                                placeholder="AGKI-2025-XXXXX"
-                                maxlength="20"
-                                name="bookingID"
-                                value="{{ bookingID|default:'' }}"
-                                required
-                                autocomplete="off"
-                            >
-                        </div>
-                        <div class="form-hint">
-                            <i class="fas fa-lightbulb"></i>
-                            <span>Format: AGKI-YYYY-XXXXX (e.g., AGKI-2025-84729)</span>
-                        </div>
-                    </div>
-
-                    {% comment %} Second factor, per design §8.1. A booking ID on its own
-                       is a five-digit number and is not treated as a secret. {% endcomment %}
-                    <div class="form-group">
-                        <label for="verification" class="form-label">
-                            Phone number or date of birth <span class="required">*</span>
-                        </label>
-                        <div class="input-wrapper">
-                            <i class="fas fa-user-shield input-icon"></i>
-                            <input
-                                type="text"
-                                class="form-control"
-                                id="verification"
-                                placeholder="0700 000 000  or  1990-05-01"
-                                name="verification"
-                                required
-                                autocomplete="off"
-                            >
-                        </div>
-                        <div class="form-hint">
-                            <i class="fas fa-lock"></i>
-                            <span>As given when the appointment was booked. This confirms the record is yours.</span>
-                        </div>
-
-                        {% if error %}
-                            <div class="alert alert-danger mt-3">
-                                <i class="fas fa-exclamation-circle"></i> {{ error }}
-                            </div>
-                        {% endif %}
-                    </div>
-
-                    <button type="submit" class="submit-button" id="submitBtn">
-                        <span class="button-text">
-                            <i class="fas fa-search"></i> Find My Appointment
-                        </span>
-                        <i class="fas fa-spinner spinner"></i>
-                    </button>
-                </form>
-
-
-                <!-- Divider -->
-                <div class="divider">
-                    <span>OR</span>
-                </div>
-
-                <!-- Alternative Options -->
-                <div class="alternative-options">
-                    <div class="alternative-title">Don't have your Booking ID?</div>
-                    <div class="alternative-buttons">
-                        
-                        <a href="#" class="alt-button" id="supportBtn">
-                            <i class="fas fa-headset"></i>
-                            Contact Support
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
+        .bl-id-input { font-variant-numeric: tabular-nums; letter-spacing: .06em; text-transform: uppercase; }
+{% endblock %}
+
+{% block content %}
+
+<div class="bl-wrap">
+    <div class="pt-page-head">
+        <div class="pt-eyebrow">{{ page_section }}</div>
+        <h1>{{ page_title }}</h1>
+        <p class="pt-lead">
+            There is no account to sign in to. Your booking ID and one detail
+            from the booking are enough to open it.
+        </p>
     </div>
 
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="container">
-            <div class="footer-links">
-                <a href="#" class="footer-link">Help Center</a>
-                <a href="#" class="footer-link">Privacy Policy</a>
-                <a href="#" class="footer-link">Terms of Service</a>
-                <a href="#" class="footer-link">Contact Us</a>
+    <div class="pt-card">
+        <div class="bl-icon"><i class="fas fa-magnifying-glass"></i></div>
+
+        {% if error %}
+        <div class="pt-alert bad" role="alert">{{ error }}</div>
+        {% endif %}
+
+        <form method="post" novalidate>
+            {% csrf_token %}
+
+            <div class="pt-field">
+                <label for="bl-id">Booking ID <span class="pt-req">*</span></label>
+                <input class="pt-input bl-id-input" type="text" id="bl-id" name="bookingID" required
+                       placeholder="AGKI-2025-XXXXX" value="{{ bookingID|default:'' }}"
+                       autocomplete="off" spellcheck="false">
+                <p class="pt-help">On the email we sent when you booked.</p>
             </div>
-            <div class="footer-content">
-                <p>&copy; 2025 MediBook. All rights reserved.</p>
+
+            <div class="pt-field">
+                {% comment %}
+                One field accepting either the phone number or the date of
+                birth, because asking a walk-in patient to remember *which* of
+                the two the form wants is friction with no security value —
+                both are things only they and AGKI know.
+                {% endcomment %}
+                <label for="bl-verification">Phone number or date of birth <span class="pt-req">*</span></label>
+                <input class="pt-input" type="text" id="bl-verification" name="verification" required
+                       placeholder="0700 000 000  or  1990-05-01" autocomplete="off">
+                <p class="pt-help">Whichever you gave when you booked.</p>
             </div>
-        </div>
-    </footer>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
-    {% comment %}
-      The client-side lookup script that used to live here has been removed
-      (plan 1.7, design finding appointments #2). It did not work and it made
-      the page not work:
+            <div class="pt-actions">
+                <button type="submit" class="pt-btn">
+                    <i class="fas fa-arrow-right"></i> Open my appointment
+                </button>
+                <a class="pt-btn ghost" href="{% url 'search_results' %}">Book a new appointment</a>
+            </div>
+        </form>
+    </div>
 
-        * it rewrote whatever the patient typed into MediBook's MB-YYYY-XXXXX
-          format, so a real AGKI- booking ID could never be entered;
-        * its submit handler cancelled the submit event unconditionally and
-          then returned, so the form was never actually submitted;
-        * the handler was left unterminated, which nested every later listener
-          inside it and made `errorMessage` - an element id that exists nowhere
-          in this page - throw on the first keystroke.
+    <div class="pt-card">
+        <h2>Lost the booking ID?</h2>
+        <p class="pt-sub">
+            Search your email for the message from AGKI — the reference is in the
+            subject line.
+            {% if site_settings.phone %}
+            If you cannot find it, call <a href="tel:{{ site_settings.phone }}">{{ site_settings.phone }}</a>
+            and we will look it up with you.
+            {% endif %}
+        </p>
+    </div>
+</div>
 
-      The form is now a plain HTML POST to a real view. Nothing about finding
-      an appointment should depend on JavaScript running correctly.
-
-      A template comment rather than an HTML one: this is a note to whoever
-      reads the template next, and there is no reason to ship it to every
-      visitor's browser.
-    {% endcomment %}
-    <script>
-        // Uppercase the booking ID as it is typed. Cosmetic only: the server
-        // does not care about case, and the form submits with or without this.
-        document.getElementById('bookingId').addEventListener('input', function () {
-            this.value = this.value.toUpperCase();
-        });
-    </script>
-</body>
-</html>
+{% endblock %}

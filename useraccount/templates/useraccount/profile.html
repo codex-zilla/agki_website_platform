@@ -1,314 +1,299 @@
 {% extends 'doctorDashboard/doctor_base.html' %}
 {% load static %}
 {% block content %}
+{% comment %}
+Rebuilt to the design agreed with AGKI on 2026-09-01 (plan 11.6), in the system
+11.1 established.
 
-<div class="dashboard-content">
-    <!-- Page Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h2 class="page-title mb-2">My Profile</h2>
-            <p class="text-muted mb-0">Manage your personal information and account settings</p>
+Nothing here was unstyled - both profile pages already extend this base and use
+Bootstrap utilities it loads. What was wrong is that **a doctor could not set
+their specialties**, and the patient search filters on exactly that: the
+specialty browse grid AGKI asked for was fed by a field no doctor had any way
+to fill in. `ProfileEditForm` offered three of `Profile`'s ten fields.
+
+The page also answered an anonymous request with a 500, because
+`get_or_create(user=request.user)` cannot prepare `AnonymousUser` and the view
+had no `@login_required` - plan 1.2's sweep covered `doctorDashboard` and this
+view lives in `useraccount`.
+
+Classes are `pf-` prefixed, and a test asserts every one is defined here.
+{% endcomment %}
+
+<div class="dashboard-content pf">
+
+    <div class="pf-head">
+        {% if request.user.image %}
+        <img class="pf-avatar" src="{{ request.user.image.url }}" alt="">
+        {% else %}
+        <div class="pf-avatar pf-initials">
+            {{ request.user.first_name|slice:":1" }}{{ request.user.last_name|slice:":1" }}
         </div>
-        <div class="d-flex gap-2">
-            <a href="{% url 'profile_edit' %}" class="card-action">
-                <i class="fas fa-edit me-2"></i>Edit Profile
-            </a>
-            <a href="{% url 'logout' %}" class="btn btn-outline-danger">
-                <i class="fas fa-sign-out-alt me-2"></i>Logout
-            </a>
+        {% endif %}
+        <div class="pf-id">
+            <h2>{{ request.user.get_full_name|default:request.user.username }}</h2>
+            <p>
+                {{ request.user.get_role_display|default:"Doctor" }}
+                &middot; {{ request.user.email }}
+                {% if request.user.phone %}&middot; {{ request.user.phone }}{% endif %}
+            </p>
         </div>
+        <a class="pf-btn" href="{% url 'profile_edit' %}">Edit profile</a>
     </div>
 
-    <div class="row">
-        <!-- Left Column: Profile Info -->
-        <div class="col-lg-8">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-user me-2"></i>Personal Information
-                    </h3>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <!-- Profile Image -->
-                        <div class="col-md-4 text-center mb-4 mb-md-0">
-                            <div class="position-relative d-inline-block">
-                                {% if user.image %}
-                                <img src="{{ user.image.url }}" alt="{{ user.username }}" 
-                                     class="rounded-circle border border-4 border-primary" 
-                                     width="180" height="180" style="object-fit: cover;">
-                                {% else %}
-                                <div class="rounded-circle d-flex align-items-center justify-content-center bg-light" 
-                                     style="width: 180px; height: 180px; border: 4px solid var(--primary-green);">
-                                    <i class="fas fa-user-md text-muted" style="font-size: 4rem;"></i>
-                                </div>
-                                {% endif %}
-                                <a href="{% url 'profile_edit' %}" class="btn btn-primary btn-sm rounded-circle position-absolute" 
-                                   style="bottom: 10px; right: 10px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;">
-                                    <i class="fas fa-camera"></i>
-                                </a>
-                            </div>
-                        </div>
-
-                        <!-- Profile Details -->
-                        <div class="col-md-8">
-                            <div class="row mb-3">
-                                <div class="col-sm-6">
-                                    <label class="text-muted small mb-1">Full Name</label>
-                                    <p class="fw-bold fs-5 mb-0">{{ user.get_full_name|default:user.username }}</p>
-                                </div>
-                                <div class="col-sm-6">
-                                    <label class="text-muted small mb-1">Role</label>
-                                    <p class="fw-bold text-success mb-0">{{ user.get_role_display|default:"Not assigned" }}</p>
-                                </div>
-                            </div>
-
-                            <div class="row mb-3">
-                                <div class="col-sm-6">
-                                    <label class="text-muted small mb-1">Email Address</label>
-                                    <p class="fw-bold mb-0">{{ user.email }}</p>
-                                </div>
-                                <div class="col-sm-6">
-                                    <label class="text-muted small mb-1">Location</label>
-                                    <p class="fw-bold mb-0">{{ profile.location|default:"Not specified" }}</p>
-                                </div>
-                            </div>
-
-                            <div class="row mb-3">
-                                <div class="col-sm-6">
-                                    <label class="text-muted small mb-1">Qualifications</label>
-                                    <p class="fw-bold mb-0">{{ user.qualifications|default:"Not specified" }}</p>
-                                </div>
-                            </div>
-
-                            <div class="row mb-3">
-                                <div class="col-sm-6">
-                                    <label class="text-muted small mb-1">Birth Date</label>
-                                    <p class="fw-bold mb-0">{{ profile.birth_date|date:"F d, Y"|default:"Not specified" }}</p>
-                                </div>
-                                <div class="col-sm-6">
-                                    <label class="text-muted small mb-1">Account Created</label>
-                                    <p class="fw-bold mb-0">{{ user.date_joined|date:"F d, Y" }}</p>
-                                </div>
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="text-muted small mb-1">Bio</label>
-                                <div class="bg-light p-3 rounded">
-                                    <p class="mb-0">{{ profile.bio|default:"No bio added yet." }}</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Contact Information Card -->
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-address-card me-2"></i>Contact Information
-                    </h3>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <div class="d-flex align-items-center">
-                                <div class="stat-icon bg-light-green text-white rounded-circle d-flex align-items-center justify-content-center" 
-                                     style="width: 50px; height: 50px; background: var(--gradient-green) !important;">
-                                    <i class="fas fa-phone"></i>
-                                </div>
-                                <div class="ms-3">
-                                    <label class="text-muted small mb-1">Phone Number</label>
-                                    <p class="fw-bold mb-0">{{ profile.user.phone|default:"Not specified" }}</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <div class="d-flex align-items-center">
-                                <div class="stat-icon bg-light-green text-white rounded-circle d-flex align-items-center justify-content-center" 
-                                     style="width: 50px; height: 50px; background: var(--gradient-green) !important;">
-                                    <i class="fas fa-map-marker-alt"></i>
-                                </div>
-                                <div class="ms-3">
-                                    <label class="text-muted small mb-1">Address</label>
-                                    <p class="fw-bold mb-0">{{ profile.location|default:"Not specified" }}</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Right Column: Stats & Actions -->
-        <div class="col-lg-4">
-            <!-- Account Status Card -->
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-shield-alt me-2"></i>Account Status
-                    </h3>
-                </div>
-                <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="stat-icon bg-light-green text-white rounded-circle d-flex align-items-center justify-content-center" 
-                             style="width: 50px; height: 50px; background: var(--gradient-green) !important;">
-                            <i class="fas fa-user-check"></i>
-                        </div>
-                        <div class="ms-3">
-                            <label class="text-muted small mb-1">Account Status</label>
-                            <p class="fw-bold text-success mb-0">
-                                {% if user.is_active %}
-                                    <i class="fas fa-check-circle me-1"></i>Active
-                                {% else %}
-                                    <i class="fas fa-times-circle me-1"></i>Inactive
-                                {% endif %}
-                                {% if user.is_approved %}
-                                    &nbsp; | &nbsp; <i class="fas fa-check-circle me-1"></i>Approved
-                                {% else %}
-                                    &nbsp; | &nbsp; <i class="fas fa-hourglass-half me-1"></i>Pending Approval
-                                {% endif %}
-                            </p>
-                        </div>
-                    </div>
-                    
-                    <div class="d-flex align-items-center mb-4">
-                        <div class="stat-icon bg-light-green text-white rounded-circle d-flex align-items-center justify-content-center" 
-                             style="width: 50px; height: 50px; background: var(--gradient-green) !important;">
-                            <i class="fas fa-calendar-check"></i>
-                        </div>
-                        <div class="ms-3">
-                            <label class="text-muted small mb-1">Last Login</label>
-                            <p class="fw-bold mb-0">{{ user.last_login|date:"M d, Y H:i"|default:"Never" }}</p>
-                        </div>
-                    </div>
-
-                    <div class="border-top pt-3">
-                        <div class="d-grid gap-2">
-                            <a href="{% url 'profile_edit' %}" class="btn btn-primary">
-                                <i class="fas fa-edit me-2"></i>Edit Profile
-                            </a>
-                            <a href="#" class="btn btn-outline-secondary">
-                                <i class="fas fa-key me-2"></i>Change Password
-                            </a>
-                            <!-- <a href="{% url 'delete_account' %}" class="btn btn-outline-danger" 
-                               onclick="return confirm('Are you sure you want to delete your account? This action cannot be undone.');">
-                                <i class="fas fa-trash-alt me-2"></i>Delete Account
-                            </a> -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Quick Stats Card -->
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-chart-line me-2"></i>Profile Statistics
-                    </h3>
-                </div>
-                <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="bg-light-primary rounded p-2 me-3">
-                            <i class="fas fa-user-clock text-primary" style="font-size: 1.5rem;"></i>
-                        </div>
-                        <div>
-                            <label class="text-muted small mb-1">Member Since</label>
-                            <p class="fw-bold mb-0">{{ user.date_joined|timesince }}</p>
-                        </div>
-                    </div>
-                    
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="bg-light-success rounded p-2 me-3">
-                            <i class="fas fa-file-medical text-success" style="font-size: 1.5rem;"></i>
-                        </div>
-                        <div>
-                            <label class="text-muted small mb-1">Profile Completion</label>
-                            <p class="fw-bold mb-0">
-                                {% with complete=profile.complete_percentage %}
-                                    {{ complete|default:"75" }}%
-                                {% endwith %}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="progress mb-4" style="height: 8px;">
-                        <div class="progress-bar" role="progressbar" 
-                             style="width: {% firstof profile.complete_percentage '75' %}%; background: var(--gradient-green);" 
-                             aria-valuenow="{% firstof profile.complete_percentage '75' %}" aria-valuemin="0" aria-valuemax="100">
-                        </div>
-                    </div>
-
-                    <div class="text-center">
-                        <small class="text-muted">Complete your profile for better visibility</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Additional Information (if any) -->
-    {% if profile.specialization or profile.qualifications %}
-    <div class="card mt-4">
-        <div class="card-header">
-            <h3 class="card-title">
-                <i class="fas fa-graduation-cap me-2"></i>Professional Information
-            </h3>
-        </div>
-        <div class="card-body">
-            <div class="row">
-                {% if profile.specialization %}
-                <div class="col-md-6 mb-3">
-                    <label class="text-muted small mb-1">Specialization</label>
-                    <p class="fw-bold mb-0">{{ profile.specialization }}</p>
-                </div>
-                {% endif %}
-                
-                {% if profile.qualifications %}
-                <div class="col-md-6 mb-3">
-                    <label class="text-muted small mb-1">Qualifications</label>
-                    <p class="fw-bold mb-0">{{ profile.qualifications }}</p>
-                </div>
-                {% endif %}
-            </div>
-        </div>
+    {% if messages %}
+    <div class="pf-messages">
+        {% for message in messages %}
+        <div class="pf-message {{ message.tags }}">{{ message }}</div>
+        {% endfor %}
     </div>
     {% endif %}
+
+    {% comment %}
+    A consequence, not a percentage. "Profile 40% complete" tells a doctor
+    nothing they can act on; `search_results` filters on specialty, so a doctor
+    without one never appears at all - which is true of every doctor in the
+    database today.
+    {% endcomment %}
+    {% if not findable %}
+    <div class="pf-banner">
+        <div>
+            <strong>Patients cannot find you yet.</strong>
+            Add at least one specialty &mdash; the search page filters on it, so a
+            doctor without one never appears.
+        </div>
+        <a class="pf-btn ghost" href="{% url 'profile_edit' %}">Add specialties</a>
+    </div>
+    {% elif missing %}
+    <div class="pf-banner soft">
+        <div>
+            You are findable. Still missing:
+            {% for item in missing %}{{ item }}{% if not forloop.last %}, {% endif %}{% endfor %}.
+        </div>
+        <a class="pf-btn ghost" href="{% url 'profile_edit' %}">Finish it</a>
+    </div>
+    {% endif %}
+
+    <div class="pf-cols">
+        <div>
+            <div class="pf-box">
+                <h3>Professional</h3>
+                <dl class="pf-kv">
+                    <dt>Qualifications</dt>
+                    <dd>
+                        {% if qualifications %}
+                        <span class="pf-chips">
+                            {% for q in qualifications %}<span class="pf-chip q">{{ q.name }}</span>{% endfor %}
+                        </span>
+                        {% else %}<span class="pf-chip none">Not set</span>{% endif %}
+                    </dd>
+
+                    <dt>Specialties</dt>
+                    <dd>
+                        {% if specialties %}
+                        <span class="pf-chips">
+                            {% for s in specialties %}<span class="pf-chip">{{ s.name }}</span>{% endfor %}
+                        </span>
+                        {% else %}<span class="pf-chip none">Not set</span>{% endif %}
+                    </dd>
+
+                    <dt>Experience</dt>
+                    <dd {% if not profile.years_of_experience %}class="pf-missing"{% endif %}>
+                        {% if profile.years_of_experience %}{{ profile.years_of_experience }} year{{ profile.years_of_experience|pluralize }}{% else %}Not set{% endif %}
+                    </dd>
+
+                    <dt>Languages</dt>
+                    <dd {% if not profile.languages_spoken %}class="pf-missing"{% endif %}>
+                        {{ profile.languages_spoken|default:"Not set" }}
+                    </dd>
+                </dl>
+            </div>
+
+            <div class="pf-box">
+                <h3>Where you practise</h3>
+                <dl class="pf-kv">
+                    <dt>Region</dt>
+                    <dd {% if not profile.region %}class="pf-missing"{% endif %}>
+                        {{ profile.region|default:"Not set" }}
+                    </dd>
+                    <dt>Location</dt>
+                    <dd {% if not profile.location %}class="pf-missing"{% endif %}>
+                        {{ profile.location|default:"Not set" }}
+                    </dd>
+                </dl>
+                <p class="pf-hint">Region is how patients searching for a doctor near them find you.</p>
+            </div>
+
+            <div class="pf-box">
+                <h3>About you</h3>
+                {% if profile.bio %}
+                <p class="pf-bio">{{ profile.bio }}</p>
+                {% else %}
+                <p class="pf-hint">Nothing written yet. A sentence or two appears on your card.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div>
+            {% comment %}
+            The booking page's own card, with this doctor's real slots. It is
+            the honest version of a completeness meter: the gap is visible
+            rather than described, and it cannot drift from the real page
+            because it is built from the same two facts - who you are and what
+            you have published.
+            {% endcomment %}
+            <div class="pf-preview">
+                <h3>How patients see you</h3>
+                {% comment %}
+                Ordered exactly as `search_results` renders it - specialties
+                first, then qualifications, with the same separator and the
+                same "Dr." - because a preview that differs from the page it
+                previews is worse than none. Both were changed together in
+                plan 11.7.
+                {% endcomment %}
+                <div class="pf-card">
+                    <div class="nm">Dr. {{ request.user.get_full_name|default:request.user.username }}</div>
+                    <div class="sm">
+                        {% for s in specialties %}{{ s.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                        {% if specialties and qualifications %} • {% endif %}
+                        {% for q in qualifications %}{{ q.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                        {% if not qualifications and not specialties %}
+                        <span class="pf-missing">Nothing to show here yet</span>
+                        {% endif %}
+                    </div>
+                    {% if profile.location or profile.region %}
+                    <div class="sm">{{ profile.location }}{% if profile.location and profile.region %}, {% endif %}{{ profile.region }}</div>
+                    {% endif %}
+                    <div class="pf-slots">
+                        {% for slot in upcoming_slots %}
+                        <span>{{ slot.time|time:"g:i A" }}</span>
+                        {% empty %}
+                        <span class="dim">No bookable times published</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                <p class="pf-hint">
+                    This is your card on the booking page.
+                    {% if not upcoming_slots %}
+                    <a href="{% url 'doctor_availability' %}">Publish some times</a> to fill the row.
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
 </div>
 
-<!-- Custom CSS for Profile Page -->
 <style>
-    .bg-light-primary {
-        background-color: rgba(33, 150, 243, 0.1);
-    }
-    
-    .bg-light-success {
-        background-color: rgba(76, 175, 80, 0.1);
-    }
-    
-    .stat-icon.bg-light-green {
-        background: var(--gradient-green) !important;
-    }
-    
-    .progress {
-        background-color: #e9ecef;
-        border-radius: 10px;
-        overflow: hidden;
-    }
-    
-    .progress-bar {
-        border-radius: 10px;
-    }
-    
-    .btn-outline-danger:hover {
-        background-color: #dc3545;
-        border-color: #dc3545;
-    }
-    
-    .border-primary {
-        border-color: var(--primary-green) !important;
-    }
-</style>
+/* ------------------------------------------------------------------------
+   `pf-` prefixed, defined here, for the reason the availability page's are
+   `av-`: a generic class name can be silently supplied - or not supplied - by
+   another page's <style> block, which is how that page shipped a Save button
+   nobody could see.
+   ------------------------------------------------------------------------ */
+.pf {
+    --pf-ink: #1c221e;
+    --pf-ink-2: #4a554d;
+    --pf-muted: #6b7770;
+    --pf-line: #dde5df;
+    --pf-line-2: #c3d0c6;
+    --pf-surface: #fff;
+    --pf-surface-2: #f2f6f2;
+    --pf-brand: var(--primary-green, #2d5a2d);
+    --pf-brand-wash: #e9f2ea;
+    --pf-ok: #1f7a4d;
+    --pf-ok-wash: #e4f3ea;
+    --pf-warn: #a35a00;
+    --pf-warn-wash: #fbeeda;
+    --pf-info: #2b5f86;
+    --pf-info-wash: #e2eef7;
+    --pf-dim: #64706a;
+    --pf-bad: #a32020;
+    --pf-bad-wash: #fae8e8;
+}
 
+.pf-head {
+    display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+    padding-bottom: .9rem; border-bottom: 1px solid var(--pf-line); margin-bottom: 1rem;
+}
+.pf-avatar {
+    width: 64px; height: 64px; border-radius: 50%; object-fit: cover;
+    border: 2px solid var(--pf-brand-wash);
+}
+.pf-initials {
+    display: grid; place-items: center; background: var(--pf-brand-wash);
+    color: var(--pf-brand); font-size: 1.35rem; font-weight: 700; letter-spacing: -.02em;
+    text-transform: uppercase;
+}
+.pf-id { margin-right: auto; }
+.pf-id h2 { margin: 0; font-size: 1.3rem; letter-spacing: -.015em; color: var(--pf-ink); }
+.pf-id p { margin: .1rem 0 0; font-size: .85rem; color: var(--pf-muted); }
+
+.pf-btn {
+    font: inherit; font-size: .84rem; font-weight: 600; cursor: pointer; text-decoration: none;
+    display: inline-block; background: var(--pf-brand); color: #fff;
+    border: 1px solid var(--pf-brand); padding: .45rem .9rem; border-radius: 8px;
+}
+.pf-btn:hover { filter: brightness(1.12); color: #fff; }
+.pf-btn.ghost { background: #fff; color: var(--pf-ink-2); border-color: var(--pf-line-2); }
+.pf-btn.ghost:hover { background: var(--pf-surface-2); filter: none; color: var(--pf-ink-2); }
+
+.pf-messages { display: grid; gap: .5rem; margin-bottom: 1rem; }
+.pf-message {
+    padding: .7rem 1rem; border-radius: 8px; font-size: .9rem;
+    background: var(--pf-brand-wash); color: var(--pf-brand); border-left: 3px solid var(--pf-brand);
+}
+.pf-message.error { background: var(--pf-bad-wash); color: var(--pf-bad); border-left-color: var(--pf-bad); }
+
+.pf-banner {
+    display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+    background: var(--pf-warn-wash); color: var(--pf-warn);
+    border-left: 3px solid var(--pf-warn); border-radius: 9px;
+    padding: .8rem 1rem; margin-bottom: 1.1rem; font-size: .9rem;
+}
+.pf-banner div { flex: 1; min-width: 220px; }
+.pf-banner.soft { background: var(--pf-info-wash); color: var(--pf-info); border-left-color: var(--pf-info); }
+
+.pf-cols { display: grid; grid-template-columns: 1.35fr 1fr; gap: 1.1rem; align-items: start; }
+.pf-box {
+    border: 1px solid var(--pf-line); border-radius: 10px;
+    background: var(--pf-surface); padding: .9rem 1.1rem; margin-bottom: .9rem;
+}
+.pf-box h3, .pf-preview h3 {
+    margin: 0 0 .7rem; font-size: .7rem; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--pf-muted); font-weight: 600;
+}
+.pf-kv { display: grid; grid-template-columns: auto 1fr; gap: .45rem 1rem; margin: 0; font-size: .9rem; }
+.pf-kv dt { color: var(--pf-muted); }
+.pf-kv dd { margin: 0; color: var(--pf-ink); }
+.pf-missing { color: var(--pf-warn); }
+.pf-hint { font-size: .8rem; color: var(--pf-muted); margin: .6rem 0 0; }
+.pf-bio { margin: 0; font-size: .9rem; color: var(--pf-ink-2); }
+
+.pf-chips { display: flex; gap: .3rem; flex-wrap: wrap; }
+.pf-chip {
+    display: inline-block; font-size: .78rem; font-weight: 600; border-radius: 6px;
+    padding: .12rem .55rem; background: var(--pf-brand-wash); color: var(--pf-brand);
+}
+.pf-chip.q { background: var(--pf-info-wash); color: var(--pf-info); }
+.pf-chip.none { background: var(--pf-warn-wash); color: var(--pf-warn); font-weight: 500; }
+
+.pf-preview {
+    border: 1px solid var(--pf-line); border-radius: 10px;
+    background: var(--pf-surface-2); padding: .9rem 1.1rem;
+}
+.pf-card {
+    background: #fff; border: 1px solid var(--pf-line); border-radius: 9px; padding: .8rem .9rem;
+}
+.pf-card .nm { font-weight: 700; letter-spacing: -.01em; color: var(--pf-ink); }
+.pf-card .sm { font-size: .82rem; color: var(--pf-muted); }
+.pf-slots { display: flex; gap: .3rem; flex-wrap: wrap; margin-top: .6rem; }
+.pf-slots span {
+    font-size: .72rem; background: var(--pf-ok-wash); color: var(--pf-ok);
+    border-radius: 5px; padding: .12rem .45rem; font-variant-numeric: tabular-nums;
+}
+.pf-slots span.dim { background: var(--pf-surface-2); color: var(--pf-dim); }
+
+@media (max-width: 860px) {
+    .pf-cols { grid-template-columns: 1fr; }
+}
+</style>
 {% endblock %}

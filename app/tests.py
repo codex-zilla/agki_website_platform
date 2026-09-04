@@ -12,6 +12,7 @@ returning.
 """
 
 import re
+from pathlib import Path
 from unittest import mock
 
 from django.core import mail
@@ -397,3 +398,74 @@ class HomePageCacheTests(CacheIsolatedTestCase):
     def _token(html):
         match = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', html)
         return match.group(1) if match else None
+
+
+class HeroActionStylingTests(TestCase):
+    """Every control in the hero must be styled by the stylesheet it ships
+    with.
+
+    This exists because a class was added to the markup and its rules were
+    written, and the page still showed a bare blue underlined link - which
+    looked exactly like the case this test does catch: a class the CSS has
+    never heard of. The two are indistinguishable in a screenshot, so the
+    cheap half is worth automating.
+
+    Reading the file rather than the response on purpose: these rules live in
+    `app/static/app/home.css`, and a template that references a class no rule
+    defines is broken whether or not any particular browser has the file.
+    """
+
+    #: Where the rules actually are. `findstatic app/home.css` resolves here.
+    STYLESHEET = Path(__file__).resolve().parent / "static" / "app" / "home.css"
+
+    def hero_markup(self):
+        html = self.client.get(reverse("home")).content.decode()
+        return html.split('class="hero-actions"', 1)[1].split("</div>", 1)[0]
+
+    def test_every_hero_button_class_has_rules_behind_it(self):
+        css = self.STYLESHEET.read_text(encoding="utf-8")
+
+        used = set()
+        for attribute in re.findall(r'class="([^"]*)"', self.hero_markup()):
+            used.update(
+                name for name in attribute.split() if name.startswith("hero-button")
+            )
+
+        self.assertTrue(used, "the hero should offer at least one control")
+        for name in sorted(used):
+            with self.subTest(control=name):
+                self.assertIn(".%s {" % name, css)
+
+    @staticmethod
+    def declarations_for(css, name):
+        """Every declaration block whose selector list mentions `.name`.
+
+        Written this way after the first version of this test let a real
+        mutation through: it looked for `text-decoration` in the class's own
+        rule *or* in the shared `.hero-button-primary, .hero-button-secondary`
+        block, and the tertiary is not in that block - so deleting the
+        declaration from the tertiary still passed on the strength of a rule
+        that does not apply to it.
+        """
+        blocks = []
+        for selectors, body in re.findall(r"([^{}]+)\{([^{}]*)\}", css):
+            names = re.findall(r"\.([A-Za-z][\w-]*)", selectors)
+            if name in names:
+                blocks.append(body)
+        return blocks
+
+    def test_the_hero_controls_do_not_rely_on_the_blanket_link_reset(self):
+        """Bootstrap's reboot underlines every `<a>`. These are buttons, and a
+        button that reads as an underlined link the moment one unrelated rule
+        moves is not styled, it is lucky."""
+        css = self.STYLESHEET.read_text(encoding="utf-8")
+
+        for name in ("hero-button-primary", "hero-button-secondary", "hero-button-tertiary"):
+            with self.subTest(control=name):
+                blocks = self.declarations_for(css, name)
+
+                self.assertTrue(blocks, "no rule mentions .%s" % name)
+                self.assertTrue(
+                    any("text-decoration" in block for block in blocks),
+                    "nothing that applies to .%s sets text-decoration" % name,
+                )

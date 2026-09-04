@@ -49,15 +49,14 @@ def create_token(sender, instance, created, **kwargs):
     if kwargs.get("raw"):
         return
 
-    if created and instance.is_superuser and not instance.is_approved:
-        # `is_approved` gates sign-in as of plan 1.10, and it defaults to
-        # False. Without this, `manage.py createsuperuser` produces an account
-        # that cannot use the site's own login form and has to approve itself
-        # through the admin first — a footgun with no upside, since
-        # `is_superuser` already means "everything" (design §4.1).
-        # `.update()` rather than `.save()` to avoid re-entering this signal.
-        CustomUser.objects.filter(pk=instance.pk).update(is_approved=True)
-        instance.is_approved = True
+    # A `createsuperuser` special case used to sit here. Plan 1.10 needed it
+    # because `is_approved` defaulted to False, so a fresh superuser could not
+    # use the site's own login form until it approved itself through the
+    # admin. Decision F flips that default (plan 10.1), so the workaround has
+    # nothing left to work around — and two mechanisms asserting the same
+    # thing is one more than can be kept in step. The outcome it guaranteed is
+    # still guarded, by `AccountApprovalTests
+    # .test_a_new_superuser_is_approved_automatically`.
 
     if created and not instance.is_superuser:
         # Check if this user was created by social login
@@ -73,34 +72,16 @@ def create_token(sender, instance, created, **kwargs):
         else:
             # This is a regular signup user - require OTP verification
             print(f"Regular user detected: {instance.username}")
-            otp_token = OtpToken.objects.create(
-                user=instance, 
-                otp_expires_at=timezone.now() + timezone.timedelta(minutes=2)
-            )
-            
-            # Ensure user is not active
+            # Held until the emailed code is used. `.update()` rather than
+            # `instance.save()` so this does not re-enter the signal.
             CustomUser.objects.filter(id=instance.id).update(is_active=False)
-            
-            # Send OTP email
-            subject = 'Email Verification - Your OTP Code'
-            verification_url = (
-                f"{settings.SITE_URL}"
-                f"{reverse('verify-email', kwargs={'username': instance.username})}"
-            )
-            message = f"""
-                Dear {instance.username},
-                Your OTP code is: {otp_token.otp_code}
-                This code will expire in 2 minutes. 
-                Use the url below to verify your account:
-                {verification_url}
-                If you did not request this, please ignore this email.      
-            """
-            sender = settings.EMAIL_HOST_USER
-            receiver = [instance.email]
-            send_mail(
-                subject, 
-                message, 
-                sender, 
-                receiver, 
-                fail_silently=False
-            )
+
+            # The code and its email used to be built here, and a second,
+            # differently worded copy lived in `resend_otp`. Both come from
+            # `useraccount.otp` now, so a registrant who asks for another
+            # code gets the same email rather than a different-looking one.
+            # Imported inside the handler because `otp` imports `.models`,
+            # which is the module this signal is registered from.
+            from .otp import issue_code
+
+            issue_code(instance)

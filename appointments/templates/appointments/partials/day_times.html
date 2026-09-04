@@ -1,0 +1,20 @@
+{% comment %}
+One day's bookable times, as rows (plan 11.17).
+
+Rendered twice per day and deliberately so: once inside the day's cell, in a
+`<template>` the script moves into the drawer without a round trip, and once in
+the drawer itself for the day the URL asks for. Both come from this file, so
+the two cannot say different things — which is the failure a second query
+would invite, and the reason the console's availability page carries its day
+detail the same way.
+
+`slots` is passed with `only`: this partial should render the day it is given
+and never pick a `slots` up from whatever surrounds it.
+{% endcomment %}
+{% for slot in slots %}
+<div class="dd-row">
+    <span class="time">{{ slot.time|date:'g:i A' }}</span>
+    <span class="pill">Bookable</span>
+    <a class="act" href="{% url 'booking_form' slot.id %}">Book this time &rarr;</a>
+</div>
+{% endfor %}

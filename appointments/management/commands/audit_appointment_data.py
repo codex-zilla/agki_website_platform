@@ -459,7 +459,22 @@ class Command(BaseCommand):
         )
 
     def check_login_lockout_risk(self):
-        """Plan 1.10 — enforcing is_approved at login can lock out live staff."""
+        """Accounts that cannot sign in because approval was withdrawn.
+
+        Written for plan 1.10, when this reported who *enforcing* the flag
+        would lock out and the answer was "most of the staff". Decision F and
+        the 10.2 backfill removed that question — every account that predates
+        them is approved, and new ones are approved on creation — so on any
+        migrated database this reports nothing unless somebody has been
+        deliberately switched off.
+
+        **Kept, with the wording corrected rather than the check deleted.**
+        "These accounts cannot sign in" is still worth knowing before a
+        deploy, and after 10.2 an unexplained row here is a more interesting
+        finding than it used to be: it means an administrator made a decision,
+        not that a default was never set. The finding id is unchanged because
+        plan 0.3 and 9.2 name it.
+        """
         at_risk = list(
             CustomUser.objects.using(self.db)
             .filter(is_active=True, is_approved=False)
@@ -469,20 +484,22 @@ class Command(BaseCommand):
         if not at_risk:
             return Finding(
                 "login_lockout_risk", INFO,
-                "No active account would be locked out by enforcing is_approved.",
-                blocks="1.10 is_approved at login",
+                "No active account has had its access withdrawn.",
+                blocks="10.2 is_approved backfill",
             )
         return Finding(
             "login_lockout_risk",
             REVIEW,
-            f"{len(at_risk)} active account(s) have is_approved=False and would be "
-            f"locked out the moment 1.10 ships.",
-            blocks="1.10 — enforce is_approved at signin()",
+            f"{len(at_risk)} active account(s) have is_approved=False and cannot "
+            f"sign in.",
+            blocks="10.2 — is_approved backfill",
             rows=at_risk,
             detail=(
-                "signin() checks only is_active today, so the approval flag gates "
-                "nothing and nobody has needed it set. Approve these accounts before "
-                "shipping 1.10, or ship it knowing exactly who has to be let back in."
+                "Approval is granted at registration since decision F, and 10.2 "
+                "backfilled every account that predates it — so a row here is an "
+                "administrator having switched the account off, not a default nobody "
+                "set. Confirm each one is meant to be switched off; anything "
+                "unexplained is someone locked out who should not be."
             ),
         )
 

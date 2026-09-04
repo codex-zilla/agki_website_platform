@@ -476,16 +476,24 @@
                             </div>
                             <div class="col-md-6">
                                 <div class="form-group">
-                                    <label class="form-label" for="role">Role</label>
-                                    <!-- "Admin" is deliberately not offered here: public self-signup
-                                         should never let someone advertise themselves as an admin
-                                         account. Admin is assigned only through the staff admin UI. -->
-                                    <select id="role" name="role" class="form-control" required>
-                                        <option value="" disabled selected>Select your role</option>
-                                        <option value="doctor">Doctor</option>
-                                        <option value="receptionist">Receptionist</option>
-                                    </select>
-                                    <div class="error-message" id="role-error">Please select your role</div>
+                                    <label class="form-label">Account type</label>
+                                    {% comment %}
+                                    Deliberately not a field. It has no `name`, so nothing about
+                                    the account type travels in the request body and the server
+                                    assigns it - see `signup` in useraccount/views.py.
+
+                                    A <select> stood here offering "Doctor" or "Receptionist".
+                                    Only doctors self-register (design §0.1), and decision 4
+                                    records the receptionist role as one that does not exist -
+                                    so the form asked a question with one real answer and one
+                                    imaginary one, and made every registrant answer it.
+                                    {% endcomment %}
+                                    <div class="form-control" style="background: #f1f3f5; color: #555; display: flex; align-items: center;">
+                                        <i class="fas fa-user-md me-2"></i>Doctor
+                                    </div>
+                                    <!-- <small class="text-muted">
+                                        Registration is for doctors. Other accounts are created by AGKI.
+                                    </small> -->
                                 </div>
                             </div>
                         </div>
@@ -721,15 +729,6 @@
                 clearError('phone');
             }
 
-            // Validate Role
-            const role = document.getElementById('role').value;
-            if (!role) {
-                showError('role', 'Please select your role');
-                isValid = false;
-            } else {
-                clearError('role');
-            }
-
             // Validate Password
             const password = document.getElementById('password').value;
             if (!password) {
@@ -767,7 +766,12 @@
         }
 
         // Real-time validation
-        const inputs = ['firstname', 'lastname', 'username', 'email', 'phone', 'role', 'password', 'confirmPassword'];
+        // 'role' is not in this list because there is no longer a #role
+        // element. Leaving it would be worse than untidy: `getElementById`
+        // returns null, `addEventListener` throws, and every line after this
+        // loop stops running - which is exactly how the booking form's fake
+        // submit handler went unnoticed for so long (plan 4.2a).
+        const inputs = ['firstname', 'lastname', 'username', 'email', 'phone', 'password', 'confirmPassword'];
         
         inputs.forEach(inputId => {
             const input = document.getElementById(inputId);

@@ -78,14 +78,8 @@ class SuperuserOnlyAdmin(admin.ModelAdmin):
         return request.user.is_superuser
 
 
-@admin.register(Specialty)
-class SpecialtyAdmin(SuperuserOnlyAdmin):
-    """The taxonomy patients search doctors by (§5.5).
-
-    Intentionally empty until AGKI names their real specialties (step 9.6) —
-    seeding it from here, or from a migration, would be putting words in their
-    mouth and creating rows somebody then has to hunt down.
-    """
+class TaxonomyAdmin(SuperuserOnlyAdmin):
+    """Shared by the two picked lists. Superuser-only, per design §4.3."""
 
     list_display = ("name", "slug", "is_active", "order", "doctor_count")
     list_editable = ("is_active", "order")
@@ -95,6 +89,33 @@ class SpecialtyAdmin(SuperuserOnlyAdmin):
     @admin.display(description="doctors")
     def doctor_count(self, obj):
         return obj.doctors.count()
+
+
+@admin.register(Specialty)
+class SpecialtyAdmin(TaxonomyAdmin):
+    """The taxonomy patients search doctors by (§5.5).
+
+    **This docstring used to say the table was "intentionally empty until AGKI
+    names their real specialties (step 9.6)", and that seeding it "would be
+    putting words in their mouth".** That was right while nobody had asked.
+    AGKI asked on 2026-09-01 - "add the most common qualifications and
+    specialization" - so migration 0013 seeds a starting list, and this note
+    is corrected rather than left contradicting the code beneath it.
+
+    The seed is a starting point, not a taxonomy: `is_active` retires a row
+    without deleting the links to it, `order` sets its place, and adding one
+    is a row here rather than a deploy.
+    """
+
+
+@admin.register(Qualification)
+class QualificationAdmin(TaxonomyAdmin):
+    """What a doctor is qualified as. AGKI's list to keep (design §4.3).
+
+    Replaces the free-text `CustomUser.qualifications`, which every doctor in
+    the database left empty - and which sat beside `Profile.expertise`, whose
+    one live value is "Cardiograph".
+    """
 
 
 admin.site.register(OtpToken)

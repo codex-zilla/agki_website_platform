@@ -1,1442 +1,272 @@
-{% load custom_filters %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Search Results - MediBook</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <style>
-        :root {
-            --primary-green: #2d5a2d;
-            --light-green: #4a7c59;
-            --gradient-green: linear-gradient(135deg, #2d5a2d 0%, #4a7c59 100%);
-            --accent-green: #7cc576;
-            --light-bg: #f8f9fa;
-            --dark-text: #333;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            color: var(--dark-text);
-            line-height: 1.6;
-            background: var(--light-bg);
-        }
-
-        /* Navigation */
-        .navbar {
-            background: white;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            padding: 1rem 0;
-        }
-
-        .navbar-brand {
-            font-size: 1.8rem;
-            font-weight: bold;
-            color: var(--primary-green) !important;
-        }
-
-        .nav-link {
-            color: var(--dark-text) !important;
-            font-weight: 500;
-            margin: 0 0.5rem;
-        }
-
-        .btn-login {
-            border: 2px solid var(--primary-green);
-            color: var(--primary-green);
-            padding: 0.5rem 1.5rem;
-            border-radius: 25px;
-            font-weight: 600;
-        }
-
-        /* Search Header */
-        .search-header {
-            background: white;
-            padding: 1.5rem 0;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            margin-bottom: 2rem;
-        }
-
-        .search-input-compact {
-            padding: 0.75rem 1rem 0.75rem 2.5rem;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            width: 100%;
-            font-size: 0.95rem;
-        }
-
-        .search-input-compact:focus {
-            outline: none;
-            border-color: var(--primary-green);
-        }
-
-        .input-wrapper {
-            position: relative;
-        }
-
-        .input-icon {
-            position: absolute;
-            left: 0.75rem;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--light-green);
-        }
-
-        .btn-search-compact {
-            background: var(--gradient-green);
-            color: white;
-            border: none;
-            padding: 0.75rem 2rem;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-        }
-
-        /* Filters Sidebar */
-        .filters-sidebar {
-            background: white;
-            padding: 1.5rem;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            position: sticky;
-            top: 20px;
-        }
-
-        .filter-title {
-            font-size: 1.2rem;
-            font-weight: 700;
-            color: var(--primary-green);
-            margin-bottom: 1.5rem;
-        }
-
-        .filter-group {
-            margin-bottom: 2rem;
-        }
-
-        .filter-group-title {
-            font-weight: 600;
-            color: var(--dark-text);
-            margin-bottom: 1rem;
-            font-size: 1rem;
-        }
-
-        .filter-option {
-            display: flex;
-            align-items: center;
-            margin-bottom: 0.75rem;
-            cursor: pointer;
-        }
-
-        .filter-option input[type="checkbox"] {
-            width: 18px;
-            height: 18px;
-            margin-right: 0.75rem;
-            cursor: pointer;
-            accent-color: var(--primary-green);
-        }
-
-        .filter-option label {
-            cursor: pointer;
-            font-size: 0.95rem;
-        }
-
-        .btn-clear-filters {
-            width: 100%;
-            padding: 0.75rem;
-            background: white;
-            border: 2px solid var(--primary-green);
-            color: var(--primary-green);
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .btn-clear-filters:hover {
-            background: var(--primary-green);
-            color: white;
-        }
-
-        /* Results Section */
-        .results-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
-        }
-
-        .results-count {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: var(--dark-text);
-        }
-
-        .sort-dropdown {
-            padding: 0.5rem 1rem;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            background: white;
-            cursor: pointer;
-            font-size: 0.95rem;
-        }
-
-        /* Doctor Card */
-        .doctor-card {
-            background: white;
-            border-radius: 12px;
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            transition: all 0.3s;
-        }
-
-        .doctor-card:hover {
-            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-            transform: translateY(-2px);
-        }
-
-        .doctor-header {
-            display: flex;
-            gap: 1.5rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .doctor-avatar {
-            width: 100px;
-            height: 100px;
-            border-radius: 12px;
-            object-fit: cover;
-            border: 3px solid var(--accent-green);
-        }
-
-        .doctor-info {
-            flex: 1;
-        }
-
-        .doctor-name {
-            font-size: 1.4rem;
-            font-weight: 700;
-            color: var(--primary-green);
-            margin-bottom: 0.25rem;
-        }
-
-        .doctor-specialty {
-            color: #666;
-            font-size: 1rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .doctor-location {
-            color: #888;
-            font-size: 0.9rem;
-            margin-bottom: 0.75rem;
-        }
-
-        .doctor-location i {
-            color: var(--light-green);
-            margin-right: 0.5rem;
-        }
-
-        .doctor-stats {
-            display: flex;
-            gap: 1.5rem;
-            flex-wrap: wrap;
-        }
-
-        .stat-item {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.9rem;
-        }
-
-        .stat-item i {
-            color: var(--accent-green);
-        }
-
-        .rating {
-            color: #ffc107;
-        }
-
-        .badge-teleconsult {
-            background: var(--accent-green);
-            color: white;
-            padding: 0.25rem 0.75rem;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            display: inline-block;
-        }
-
-        .badge-new-patients {
-            background: #17a2b8;
-            color: white;
-            padding: 0.25rem 0.75rem;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            display: inline-block;
-            margin-left: 0.5rem;
-        }
-
-        /* Time Slots Section */
-        .time-slots-section {
-            border-top: 2px solid #f0f0f0;
-            padding-top: 1.5rem;
-        }
-
-        .availability-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-        }
-
-        .availability-title {
-            font-weight: 600;
-            color: var(--primary-green);
-            font-size: 1.1rem;
-        }
-
-        .date-selector {
-            display: flex;
-            gap: 0.5rem;
-            overflow-x: auto;
-            padding-bottom: 0.5rem;
-            margin-bottom: 1rem;
-        }
-
-        .date-card {
-            min-width: 90px;
-            padding: 0.75rem;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s;
-            background: white;
-        }
-
-        .date-card:hover {
-            border-color: var(--primary-green);
-        }
-
-        .date-card.active {
-            background: var(--gradient-green);
-            color: white;
-            border-color: var(--primary-green);
-        }
-
-        .date-day {
-            font-size: 0.85rem;
-            font-weight: 600;
-            margin-bottom: 0.25rem;
-        }
-
-        .date-number {
-            font-size: 1.2rem;
-            font-weight: 700;
-        }
-
-        .date-month {
-            font-size: 0.8rem;
-        }
-
-        .time-slots-container {
-            display: flex;
-            gap: 0.75rem;
-            flex-wrap: wrap;
-        }
-
-        .time-slot {
-            padding: 0.75rem 1.25rem;
-            border: 2px solid var(--accent-green);
-            border-radius: 8px;
-            background: white;
-            color: var(--primary-green);
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-size: 0.95rem;
-        }
-
-        .time-slot:hover {
-            background: var(--primary-green);
-            color: white;
-            transform: scale(1.05);
-        }
-
-        .time-slot.booked {
-            background: #f0f0f0;
-            border-color: #ccc;
-            color: #999;
-            cursor: not-allowed;
-        }
-
-        .time-slot.booked:hover {
-            transform: none;
-        }
-
-        .show-more-slots {
-            margin-top: 1rem;
-            color: var(--primary-green);
-            font-weight: 600;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            border: none;
-            background: none;
-            padding: 0.5rem 0;
-        }
-
-        .show-more-slots:hover {
-            text-decoration: underline;
-        }
-
-        /* View Profile Button */
-        .btn-view-profile {
-            background: white;
-            border: 2px solid var(--primary-green);
-            color: var(--primary-green);
-            padding: 0.75rem 1.5rem;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            margin-top: 1rem;
-        }
-
-        .btn-view-profile:hover {
-            background: var(--primary-green);
-            color: white;
-        }
-
-        /* No Results */
-        .no-results {
-            text-align: center;
-            padding: 3rem;
-            background: white;
-            border-radius: 12px;
-        }
-
-        .no-results i {
-            font-size: 4rem;
-            color: #ccc;
-            margin-bottom: 1rem;
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .doctor-header {
-                flex-direction: column;
-            }
-
-            .doctor-avatar {
-                width: 80px;
-                height: 80px;
-            }
-
-            .filters-sidebar {
-                margin-bottom: 2rem;
-                position: relative;
-                top: 0;
-            }
-
-            .time-slots-container {
-                gap: 0.5rem;
-            }
-
-            .time-slot {
-                padding: 0.6rem 1rem;
-                font-size: 0.9rem;
-            }
-        }
-
-        /* Loading Animation */
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        .skeleton {
-            animation: pulse 1.5s ease-in-out infinite;
-            background: #e0e0e0;
-            border-radius: 4px;
-        }
-       /* Pagination Styles */
-        .pagination {
-            margin-top: 2rem;
-        }
-        
-        .page-link {
-            color: var(--primary-green);
-            border-color: #dee2e6;
-            padding: 0.5rem 0.75rem;
-            margin: 0 0.25rem;
-            border-radius: 8px;
-        }
-        
-        .page-link:hover {
-            background-color: var(--light-green);
-            color: white;
-            border-color: var(--light-green);
-        }
-        
-        .page-item.active .page-link {
-            background-color: var(--primary-green);
-            border-color: var(--primary-green);
-        }
-        
-        .page-item.disabled .page-link {
-            color: #6c757d;
-        }
-        
-        /* Hidden class for pagination */
-        .hidden {
-            display: none !important;
-        }
-
-        /* Loading State */
-        .loading {
-            opacity: 0.6;
-            pointer-events: none;
-        }
-
-        /* No Results State */
-        .no-results-message {
-            text-align: center;
-            padding: 3rem;
-            background: white;
-            border-radius: 12px;
-            margin-bottom: 2rem;
-        }
-
-        .no-results-message i {
-            font-size: 4rem;
-            color: #ccc;
-            margin-bottom: 1rem;
-        }
-
-        /* Filter Active State */
-        .filter-option.active {
-            background-color: #f0f7f0;
-            border-radius: 6px;
-            padding: 0.5rem;
-        }
-
-        /* Applied Filters */
-        .applied-filters {
-            margin-bottom: 1rem;
-            padding: 1rem;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        }
-
-        .filter-tag {
-            display: inline-flex;
-            align-items: center;
-            background: var(--gradient-green);
-            color: white;
-            padding: 0.4rem 0.8rem;
-            border-radius: 20px;
-            margin: 0.25rem;
-            font-size: 0.85rem;
-            font-weight: 600;
-        }
-
-        .filter-tag .remove {
-            margin-left: 0.5rem;
-            cursor: pointer;
-            opacity: 0.8;
-        }
-
-        .filter-tag .remove:hover {
-            opacity: 1;
-        }
-    </style>
-</head>
-<body>
-    <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg sticky-top">
-        <div class="container">
-            <a class="navbar-brand" href="{% url 'appointment_home' %}">
-                <i class="fas fa-heartbeat"></i> MediBook
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto align-items-center">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'appointment_home' %}">Home</a>
-                    </li>
-                    <li class="nav-item ms-3">
-                        <a href="{% url 'booking_id_lookup' %}">
-                            <button class="btn-login">Trace an Appointment</button>
-                        </a>
-                    </li>
-                </ul>
-            </div>
+{% extends "appointments/patient_base.html" %}
+
+{% comment %}
+The doctor list (design §6 step 2), rehoused on the shared patient chrome in
+plan 11.11. The content is what earlier phases built and is unchanged in
+substance: everything below is server-rendered. What was here before those
+phases was a client-side filter engine (gender, rating, experience, "Accepting
+New Patients") that filtered only the cards already on the page — over data
+that was, in two of the three cases, not real. `Rating` is a table nothing has
+ever written to, and the "accepting new patients" flag was a hardcoded `true`.
+
+Gone with the rehousing: the MediBook navbar, the second copy of the
+stylesheet, and an empty <footer> painted black with 3rem of padding, which
+rendered a black bar under every set of results.
+{% endcomment %}
+
+{% block page_css %}
+        .sr-bar {
+            background: var(--panel); border: 1px solid var(--line);
+            border-radius: var(--radius); box-shadow: var(--shadow);
+            padding: 1rem; margin-bottom: 1.25rem;
+        }
+        .sr-search { display: grid; gap: .6rem; }
+        @media (min-width: 760px) {
+            .sr-search { grid-template-columns: 1.2fr 1fr auto; align-items: end; }
+        }
+
+        .sr-layout { display: grid; gap: 1.25rem; align-items: start; }
+        @media (min-width: 1000px) { .sr-layout { grid-template-columns: 260px 1fr; } }
+
+        .sr-side { position: sticky; top: 5.5rem; }
+        @media (max-width: 999px) { .sr-side { position: static; } }
+
+        .sr-filters { display: grid; gap: .15rem; margin-bottom: 1rem; }
+        .sr-filter {
+            display: flex; justify-content: space-between; gap: .5rem;
+            padding: .45rem .6rem; border-radius: 8px; font-size: .89rem;
+            text-decoration: none; color: var(--ink-2);
+        }
+        .sr-filter:hover { background: var(--panel-2); color: var(--green); }
+        .sr-filter.active { background: #edf5ed; color: var(--green); font-weight: 600; }
+        .sr-filter.none { color: var(--dim); }
+        .sr-filter span { font-size: .8rem; color: var(--dim); white-space: nowrap; }
+
+        .sr-count { font-size: .92rem; color: var(--dim); margin-bottom: .85rem; }
+        .sr-count strong { color: var(--ink); }
+
+        .sr-doctor { margin-bottom: 1rem; }
+
+        .sr-head { display: flex; gap: 1rem; align-items: flex-start; }
+        .sr-avatar {
+            width: 56px; height: 56px; border-radius: 12px; object-fit: cover;
+            flex: 0 0 auto; border: 1px solid var(--line);
+        }
+        .sr-name { font-size: 1.05rem; color: var(--ink); font-weight: 700; }
+        .sr-specialty { font-size: .87rem; color: var(--green-mid); font-weight: 600; }
+        .sr-meta { font-size: .84rem; color: var(--dim); margin-top: .1rem; }
+
+        /* The card's second line: can this doctor be booked, how soon, and
+           how much is there. What stood here was every bookable time in the
+           next 30 days, grouped by day — 59 chips across 20 groups for the one
+           doctor in the current database, six such cards to a page. */
+        .sr-when {
+            display: flex; flex-wrap: wrap; gap: .5rem .9rem; align-items: center;
+            margin-top: .9rem; padding-top: .9rem; border-top: 1px solid #edf2ee;
+        }
+        .sr-next { font-size: .9rem; color: var(--ink); font-weight: 600; }
+        .sr-next time { font-variant-numeric: tabular-nums; }
+        .sr-volume { font-size: .82rem; color: var(--dim); }
+        .sr-go { margin-left: auto; }
+
+        .sr-pager {
+            display: flex; gap: .75rem; align-items: center; justify-content: center;
+            margin-top: 1.5rem; font-size: .9rem; color: var(--dim);
+        }
+{% endblock %}
+
+{% block content %}
+
+<div class="pt-page-head">
+    <div class="pt-eyebrow">{{ page_section }}</div>
+    <h1>{{ page_title }}</h1>
+    <p class="pt-lead">
+        Every time shown can still be booked. Pick one and tell us who you are —
+        the doctor confirms it afterwards.
+    </p>
+</div>
+
+<div class="sr-bar">
+    {% comment %}
+    A real GET form, not a JS listener: the filtering that matters happens in
+    the view, so a result page can be linked to, bookmarked and shared.
+    {% endcomment %}
+    <form class="sr-search" method="get" action="{% url 'search_results' %}">
+        <div>
+            <label class="pt-label" for="sr-specialty">Specialty</label>
+            <select class="pt-select" id="sr-specialty" name="specialty">
+                <option value="">All specialties</option>
+                {% for specialty in specialties %}
+                <option value="{{ specialty.slug }}"
+                        {% if specialty.slug == selected_specialty %}selected{% endif %}>
+                    {{ specialty.name }}{% if not specialty.bookable_doctors %} (none available){% endif %}
+                </option>
+                {% endfor %}
+            </select>
         </div>
-    </nav>
+        <div>
+            <label class="pt-label" for="sr-location">Region or town</label>
+            <input class="pt-input" type="text" id="sr-location" name="location"
+                   placeholder="Pwani, Kibaha…" value="{{ location_query }}">
+        </div>
+        <button type="submit" class="pt-btn">
+            <i class="fas fa-search"></i> Search
+        </button>
+    </form>
+</div>
 
-    <!-- Search Header -->
-    <div class="search-header">
-        <div class="container">
-            <div class="row g-2">
-                <div class="col-md-5">
-                    <div class="input-wrapper">
-                        <i class="fas fa-search input-icon"></i>
-                        <input type="text" class="search-input-compact" id="search-specialty" placeholder="Cardiologist" value="Cardiologist">
+<div class="sr-layout">
+    <aside class="sr-side">
+        <div class="pt-card">
+            <h2>Browse by specialty</h2>
+            <p class="pt-sub" style="margin-bottom: .75rem;">Counting doctors you can book now.</p>
+
+            <div class="sr-filters">
+                <a class="sr-filter {% if not selected_specialty %}active{% endif %}"
+                   href="{% url 'search_results' %}">All doctors</a>
+
+                {% for specialty in specialties %}
+                {% comment %}
+                A specialty with no bookable doctor is shown as unavailable
+                rather than as a link to an empty page — the template's old
+                "Popular Specialties" grid was a hardcoded list of links to
+                nothing at all (design §5.5).
+                {% endcomment %}
+                {% if specialty.bookable_doctors %}
+                <a class="sr-filter {% if specialty.slug == selected_specialty %}active{% endif %}"
+                   href="{% url 'search_results' %}?specialty={{ specialty.slug }}">
+                    {{ specialty.name }} <span>{{ specialty.bookable_doctors }}</span>
+                </a>
+                {% else %}
+                <span class="sr-filter none">{{ specialty.name }} <span>none available</span></span>
+                {% endif %}
+                {% empty %}
+                <p class="pt-sub">No specialties have been set up yet.</p>
+                {% endfor %}
+            </div>
+
+            <p class="pt-help">
+                Appointments need at least {{ booking_notice }} notice, so anything
+                sooner than that is not offered here.
+            </p>
+        </div>
+    </aside>
+
+    <div>
+        <div class="sr-count">
+            <strong>{{ result_count }} doctor{{ result_count|pluralize }}</strong>
+            {% if selected_specialty or location_query %}
+            matching your search — <a href="{% url 'search_results' %}">clear</a>
+            {% endif %}
+        </div>
+
+        {% for doctor_data in doctors_data %}
+        <div class="pt-card sr-doctor">
+            <div class="sr-head">
+                {% include "partials/avatar.html" with image=doctor_data.doctor.image alt=doctor_data.doctor.get_full_name css_class="sr-avatar" only %}
+                <div>
+                    <div class="sr-name">
+                        Dr. {{ doctor_data.doctor.get_full_name|default:doctor_data.doctor.username }}
                     </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="input-wrapper">
-                        <i class="fas fa-map-marker-alt input-icon"></i>
-                        <input type="text" class="search-input-compact" id="search-location" placeholder="Location" value="New York, NY">
+                    {% comment %}
+                    Qualifications come from `profile.qualifications` — the
+                    picked list — not from `doctor.qualifications`, the
+                    free-text field on `CustomUser` that plan 11.6 stopped
+                    writing to. Reading the old one here meant a doctor who
+                    picked "MD" saw it on their own profile preview and
+                    patients saw nothing (plan 11.7).
+                    {% endcomment %}
+                    <div class="sr-specialty">
+                        {% for specialty in doctor_data.specialties %}{{ specialty.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                        {% with quals=doctor_data.profile.qualifications.all %}
+                        {% if quals %}
+                            {% if doctor_data.specialties %} • {% endif %}
+                            {% for q in quals %}{{ q.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                        {% endif %}
+                        {% endwith %}
                     </div>
-                </div>
-                <div class="col-md-3">
-                    <button class="btn-search-compact w-100" id="search-button">
-                        <i class="fas fa-search"></i> Search
-                    </button>
+                    {% if doctor_data.profile.region or doctor_data.profile.location %}
+                    <div class="sr-meta">
+                        <i class="fas fa-map-marker-alt"></i>
+                        {{ doctor_data.profile.region }}{% if doctor_data.profile.location %} — {{ doctor_data.profile.location }}{% endif %}
+                        {% if doctor_data.profile.years_of_experience %}
+                        · {{ doctor_data.profile.years_of_experience }} years experience
+                        {% endif %}
+                    </div>
+                    {% elif doctor_data.profile.years_of_experience %}
+                    <div class="sr-meta">{{ doctor_data.profile.years_of_experience }} years experience</div>
+                    {% endif %}
+                    {% comment %}
+                    Removed in an earlier phase and not coming back: the rating
+                    stars, the "% Recommend" figure and the "Video
+                    Consultation" badge. The first two read an empty table
+                    (decision 7); the third asserted per-doctor what is
+                    actually negotiated per appointment in round 3 (§0.1).
+                    {% endcomment %}
                 </div>
             </div>
+
+            {% comment %}
+            One line instead of twenty. The soonest time is the most useful
+            fact about a doctor and it used to be buried as the first chip of
+            the first group; the count tells a patient whether it is worth
+            opening, since a doctor with two times left is a different
+            proposition from one with sixty.
+
+            A doctor with nothing free is still listed, and still says so. They
+            are a real doctor, and dropping them would make the practice look
+            smaller than it is (design §5.3) — but "See profile" rather than
+            "See times", because there are none.
+            {% endcomment %}
+            <div class="sr-when">
+                {% if doctor_data.next_slot %}
+                <span class="pt-chip ok">Bookable</span>
+                <span class="sr-next">
+                    Next:
+                    <time datetime="{{ doctor_data.next_slot.date|date:'Y-m-d' }}">
+                        {{ doctor_data.next_slot.date|date:'D j M' }},
+                        {{ doctor_data.next_slot.time|date:'g:i A' }}
+                    </time>
+                </span>
+                <span class="sr-volume">
+                    {{ doctor_data.slot_count }} time{{ doctor_data.slot_count|pluralize }}
+                    over {{ doctor_data.day_count }} day{{ doctor_data.day_count|pluralize }}
+                </span>
+                <a class="pt-btn sr-go" href="{% url 'doctor_detail' doctor_data.doctor.id %}">
+                    See times <i class="fas fa-arrow-right"></i>
+                </a>
+                {% else %}
+                <span class="pt-chip">No times published</span>
+                <span class="sr-volume">Nothing bookable in the next {{ horizon_days }} days.</span>
+                <a class="pt-btn ghost sr-go" href="{% url 'doctor_detail' doctor_data.doctor.id %}">
+                    See profile
+                </a>
+                {% endif %}
+            </div>
         </div>
+        {% empty %}
+        <div class="pt-card pt-empty">
+            <i class="fas fa-user-doctor"></i>
+            <h2>No doctors found</h2>
+            <p>Try a different specialty, or clear the search to see everyone.</p>
+            <p style="margin-top: 1rem;">
+                <a class="pt-btn ghost" href="{% url 'search_results' %}">Show all doctors</a>
+            </p>
+        </div>
+        {% endfor %}
+
+        {% if page.paginator.num_pages > 1 %}
+        <nav class="sr-pager" aria-label="Pages">
+            {% if page.has_previous %}
+            <a class="pt-btn ghost" href="?{% if selected_specialty %}specialty={{ selected_specialty }}&amp;{% endif %}{% if location_query %}location={{ location_query|urlencode }}&amp;{% endif %}page={{ page.previous_page_number }}">Previous</a>
+            {% endif %}
+            <span>Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+            {% if page.has_next %}
+            <a class="pt-btn ghost" href="?{% if selected_specialty %}specialty={{ selected_specialty }}&amp;{% endif %}{% if location_query %}location={{ location_query|urlencode }}&amp;{% endif %}page={{ page.next_page_number }}">Next</a>
+            {% endif %}
+        </nav>
+        {% endif %}
     </div>
+</div>
 
-    <!-- Main Content -->
-    <div class="container">
-        <div class="row">
-            <!-- Filters Sidebar -->
-            <div class="col-lg-3">
-                <div class="filters-sidebar">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h3 class="filter-title mb-0">Filters</h3>
-                        <span class="badge bg-primary" id="active-filter-count">0</span>
-                    </div>
-
-                    <!-- Gender Filter -->
-                    <div class="filter-group">
-                        <div class="filter-group-title">Gender</div>
-                        <div class="filter-option" data-filter-type="gender" data-filter-value="male">
-                            <input type="checkbox" id="male">
-                            <label for="male">Male</label>
-                        </div>
-                        <div class="filter-option" data-filter-type="gender" data-filter-value="female">
-                            <input type="checkbox" id="female">
-                            <label for="female">Female</label>
-                        </div>
-                    </div>
-
-                    <!-- Rating Filter -->
-                    <div class="filter-group">
-                        <div class="filter-group-title">Rating</div>
-                        <div class="filter-option" data-filter-type="rating" data-filter-value="5">
-                            <input type="checkbox" id="rating5">
-                            <label for="rating5">⭐ 5.0</label>
-                        </div>
-                        <div class="filter-option" data-filter-type="rating" data-filter-value="4">
-                            <input type="checkbox" id="rating4">
-                            <label for="rating4">⭐ 4.0+</label>
-                        </div>
-                        <div class="filter-option" data-filter-type="rating" data-filter-value="3">
-                            <input type="checkbox" id="rating3">
-                            <label for="rating3">⭐ 3.0+</label>
-                        </div>
-                    </div>
-
-                    <!-- Experience Filter -->
-                    <div class="filter-group">
-                        <div class="filter-group-title">Experience</div>
-                        <div class="filter-option" data-filter-type="experience" data-filter-value="10">
-                            <input type="checkbox" id="exp10">
-                            <label for="exp10">10+ years</label>
-                        </div>
-                        <div class="filter-option" data-filter-type="experience" data-filter-value="5">
-                            <input type="checkbox" id="exp5">
-                            <label for="exp5">5-10 years</label>
-                        </div>
-                        <div class="filter-option" data-filter-type="experience" data-filter-value="0">
-                            <input type="checkbox" id="exp0">
-                            <label for="exp0">0-5 years</label>
-                        </div>
-                    </div>
-
-                    <!-- Availability Filter -->
-                    <div class="filter-group">
-                        <div class="filter-group-title">Availability</div>
-                        <div class="filter-option" data-filter-type="availability" data-filter-value="today">
-                            <input type="checkbox" id="available-today">
-                            <label for="available-today">Available Today</label>
-                        </div>
-                        <div class="filter-option" data-filter-type="availability" data-filter-value="teleconsult">
-                            <input type="checkbox" id="teleconsult">
-                            <label for="teleconsult">Video Consultation</label>
-                        </div>
-                        <div class="filter-option" data-filter-type="availability" data-filter-value="new-patients">
-                            <input type="checkbox" id="new-patients">
-                            <label for="new-patients">Accepting New Patients</label>
-                        </div>
-                    </div>
-
-                    <button class="btn-clear-filters" id="clear-all-filters">
-                        Clear All Filters
-                    </button>
-                </div>
-            </div>
-
-            <!-- Results Section -->
-            <div class="col-lg-9">
-                <!-- Applied Filters -->
-                <div class="applied-filters hidden" id="applied-filters">
-                    <strong>Active Filters:</strong>
-                    <div id="filter-tags-container"></div>
-                </div>
-
-                <div class="results-header">
-                    <div class="results-count">
-                        <strong id="results-count">Loading...</strong>
-                    </div>
-                    <select class="sort-dropdown" id="sort-results">
-                        <option value="recommended">Sort by: Recommended</option>
-                        <option value="rating">Highest Rated</option>
-                        <option value="experience">Most Experienced</option>
-                        <option value="name">Name A-Z</option>
-                    </select>
-                </div>
-
-                <!-- Doctor Cards Container -->
-                <div id="doctor-cards-container">
-                    {% for doctor_data in doctors_data %}
-                    <div class="doctor-card" 
-                         data-doctor-id="{{ doctor_data.doctor.user.id }}"
-                         data-gender="{{ doctor_data.doctor.gender|lower }}"
-                         data-rating="{{ doctor_data.rating.average_rating }}"
-                         data-experience="{{ doctor_data.doctor.years_of_experience }}"
-                         data-specialty="{{ doctor_data.doctor.expertise|lower }}"
-                         data-location="{{ doctor_data.doctor.location|lower }}"
-                         data-availability-today="{% if date_range.0 in doctor_data.slots_by_date.keys %}true{% else %}false{% endif %}"
-                         data-teleconsult="true"
-                         data-new-patients="true">
-                        <div class="doctor-header">
-                            {% include "partials/avatar.html" with image=doctor_data.doctor.user.image alt=doctor_data.doctor.user.get_full_name css_class="doctor-avatar" only %}
-                            <div class="doctor-info">
-                                <h3 class="doctor-name">{{ doctor_data.doctor.user.first_name }} {{ doctor_data.doctor.user.last_name }}</h3>
-                                <div class="doctor-specialty">{{ doctor_data.doctor.expertise }} • {{ doctor_data.doctor.years_of_experience }} years experience • {{doctor_data.doctor.gender}}</div>
-                                
-                                <div class="doctor-location">
-                                    <i class="fas fa-map-marker-alt"></i>
-                                    {{ doctor_data.doctor.location }}
-                                </div>
-                                {% comment %} The rating and "% Recommend" stats are gone
-                                   (decision 7): both were computed from a table
-                                   nothing has ever written to, so they were a
-                                   fixed placeholder wearing the clothes of a
-                                   measurement. The rating *filter* in the
-                                   sidebar goes with the search rebuild (4.2). {% endcomment %}
-                                <div class="doctor-stats">
-                                    <div class="stat-item">
-                                        <i class="fas fa-briefcase"></i>
-                                        <span>{{ doctor_data.doctor.years_of_experience }} years experience</span>
-                                    </div>
-                                </div>
-                                <div style="margin-top: 0.75rem;">
-                                    <span class="badge-teleconsult">
-                                        <i class="fas fa-video"></i> Video Consultation
-                                    </span>
-                                    <span class="badge-new-patients">
-                                        <i class="fas fa-check-circle"></i> Accepting New Patients
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="time-slots-section">
-                            <div class="availability-header">
-                                <div class="availability-title">
-                                    <i class="fas fa-calendar-check"></i> Available Appointments
-                                </div>
-                            </div>
-
-                            <div class="date-selector">
-                                {% for date in date_range %}
-                                <div class="date-card {% if forloop.first %}active{% endif %}" 
-                                    data-date="{{ date|date:'Y-m-d' }}" 
-                                    data-doctor="{{ doctor_data.doctor.user.id }}">
-                                    <div class="date-day">
-                                        {% if forloop.first %}Today{% else %}{{ date|date:'D' }}{% endif %}
-                                    </div>
-                                    <div class="date-number">{{ date|date:'d' }}</div>
-                                    <div class="date-month">{{ date|date:'M' }}</div>
-                                </div>
-                                {% endfor %}
-                            </div>
-
-                            <div class="time-slots-container" id="slots-doctor-{{ doctor_data.doctor.user.id }}">
-                                {% with first_date=date_range.0 %}
-                                    {% if first_date in doctor_data.slots_by_date.keys %}
-                                        {% for slot in doctor_data.slots_by_date|get_item:first_date %}
-                                        <a href="{% url 'booking_form' slot.id %}">
-                                        <button class="time-slot {% if slot.is_booked %}booked{% endif %}" 
-                                                {% if slot.is_booked %}disabled{% endif %}
-                                                data-slot-id="{{ slot.id }}">
-                                            {{ slot.time|date:'g:i A' }}
-                                        </button>
-                                        </a>
-                                        {% endfor %}
-                                    {% else %}
-                                        <p class="no-slots">No available slots for this date</p>
-                                    {% endif %}
-                                {% endwith %}
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Hidden data for JavaScript -->
-                    <script type="application/json" id="slots-data-{{ doctor_data.doctor.user.id }}">
-                        {
-                            {% for date, slots in doctor_data.slots_by_date.items %}
-                            "{{ date|date:'Y-m-d' }}": [
-                                {% for slot in slots %}
-                                {
-                                    "id": {{ slot.id }},
-                                    "time": "{{ slot.time|date:'g:i A' }}",
-                                    "is_booked": {% if slot.is_booked %}true{% else %}false{% endif %}
-                                }{% if not forloop.last %},{% endif %}
-                                {% endfor %}
-                            ]{% if not forloop.last %},{% endif %}
-                            {% endfor %}
-                        }
-                    </script>
-                    {% endfor %}
-                </div>
-
-                <!-- No Results Message -->
-                <div class="no-results-message hidden" id="no-results">
-                    <i class="fas fa-search"></i>
-                    <h3>No doctors found</h3>
-                    <p>Try adjusting your filters or search criteria</p>
-                    <button class="btn-clear-filters" id="reset-search">Reset Search</button>
-                </div>
-
-                <!-- Pagination -->
-                <nav aria-label="Page navigation" class="pagination-container">
-                    <ul class="pagination justify-content-center" id="pagination">
-                        <!-- Pagination will be generated by JavaScript -->
-                    </ul>
-                </nav>
-            </div>
-        </div>
-    </div>
-
-    <!-- Footer -->
-    <footer style="background: #1a1a1a; color: white; padding: 3rem 0 1rem; margin-top: 4rem;">
-        <!-- ... (footer content remains the same) ... -->
-    </footer>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Filter Configuration
-        const FILTER_CONFIG = {
-            itemsPerPage: 6,
-            visiblePages: 5,
-            filters: {
-                gender: [],
-                rating: [],
-                experience: [],
-                availability: [],
-                search: {
-                    specialty: '',
-                    location: ''
-                }
-            }
-        };
-
-        class FilterManager {
-            constructor() {
-                this.filters = JSON.parse(JSON.stringify(FILTER_CONFIG.filters));
-                this.allDoctorCards = Array.from(document.querySelectorAll('.doctor-card'));
-                this.filteredDoctorCards = [...this.allDoctorCards];
-                this.currentSort = 'recommended';
-                
-                this.init();
-            }
-
-            init() {
-                this.setupEventListeners();
-                this.updateResults();
-            }
-
-            setupEventListeners() {
-                // Filter checkboxes
-                document.querySelectorAll('.filter-option input[type="checkbox"]').forEach(checkbox => {
-                    checkbox.addEventListener('change', (e) => {
-                        this.handleFilterChange(e.target);
-                    });
-                });
-
-                // Search inputs
-                document.getElementById('search-specialty').addEventListener('input', (e) => {
-                    this.handleSearchChange('specialty', e.target.value);
-                });
-
-                document.getElementById('search-location').addEventListener('input', (e) => {
-                    this.handleSearchChange('location', e.target.value);
-                });
-
-                document.getElementById('search-button').addEventListener('click', () => {
-                    this.applySearchFilters();
-                });
-
-                // Sort dropdown
-                document.getElementById('sort-results').addEventListener('change', (e) => {
-                    this.currentSort = e.target.value;
-                    this.applySorting();
-                    this.updateResults();
-                });
-
-                // Clear filters
-                document.getElementById('clear-all-filters').addEventListener('click', () => {
-                    this.clearAllFilters();
-                });
-
-                // Reset search
-                document.getElementById('reset-search').addEventListener('click', () => {
-                    this.clearAllFilters();
-                });
-            }
-
-            handleFilterChange(checkbox) {
-                const filterOption = checkbox.closest('.filter-option');
-                const filterType = filterOption.dataset.filterType;
-                const filterValue = filterOption.dataset.filterValue;
-
-                if (checkbox.checked) {
-                    this.filters[filterType].push(filterValue);
-                    filterOption.classList.add('active');
-                } else {
-                    this.filters[filterType] = this.filters[filterType].filter(val => val !== filterValue);
-                    filterOption.classList.remove('active');
-                }
-
-                this.updateActiveFilterCount();
-                this.applyFilters();
-            }
-
-            handleSearchChange(type, value) {
-                this.filters.search[type] = value.toLowerCase().trim();
-            }
-
-            applySearchFilters() {
-                this.applyFilters();
-            }
-
-            applyFilters() {
-                this.filteredDoctorCards = this.allDoctorCards.filter(card => {
-                    return this.passesAllFilters(card);
-                });
-
-                this.applySorting();
-                this.updateResults();
-            }
-
-            passesAllFilters(card) {
-                // Gender filter
-                if (this.filters.gender.length > 0) {
-                    const cardGender = card.dataset.gender;
-                    if (!this.filters.gender.includes(cardGender)) {
-                        return false;
-                    }
-                }
-
-                // Rating filter
-                if (this.filters.rating.length > 0) {
-                    const cardRating = parseFloat(card.dataset.rating);
-                    let passesRating = false;
-                    
-                    this.filters.rating.forEach(ratingFilter => {
-                        const minRating = parseFloat(ratingFilter);
-                        if (cardRating >= minRating) {
-                            passesRating = true;
-                        }
-                    });
-                    
-                    if (!passesRating) return false;
-                }
-
-                // Experience filter
-                if (this.filters.experience.length > 0) {
-                    const cardExperience = parseInt(card.dataset.experience);
-                    let passesExperience = false;
-                    
-                    this.filters.experience.forEach(expFilter => {
-                        const minExp = parseInt(expFilter);
-                        if (expFilter === '10' && cardExperience >= 10) passesExperience = true;
-                        if (expFilter === '5' && cardExperience >= 5 && cardExperience < 10) passesExperience = true;
-                        if (expFilter === '0' && cardExperience < 5) passesExperience = true;
-                    });
-                    
-                    if (!passesExperience) return false;
-                }
-
-                // Availability filters
-                if (this.filters.availability.length > 0) {
-                    this.filters.availability.forEach(availabilityFilter => {
-                        if (availabilityFilter === 'today' && card.dataset.availabilityToday !== 'true') {
-                            return false;
-                        }
-                        if (availabilityFilter === 'teleconsult' && card.dataset.teleconsult !== 'true') {
-                            return false;
-                        }
-                        if (availabilityFilter === 'new-patients' && card.dataset.newPatients !== 'true') {
-                            return false;
-                        }
-                    });
-                }
-
-                // Search filters
-                if (this.filters.search.specialty) {
-                    const cardSpecialty = card.dataset.specialty;
-                    if (!cardSpecialty.includes(this.filters.search.specialty)) {
-                        return false;
-                    }
-                }
-
-                if (this.filters.search.location) {
-                    const cardLocation = card.dataset.location;
-                    if (!cardLocation.includes(this.filters.search.location)) {
-                        return false;
-                    }
-                }
-
-                return true;
-            }
-
-            applySorting() {
-                switch (this.currentSort) {
-                    case 'rating':
-                        this.filteredDoctorCards.sort((a, b) => 
-                            parseFloat(b.dataset.rating) - parseFloat(a.dataset.rating)
-                        );
-                        break;
-                    case 'experience':
-                        this.filteredDoctorCards.sort((a, b) => 
-                            parseInt(b.dataset.experience) - parseInt(a.dataset.experience)
-                        );
-                        break;
-                    case 'name':
-                        this.filteredDoctorCards.sort((a, b) => {
-                            const nameA = a.querySelector('.doctor-name').textContent.toLowerCase();
-                            const nameB = b.querySelector('.doctor-name').textContent.toLowerCase();
-                            return nameA.localeCompare(nameB);
-                        });
-                        break;
-                    default: // recommended
-                        // Keep original order or implement recommendation algorithm
-                        break;
-                }
-            }
-
-            updateResults() {
-                const resultsContainer = document.getElementById('doctor-cards-container');
-                const noResultsMessage = document.getElementById('no-results');
-                const appliedFilters = document.getElementById('applied-filters');
-
-                // Hide all cards first
-                this.allDoctorCards.forEach(card => {
-                    card.classList.add('hidden');
-                });
-
-                // Show filtered cards
-                this.filteredDoctorCards.forEach(card => {
-                    card.classList.remove('hidden');
-                });
-
-                // Show/hide no results message
-                if (this.filteredDoctorCards.length === 0) {
-                    resultsContainer.classList.add('hidden');
-                    noResultsMessage.classList.remove('hidden');
-                    appliedFilters.classList.add('hidden');
-                } else {
-                    resultsContainer.classList.remove('hidden');
-                    noResultsMessage.classList.add('hidden');
-                    
-                    // Show applied filters if any active
-                    if (this.hasActiveFilters()) {
-                        appliedFilters.classList.remove('hidden');
-                        this.updateAppliedFiltersDisplay();
-                    } else {
-                        appliedFilters.classList.add('hidden');
-                    }
-                }
-
-                // Update pagination
-                if (window.paginationManager) {
-                    window.paginationManager.setDoctorCards(this.filteredDoctorCards);
-                    window.paginationManager.showPage(1);
-                }
-
-                this.updateResultsCount();
-            }
-
-            updateResultsCount() {
-                const countElement = document.getElementById('results-count');
-                const total = this.filteredDoctorCards.length;
-                
-                if (countElement) {
-                    countElement.textContent = `${total} Cardiologist${total !== 1 ? 's' : ''} found`;
-                }
-            }
-
-            updateActiveFilterCount() {
-                const countElement = document.getElementById('active-filter-count');
-                const total = this.countActiveFilters();
-                
-                if (countElement) {
-                    countElement.textContent = total;
-                    countElement.style.display = total > 0 ? 'inline-block' : 'none';
-                }
-            }
-
-            countActiveFilters() {
-                let count = 0;
-                Object.values(this.filters).forEach(filterArray => {
-                    if (Array.isArray(filterArray)) {
-                        count += filterArray.length;
-                    }
-                });
-                return count;
-            }
-
-            hasActiveFilters() {
-                return this.countActiveFilters() > 0 || 
-                       this.filters.search.specialty || 
-                       this.filters.search.location;
-            }
-
-            updateAppliedFiltersDisplay() {
-                const container = document.getElementById('filter-tags-container');
-                container.innerHTML = '';
-
-                // Gender filters
-                this.filters.gender.forEach(gender => {
-                    this.createFilterTag(container, `Gender: ${gender}`, 'gender', gender);
-                });
-
-                // Rating filters
-                this.filters.rating.forEach(rating => {
-                    this.createFilterTag(container, `Rating: ${rating}+`, 'rating', rating);
-                });
-
-                // Experience filters
-                this.filters.experience.forEach(exp => {
-                    let label = '';
-                    if (exp === '10') label = 'Experience: 10+ years';
-                    if (exp === '5') label = 'Experience: 5-10 years';
-                    if (exp === '0') label = 'Experience: 0-5 years';
-                    this.createFilterTag(container, label, 'experience', exp);
-                });
-
-                // Availability filters
-                this.filters.availability.forEach(avail => {
-                    let label = '';
-                    if (avail === 'today') label = 'Available Today';
-                    if (avail === 'teleconsult') label = 'Video Consultation';
-                    if (avail === 'new-patients') label = 'New Patients';
-                    this.createFilterTag(container, label, 'availability', avail);
-                });
-
-                // Search filters
-                if (this.filters.search.specialty) {
-                    this.createFilterTag(container, `Specialty: ${this.filters.search.specialty}`, 'search-specialty', this.filters.search.specialty);
-                }
-
-                if (this.filters.search.location) {
-                    this.createFilterTag(container, `Location: ${this.filters.search.location}`, 'search-location', this.filters.search.location);
-                }
-            }
-
-            createFilterTag(container, label, type, value) {
-                const tag = document.createElement('div');
-                tag.className = 'filter-tag';
-                tag.innerHTML = `
-                    ${label}
-                    <span class="remove" data-type="${type}" data-value="${value}">
-                        <i class="fas fa-times"></i>
-                    </span>
-                `;
-                
-                tag.querySelector('.remove').addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this.removeFilter(type, value);
-                });
-                
-                container.appendChild(tag);
-            }
-
-            removeFilter(type, value) {
-                if (type.startsWith('search-')) {
-                    const searchType = type.replace('search-', '');
-                    this.filters.search[searchType] = '';
-                    document.getElementById(`search-${searchType}`).value = '';
-                } else {
-                    this.filters[type] = this.filters[type].filter(val => val !== value);
-                    
-                    // Uncheck the corresponding checkbox
-                    const checkbox = document.querySelector(`.filter-option[data-filter-type="${type}"][data-filter-value="${value}"] input`);
-                    if (checkbox) {
-                        checkbox.checked = false;
-                        checkbox.closest('.filter-option').classList.remove('active');
-                    }
-                }
-                
-                this.updateActiveFilterCount();
-                this.applyFilters();
-            }
-
-            clearAllFilters() {
-                // Reset filter state
-                this.filters = JSON.parse(JSON.stringify(FILTER_CONFIG.filters));
-                
-                // Uncheck all checkboxes
-                document.querySelectorAll('.filter-option input[type="checkbox"]').forEach(checkbox => {
-                    checkbox.checked = false;
-                    checkbox.closest('.filter-option').classList.remove('active');
-                });
-                
-                // Clear search inputs
-                document.getElementById('search-specialty').value = 'Cardiologist';
-                document.getElementById('search-location').value = 'New York, NY';
-                this.filters.search.specialty = 'cardiologist';
-                this.filters.search.location = 'new york, ny';
-                
-                // Reset sort
-                document.getElementById('sort-results').value = 'recommended';
-                this.currentSort = 'recommended';
-                
-                this.updateActiveFilterCount();
-                this.applyFilters();
-            }
-        }
-
-        class PaginationManager {
-            constructor(doctorCards) {
-                this.currentPage = 1;
-                this.doctorCards = doctorCards;
-                this.totalItems = this.doctorCards.length;
-                this.totalPages = Math.ceil(this.totalItems / FILTER_CONFIG.itemsPerPage);
-                
-                this.init();
-            }
-
-            setDoctorCards(doctorCards) {
-                this.doctorCards = doctorCards;
-                this.totalItems = this.doctorCards.length;
-                this.totalPages = Math.ceil(this.totalItems / FILTER_CONFIG.itemsPerPage);
-                this.showPage(1);
-            }
-
-            init() {
-                this.setupPagination();
-                this.showPage(1);
-            }
-
-            setupPagination() {
-                const paginationContainer = document.getElementById('pagination');
-                
-                // Clear existing pagination
-                paginationContainer.innerHTML = '';
-
-                if (this.totalPages <= 1) {
-                    paginationContainer.classList.add('hidden');
-                    return;
-                }
-
-                paginationContainer.classList.remove('hidden');
-
-                // Previous button
-                const prevLi = this.createPaginationItem('Previous', this.currentPage > 1, () => this.previousPage());
-                paginationContainer.appendChild(prevLi);
-
-                // Page numbers
-                const pages = this.getVisiblePages();
-                pages.forEach(page => {
-                    const pageLi = this.createPaginationItem(
-                        page, 
-                        true, 
-                        () => this.showPage(page),
-                        page === this.currentPage
-                    );
-                    paginationContainer.appendChild(pageLi);
-                });
-
-                // Next button
-                const nextLi = this.createPaginationItem('Next', this.currentPage < this.totalPages, () => this.nextPage());
-                paginationContainer.appendChild(nextLi);
-            }
-
-            createPaginationItem(text, enabled, onClick, isActive = false) {
-                const li = document.createElement('li');
-                li.className = `page-item ${!enabled ? 'disabled' : ''} ${isActive ? 'active' : ''}`;
-                
-                const link = document.createElement('a');
-                link.className = 'page-link';
-                link.href = '#';
-                link.textContent = text;
-                
-                if (enabled && !isActive) {
-                    link.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        onClick();
-                    });
-                }
-                
-                li.appendChild(link);
-                return li;
-            }
-
-            getVisiblePages() {
-                const half = Math.floor(FILTER_CONFIG.visiblePages / 2);
-                let start = Math.max(1, this.currentPage - half);
-                let end = Math.min(this.totalPages, start + FILTER_CONFIG.visiblePages - 1);
-                
-                // Adjust start if we're near the end
-                if (end - start + 1 < FILTER_CONFIG.visiblePages) {
-                    start = Math.max(1, end - FILTER_CONFIG.visiblePages + 1);
-                }
-                
-                const pages = [];
-                for (let i = start; i <= end; i++) {
-                    pages.push(i);
-                }
-                return pages;
-            }
-
-            showPage(page) {
-                this.currentPage = page;
-                
-                // Hide all cards
-                this.doctorCards.forEach(card => {
-                    card.classList.add('hidden');
-                });
-                
-                // Show cards for current page
-                const startIndex = (page - 1) * FILTER_CONFIG.itemsPerPage;
-                const endIndex = startIndex + FILTER_CONFIG.itemsPerPage;
-                
-                for (let i = startIndex; i < endIndex && i < this.doctorCards.length; i++) {
-                    this.doctorCards[i].classList.remove('hidden');
-                }
-                
-                this.setupPagination();
-                
-                // Scroll to top of results
-                document.getElementById('doctor-cards-container').scrollIntoView({ 
-                    behavior: 'smooth', 
-                    block: 'start' 
-                });
-            }
-
-            previousPage() {
-                if (this.currentPage > 1) {
-                    this.showPage(this.currentPage - 1);
-                }
-            }
-
-            nextPage() {
-                if (this.currentPage < this.totalPages) {
-                    this.showPage(this.currentPage + 1);
-                }
-            }
-        }
-
-        // Initialize the application
-        document.addEventListener('DOMContentLoaded', function() {
-            // Initialize filter manager
-            const filterManager = new FilterManager();
-            
-            // Initialize pagination with all cards
-            window.paginationManager = new PaginationManager(filterManager.filteredDoctorCards);
-
-            // Date selector functionality
-            document.querySelectorAll('.date-card').forEach(card => {
-                card.addEventListener('click', function() {
-                    const date = this.getAttribute('data-date');
-                    const doctorId = this.getAttribute('data-doctor');
-                    
-                    // Remove active class from siblings in this doctor's card
-                    this.parentElement.querySelectorAll('.date-card').forEach(c => {
-                        c.classList.remove('active');
-                    });
-                    
-                    // Add active class to clicked card
-                    this.classList.add('active');
-                    
-                    // Get slots data for this doctor
-                    const slotsDataElement = document.getElementById(`slots-data-${doctorId}`);
-                    if (!slotsDataElement) return;
-                    
-                    const slotsData = JSON.parse(slotsDataElement.textContent);
-                    
-                    // Update time slots
-                    const slotsContainer = document.getElementById(`slots-doctor-${doctorId}`);
-                    const slots = slotsData[date] || [];
-                    
-                    if (slots.length === 0) {
-                        slotsContainer.innerHTML = '<p class="no-slots">No available slots for this date</p>';
-                    } else {
-                        slotsContainer.innerHTML = slots.map(slot => `
-                            <a href="/appointments/book/${slot.id}/">
-                                <button class="time-slot ${slot.is_booked ? 'booked' : ''}" 
-                                        ${slot.is_booked ? 'disabled' : ''}
-                                        data-slot-id="${slot.id}">
-                                    ${slot.time}
-                                </button>
-                            </a>
-                        `).join('');
-                    }
-                });
-            });
-
-            // Show more slots functionality
-            document.querySelectorAll('.show-more-slots').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const container = this.previousElementSibling;
-                    const additionalSlots = ['6:00 PM', '6:30 PM', '7:00 PM', '7:30 PM'];
-                    
-                    additionalSlots.forEach(time => {
-                        const slot = document.createElement('button');
-                        slot.className = 'time-slot';
-                        slot.textContent = time;
-                        container.appendChild(slot);
-                    });
-                    
-                    this.innerHTML = '<i class="fas fa-chevron-up"></i> Show less';
-                    this.onclick = function() {
-                        const slots = container.querySelectorAll('.time-slot');
-                        for(let i = 5; i < slots.length; i++) {
-                            slots[i].remove();
-                        }
-                        this.innerHTML = '<i class="fas fa-chevron-down"></i> Show more times';
-                        this.onclick = null;
-                        document.querySelectorAll('.show-more-slots').forEach(b => {
-                            b.addEventListener('click', arguments.callee);
-                        });
-                    };
-                });
-            });
-        });
-    </script>
-</body>
-</html>
+{% endblock %}

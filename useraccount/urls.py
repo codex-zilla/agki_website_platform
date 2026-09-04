@@ -37,6 +37,11 @@ urlpatterns = [
     path('signin/', views.signin, name='signin'),
     path('verify-email/<str:username>/', views.verify_email, name='verify-email'),
     path('resend-otp/', views.resend_otp, name='resend-otp'),
+    path(
+        'verify-email/<str:username>/resend/',
+        views.resend_verification,
+        name='resend-verification',
+    ),
     path('otp/', views.otp_view, name='otp'), # otp for login verification
 
     # Password reset URLs
@@ -64,7 +69,12 @@ urlpatterns = [
     path('register/', views.register_user, name='register'),
     path('login/', views.login_user, name='login'),
     path('logout/', views.logout_user, name='api-logout'),
-    path('profile/', views.get_user_profile, name='profile'),
+    # `path('profile/', views.get_user_profile, name='profile')` stood here.
+    # Both this and the page view above were registered at `profile/` with the
+    # name `profile`, so the page won resolution and **this API view was
+    # unreachable** - dead code behind a live URL, which the plan already
+    # listed under `useraccount` debris. Given its own path and name (11.6).
+    path('api/profile/', views.get_user_profile, name='api-profile'),
     path('profile/update/', views.update_user_profile, name='update-profile'),
     path('change-password/', views.change_password, name='change-password'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),

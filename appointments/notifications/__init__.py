@@ -66,7 +66,7 @@ def message_context(event, appointment, audience, extra=None):
 
 def render_message(event, appointment, audience, extra=None):
     context = message_context(event, appointment, audience, extra)
-    subject = event.subject.format(**context)
+    subject = event.subject_for(audience).format(**context)
     body = render_to_string(event.body_template, context)
     return subject, body.strip() + "\n"
 

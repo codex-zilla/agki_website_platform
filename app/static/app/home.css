@@ -344,6 +344,7 @@ a {
     font-weight: 600;
     gap: 11px;
     padding: 15px 21px;
+    text-decoration: none;
     transition: box-shadow 0.2s ease, transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
 }
 
@@ -368,6 +369,39 @@ a {
 
 .hero-button-secondary:hover {
     background: #fff;
+    border-color: #16804a;
+    box-shadow: 0 10px 22px rgba(11, 43, 29, 0.07);
+    color: #0e633a;
+    transform: translateY(-2px);
+}
+
+/* The clinicians' route in: a button like the two beside it, third in rank.
+   The first attempt made it a bare text link, on the theory that three filled
+   buttons compete - which is true, and produced something that read as an
+   accident rather than a choice. Outlined and unfilled says "also a control,
+   less urgent". No border at all just says "unstyled".
+
+   `text-decoration` is set explicitly here and above. Bootstrap's reboot
+   underlines every <a>, and the only thing standing between that and every
+   button on this page is a blanket `a { text-decoration: none }` 340 lines
+   up. A button should not depend on a rule it never mentions. */
+.hero-button-tertiary {
+    align-items: center;
+    background: transparent;
+    border: 1px solid #d3e2d8;
+    border-radius: 15px;
+    color: #2f5c42;
+    display: inline-flex;
+    font-size: 0.96rem;
+    font-weight: 600;
+    gap: 11px;
+    padding: 15px 21px;
+    text-decoration: none;
+    transition: box-shadow 0.2s ease, transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.hero-button-tertiary:hover {
+    background: rgba(255, 255, 255, 0.72);
     border-color: #16804a;
     box-shadow: 0 10px 22px rgba(11, 43, 29, 0.07);
     color: #0e633a;
@@ -1022,8 +1056,11 @@ a {
         margin: 15px 0 25px;
     }
 
+    /* Wrap is back on, but the two buttons still share one row: with
+       `flex-basis: 0` they shrink rather than wrap, and only the tertiary —
+       which asks for a full line — is pushed below them. */
     .hero-actions {
-        flex-wrap: nowrap;
+        flex-wrap: wrap;
         gap: 10px;
     }
 
@@ -1032,6 +1069,14 @@ a {
         flex: 1 1 0;
         justify-content: center;
         min-width: 0;
+        padding: 12px 14px;
+        font-size: 0.82rem;
+        gap: 7px;
+    }
+
+    .hero-button-tertiary {
+        flex: 1 1 100%;
+        justify-content: center;
         padding: 12px 14px;
         font-size: 0.82rem;
         gap: 7px;
@@ -1067,6 +1112,7 @@ a {
 
     .hero-button-primary,
     .hero-button-secondary,
+    .hero-button-tertiary,
     .nav-appointment {
         transition: none;
     }

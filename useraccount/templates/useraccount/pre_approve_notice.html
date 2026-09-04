@@ -500,15 +500,15 @@
                     </div>
                     
                     <div class="activation-content">
-                        <h2>Email Successfully Activated!</h2>
+                        <h2>Your account is ready</h2>
                         
-                        <p>Congratulations! Your email address has been successfully verified and your account activation is now in progress.</p>
+                        <p>Your email address is verified and your account is active. You can sign in now &mdash; there is nothing left to wait for.</p>
                         
                         <div class="highlight-box">
-                            <p><i class="fas fa-info-circle"></i> Your account will be accessible for login once it has been reviewed and approved by our administration team.</p>
+                            <p><i class="fas fa-info-circle"></i> Sign in with the email address and password you registered with.</p>
                         </div>
                         
-                        <p>An approval confirmation email will be sent to your registered email address once your account has been approved. You will be able to log in and access all features only after receiving this approval notification.</p>
+                        <p>Patients can only book times you have published, so the first thing worth doing is adding your availability from the dashboard.</p>
                         
                         <!-- Status Timeline -->
                         <div class="status-timeline">
@@ -518,19 +518,18 @@
                                 </div>
                                 <div class="status-text">Registration</div>
                             </div>
-                            <div class="status-step active">
+                            <div class="status-step completed">
                                 <div class="status-icon">
                                     <i class="fas fa-envelope"></i>
                                 </div>
                                 <div class="status-text">Email Verified</div>
                             </div>
-                            <div class="status-step">
-                                <div class="status-icon">
-                                    <i class="fas fa-user-shield"></i>
-                                </div>
-                                <div class="status-text">Admin Approval</div>
-                            </div>
-                            <div class="status-step">
+                            {% comment %}
+                            An "Admin Approval" step sat here until plan 10.5. There is no such
+                            step under decision F, and a timeline that shows one implies somebody
+                            is working through a queue on the reader's behalf.
+                            {% endcomment %}
+                            <div class="status-step completed">
                                 <div class="status-icon">
                                     <i class="fas fa-check-circle"></i>
                                 </div>
@@ -540,24 +539,24 @@
                         
                         <!-- Notification Card -->
                         <div class="notification-card">
-                            <h4><i class="fas fa-bell"></i> What happens next?</h4>
+                            <h4><i class="fas fa-bell"></i> What to do next</h4>
                             <ul>
-                                <li><strong>Immediate:</strong> Your email has been verified successfully</li>
-                                <li><strong>Within 24-48 hours:</strong> Our admin team will review your registration</li>
-                                <li><strong>Upon approval:</strong> You will receive an approval email notification</li>
-                                <li><strong>After approval:</strong> You can log in and access the platform</li>
+                                <li><strong>Sign in</strong> with your registered email address and password</li>
+                                <li><strong>Complete your profile</strong> so patients can see your specialty and where you practise</li>
+                                <li><strong>Publish your availability</strong> &mdash; patients can only book times you have added</li>
+                                <li><strong>Answer booking requests</strong> from your dashboard; a request nobody confirms expires and releases the time</li>
                             </ul>
                         </div>
                         
                         <div class="activation-footer">
-                            <p>If you don't receive an approval email within 48 hours, please check your spam folder or <a href="mailto:support@agkimedicallaboratory.co.tz">contact our support team</a>.</p>
+                            <p>Trouble signing in? <a href="mailto:support@agkimedicallaboratory.co.tz">Contact our support team</a>.</p>
                             
                             <div class="mt-4">
-                                <a href="{% url 'home' %}" class="btn-primary-custom">
-                                    <i class="fas fa-home me-2"></i>Back to Home
+                                <a href="{% url 'signin' %}" class="btn-primary-custom">
+                                    <i class="fas fa-sign-in-alt me-2"></i>Sign in
                                 </a>
-                                <a href="{% url 'signin' %}" class="btn-secondary-custom">
-                                    <i class="fas fa-sign-in-alt me-2"></i>Go to Login
+                                <a href="{% url 'home' %}" class="btn-secondary-custom">
+                                    <i class="fas fa-home me-2"></i>Back to Home
                                 </a>
                             </div>
                         </div>
@@ -576,36 +575,36 @@
                         <div class="accordion-item mb-3">
                             <h2 class="accordion-header">
                                 <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
-                                    Why is admin approval required?
+                                    Do I need to be approved before I can sign in?
                                 </button>
                             </h2>
                             <div id="faq1" class="accordion-collapse collapse show" data-bs-parent="#faqAccordion">
                                 <div class="accordion-body">
-                                    To ensure the security and integrity of our healthcare platform, all new registrations require manual verification by our administration team. This helps us maintain a trusted environment for both patients and healthcare professionals.
+                                    No. Verifying your email address was the only step, and you have completed it. AGKI Medical Laboratory can withdraw access to an account later &mdash; if that ever happens you will be told so when you try to sign in &mdash; but nothing is holding your account now.
                                 </div>
                             </div>
                         </div>
                         <div class="accordion-item mb-3">
                             <h2 class="accordion-header">
                                 <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
-                                    How long does approval take?
+                                    How do patients find me?
                                 </button>
                             </h2>
                             <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
                                 <div class="accordion-body">
-                                    Typically, account approvals are processed within 24-48 hours during business days. If you haven't received approval after 48 hours, please check your spam folder or contact our support team.
+                                    You appear on the public doctor list once you have published availability, and patients can only request the times you have added. Filling in your specialty and the area you practise in makes you findable by patients searching for either.
                                 </div>
                             </div>
                         </div>
                         <div class="accordion-item mb-3">
                             <h2 class="accordion-header">
                                 <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">
-                                    What if I need immediate access?
+                                    What if I cannot sign in?
                                 </button>
                             </h2>
                             <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
                                 <div class="accordion-body">
-                                    If you require urgent access to our services, please contact our support team directly at +255 717 308 796 or email support@agkimedicallaboratory.co.tz with your registration details.
+                                    Check that you are using the email address you registered with. If it still refuses, contact our support team on +255 717 308 796 or at support@agkimedicallaboratory.co.tz with your registration details.
                                 </div>
                             </div>
                         </div>
@@ -668,59 +667,6 @@
             }
         });
 
-        // Auto-update timeline status (simulated)
-        function updateTimelineStatus() {
-            const steps = document.querySelectorAll('.status-step');
-            
-            // Simulate admin approval after 3 seconds
-            setTimeout(() => {
-                steps[2].classList.add('completed');
-                steps[2].classList.remove('active');
-                steps[3].classList.add('active');
-                
-                // Show success message
-                showSuccessMessage();
-            }, 3000);
-        }
-
-        function showSuccessMessage() {
-            // Create success notification
-            const notification = document.createElement('div');
-            notification.className = 'alert alert-success alert-dismissible fade show';
-            notification.style.cssText = `
-                position: fixed;
-                top: 100px;
-                right: 20px;
-                z-index: 1000;
-                max-width: 400px;
-                box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-                border-radius: 10px;
-                border: none;
-                background: linear-gradient(135deg, #7cc576, #91d68a);
-                color: white;
-            `;
-            
-            notification.innerHTML = `
-                <div style="display: flex; align-items: center;">
-                    <i class="fas fa-check-circle me-3" style="font-size: 1.5rem;"></i>
-                    <div>
-                        <strong>Account Approved!</strong>
-                        <div>Your account has been approved. You can now log in.</div>
-                    </div>
-                </div>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close" style="filter: brightness(0) invert(1);"></button>
-            `;
-            
-            document.body.appendChild(notification);
-            
-            // Auto-remove after 5 seconds
-            setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.remove();
-                }
-            }, 5000);
-        }
-
         // Initialize timeline animation
         setTimeout(() => {
             const timelineSteps = document.querySelectorAll('.status-step');
@@ -731,41 +677,17 @@
             });
         }, 500);
 
-        // Countdown timer for estimated approval time
-        function startCountdown() {
-            const countdownElement = document.getElementById('countdown');
-            if (!countdownElement) return;
-            
-            let hours = 48;
-            let minutes = 0;
-            
-            function updateCountdown() {
-                countdownElement.textContent = `${hours}h ${minutes}m`;
-                
-                if (minutes === 0) {
-                    if (hours === 0) {
-                        countdownElement.textContent = "Under review";
-                        return;
-                    }
-                    hours--;
-                    minutes = 59;
-                } else {
-                    minutes--;
-                }
-            }
-            
-            updateCountdown();
-            setInterval(updateCountdown, 60000); // Update every minute
-        }
-
         // Initialize when page loads
         document.addEventListener('DOMContentLoaded', function() {
-            // Start simulated timeline updates (for demo only)
-            // setTimeout(updateTimelineStatus, 5000);
-            
-            // Start countdown timer
-            startCountdown();
-            
+            {% comment %}
+            Three demo functions were removed here by plan 10.5: a timer that faked
+            admin approval after 3 seconds and popped an "Account Approved!" toast, a
+            48-hour countdown to a review that never happened, and a "Check Approval
+            Status" button that approved the account on a 2-second delay. All three
+            simulated a step decision F deleted. Two were merely commented out rather
+            than called, which is exactly how they survived -- and a commented-out
+            demo is still served to the browser (plan 4.2a).
+            {% endcomment %}
             // Add hover effects to buttons
             const buttons = document.querySelectorAll('.btn-primary-custom, .btn-secondary-custom');
             buttons.forEach(button => {
@@ -788,45 +710,6 @@
             }, 300);
         });
 
-        // Email check simulation (for demo purposes)
-        function simulateEmailCheck() {
-            const emailCheckBtn = document.createElement('button');
-            emailCheckBtn.className = 'btn-secondary-custom mt-3';
-            emailCheckBtn.innerHTML = '<i class="fas fa-sync-alt me-2"></i>Check Approval Status';
-            emailCheckBtn.style.display = 'block';
-            emailCheckBtn.style.margin = '20px auto 0';
-            
-            const activationBody = document.querySelector('.activation-body');
-            activationBody.appendChild(emailCheckBtn);
-            
-            emailCheckBtn.addEventListener('click', function() {
-                this.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Checking...';
-                this.disabled = true;
-                
-                setTimeout(() => {
-                    this.innerHTML = '<i class="fas fa-clock me-2"></i>Status: Pending Approval';
-                    this.style.background = '#f8f9fa';
-                    this.style.color = '#666';
-                    this.style.borderColor = '#dee2e6';
-                    
-                    setTimeout(() => {
-                        this.innerHTML = '<i class="fas fa-check-circle me-2"></i>Approved! You can now log in';
-                        this.style.background = 'linear-gradient(45deg, var(--accent-green), #91d68a)';
-                        this.style.color = 'white';
-                        this.style.borderColor = 'transparent';
-                        
-                        // Enable login
-                        const loginBtn = document.querySelector('a[href*="signin"]');
-                        loginBtn.classList.remove('btn-secondary-custom');
-                        loginBtn.classList.add('btn-primary-custom');
-                        loginBtn.innerHTML = '<i class="fas fa-sign-in-alt me-2"></i>Login Now';
-                    }, 2000);
-                }, 1500);
-            });
-        }
-
-        // Uncomment to enable email check simulation (for demo)
-        // setTimeout(simulateEmailCheck, 2000);
     </script>
 </body>
 </html>

@@ -26,11 +26,21 @@ class Event:
     name: str
     audience: tuple
     subject: str
+    #: Per-audience subject overrides. Most events read the same to both
+    #: parties ("Appointment cancelled: AGKI-2026-12345"), but some do not:
+    #: "New appointment request: Asha Mbwana" is what the *doctor* needs in
+    #: their inbox and is nonsense in the patient's, since they are the one who
+    #: made the request. The body templates already branch on `is_patient`;
+    #: without this the subject line was the one part that could not.
+    subjects: dict = field(default_factory=dict)
     #: Template under appointments/notifications/, without the .txt
     template: str = ""
     #: Channels to deliver on. Email only today; adding "sms" here is the
     #: entire change needed once SmsChannel is implemented.
     channels: tuple = ("email",)
+
+    def subject_for(self, audience):
+        return self.subjects.get(audience, self.subject)
 
     @property
     def body_template(self):
@@ -46,28 +56,39 @@ class Event:
 
 BOOKED = Event(
     name="appointment.booked",
-    audience=(PROVIDER,),
+    # Both, and the doctor is the half decision 8 is about. The patient half
+    # was added with the booking flow (plan 4.6): design §6 step 4 requires
+    # them to be told their reference *and what happens next*, because what
+    # happens next is a wait for someone else — the old page promised an
+    # instant confirmation this flow cannot deliver.
+    audience=(PROVIDER, PATIENT),
     subject="New appointment request: {appointment.fullName} on {slot_date}",
-)
-TIME_CONFIRMED = Event(
-    name="appointment.time_confirmed",
-    audience=(PATIENT,),
-    subject="Your appointment time is confirmed - please choose how to meet",
+    subjects={PATIENT: "We have your booking request - reference {booking_id}"},
 )
 TIME_DECLINED = Event(
     name="appointment.time_declined",
     audience=(PATIENT,),
     subject="Your requested appointment time is not available",
 )
-MODE_PROPOSED = Event(
-    name="appointment.mode_proposed",
-    audience=(PROVIDER,),
-    subject="{appointment.fullName} chose how to meet - please confirm",
-)
-MODE_CONFIRMED = Event(
-    name="appointment.mode_confirmed",
+# One confirmation, so one message (AGKI, 2026-09-03). This replaces
+# `time_confirmed` (*"please choose how to meet"*), `mode_proposed` (*"the
+# patient chose, please confirm"*) and `mode_confirmed` — three messages that
+# only existed to carry a negotiation between two rounds that no longer
+# happens. The patient hears once, and what they hear is that it is settled.
+CONFIRMED = Event(
+    name="appointment.confirmed",
     audience=(PATIENT,),
-    subject="Your appointment is confirmed",
+    subject="Your appointment is confirmed - {booking_id}",
+)
+# Sent instead of the above when the doctor confirmed a **different** way of
+# meeting from the one asked for. It is still one decision and one message, but
+# it is not the same message: "confirmed" and "confirmed, though not the way
+# you asked" are different facts, and a patient who is now expected to travel
+# needs to be told plainly rather than left to spot it in a details table.
+CONFIRMED_OTHER_MODE = Event(
+    name="appointment.confirmed_other_mode",
+    audience=(PATIENT,),
+    subject="Your appointment is confirmed, with a change - {booking_id}",
 )
 CANCELLED = Event(
     name="appointment.cancelled",
@@ -91,10 +112,9 @@ REGISTRY = {
     event.name: event
     for event in (
         BOOKED,
-        TIME_CONFIRMED,
         TIME_DECLINED,
-        MODE_PROPOSED,
-        MODE_CONFIRMED,
+        CONFIRMED,
+        CONFIRMED_OTHER_MODE,
         CANCELLED,
         EXPIRED,
         COMPLETED,
