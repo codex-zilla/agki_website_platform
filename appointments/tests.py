@@ -29,6 +29,8 @@ from django.core import mail
 from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.contrib.messages import get_messages
+from django.conf import settings as django_settings
+from django.core.management.base import CommandError
 from django.core.management import call_command
 from django.db import IntegrityError
 from django.db.models import ProtectedError
@@ -49,6 +51,8 @@ from appointments.management.commands.audit_appointment_data import (
 import inspect
 from django.db import IntegrityError, transaction
 from appointments import models as appointment_models
+import requests
+from appointments.notifications import beem
 from appointments.access import has_appointment_access
 from appointments.journey import journey_before_booking, journey_for
 from appointments.notifications import deliver, delivery_mode, notify
@@ -1441,7 +1445,11 @@ class NotifyApiTests(NotificationTestCase):
         # nowhere to go, that must be recorded rather than dropped.
         skipped = NotificationLog.objects.get(status=NotificationLog.Status.SKIPPED)
         self.assertEqual(skipped.event, "appointment.booked")
-        self.assertIn("No email address", skipped.error)
+        # The message names the whole order, not one channel: since plan 13.1
+        # a skip means every channel was tried and none could reach them,
+        # which is a different and more serious fact than "no email address".
+        self.assertIn("No way to reach the provider", skipped.error)
+        self.assertEqual(skipped.audience, "provider")
 
     def test_the_message_body_is_stored_not_just_the_fact_of_it(self):
         """"Did the patient get told, and what did it say?" is one question in
@@ -1731,13 +1739,20 @@ class SmsSeamTests(NotificationTestCase):
 
     def test_sending_it_fails_loudly_and_is_recorded(self):
         """It must not silently look like a success, and it must not take the
-        booking down with it."""
+        booking down with it.
+
+        The provider call reaches Beem
+        now (plan 13.1), which with no credentials configured - the state of
+        every test run and every developer laptop - refuses before making a
+        request. Different exception, same contract: recorded, not sent, and
+        the booking unharmed."""
         message = notify(self.ONE_RECIPIENT, self.appointment, channels=("sms",))[0]
 
         call_command("send_pending_notifications", stdout=StringIO())
 
         message.refresh_from_db()
-        self.assertIn("NotImplementedError", message.error)
+        self.assertIn("SmsError", message.error)
+        self.assertIn("not configured", message.error)
         self.assertNotEqual(message.status, NotificationLog.Status.SENT)
 
 
@@ -3816,33 +3831,54 @@ class DoctorPageTests(FlowTestCase):
         # Monday first, so the day-of-week headings line up with the cells.
         self.assertEqual(weeks[0][0]["date"].weekday(), 0)
 
-    def test_the_grid_covers_the_whole_horizon_with_nothing_to_navigate(self):
-        """Thirty days is five or six rows. Drawing a month at a time would
-        need a second parameter saying which month is on screen, separate from
-        the day whose times are listed below it."""
-        weeks = self.page().context["weeks"]
+    def test_the_grid_covers_the_period_on_screen_and_opens_on_today(self):
+        """**This test asserted the wrong thing for four days and passed on
+        luck.**
+
+        Written in plan 11.16, when the calendar drew the whole 30-day horizon
+        at once. Plan 11.17 replaced that with a navigable week/month, so the
+        grid covers the *period* and the rest of the horizon is reached with
+        the arrows - but the assertion kept saying "the last cell is at or past
+        the horizon", and stayed green while the padded end of September
+        happened to fall beyond it. On 7 September it stopped: the horizon
+        moved to 7 October and September's grid ends on the 4th.
+
+        A date-dependent assertion that survives its own premise is worse than
+        one that fails immediately, so this now asserts the two things that are
+        actually true and stay true: the default view contains today, and the
+        grid spans the period padded to whole weeks."""
+        response = self.page()
+        weeks = response.context["weeks"]
         dates = [day["date"] for week in weeks for day in week]
         today = timezone.localdate()
-        horizon = today + timedelta(days=self.settings_row.booking_horizon_days)
 
-        self.assertLessEqual(min(dates), today)
-        self.assertGreaterEqual(max(dates), horizon)
+        self.assertIn(today, dates)
+        self.assertTrue(response.context["is_current_period"])
+        # Padded to whole Monday-Sunday weeks, which is what makes a month
+        # render as a month.
+        self.assertEqual(min(dates).weekday(), 0)
+        self.assertEqual(max(dates).weekday(), 6)
+        self.assertEqual(len(dates) % 7, 0)
 
-    def test_days_outside_the_horizon_are_marked_as_such(self):
-        """They are drawn because a week has seven days, not because they are
-        offers."""
+    def test_days_outside_the_period_are_marked_as_such(self):
+        """They are drawn because a week has seven days, not because the
+        period reaches them - the page dims them for exactly that reason.
+
+        It does **not** assert they hold nothing: a padded day at the end of a
+        month is a real date, and a doctor with a time on 1 October is offering
+        it whether or not the patient is looking at September. Asserting zero
+        there passed only while no fixture happened to land in the padding."""
         weeks = self.page().context["weeks"]
-        today = timezone.localdate()
+        period_start = self.page().context["period_start"]
 
-        outside = [
-            day for week in weeks for day in week
-            if not day["in_period"]
-        ]
+        outside = [day for week in weeks for day in week if not day["in_period"]]
 
         self.assertTrue(outside)
         for day in outside:
             with self.subTest(date=day["date"]):
-                self.assertEqual(day["count"], 0)
+                self.assertTrue(
+                    day["date"] < period_start or day["date"].month != period_start.month
+                )
 
     def test_a_nonsense_date_leaves_it_shut_rather_than_500ing(self):
         """It arrives from history, from a bookmark taken weeks ago, and from
@@ -4263,3 +4299,513 @@ class SlotModeTests(TestCase):
                     [value for value, _ in slot.offered_modes],
                     [Appointment.Mode.PATIENT_TRAVELS],
                 )
+
+
+SMS_ON = dict(BEEM_API_KEY="test-key", BEEM_SECRET_KEY="test-secret", BEEM_SENDER_ID="AGKI")
+
+
+def fake_response(status_code=200, payload=None, text=""):
+    """Enough of a `requests` response for the client to read."""
+    response = mock.Mock()
+    response.status_code = status_code
+    response.text = text or json.dumps(payload or {})
+    response.json.return_value = payload if payload is not None else {}
+    return response
+
+
+def accepted():
+    return {"successful": True, "request_id": 35918915, "code": 100,
+            "message": "Message Submitted Successfully", "valid": 1,
+            "invalid": 0, "duplicates": 0}
+
+
+class TanzanianNumberTests(TestCase):
+    """`0712 345 678`, `+255712345678` and `255712345678` are one person.
+
+    The gateway accepts one of those forms, so this function is the difference
+    between a delivered message and a rejected one - and patients type all
+    three (plan 13.1).
+    """
+
+    def test_the_forms_people_actually_type_all_normalise(self):
+        for typed in (
+            "0712345678", "+255712345678", "255712345678", "0712 345 678",
+            "+255 712 345 678", "255-712-345-678", "712345678",
+        ):
+            with self.subTest(typed=typed):
+                self.assertEqual(beem.normalise(typed), "255712345678")
+
+    def test_both_mobile_prefixes_are_accepted(self):
+        """Tanzanian mobiles begin 6 or 7 after the country code."""
+        self.assertEqual(beem.normalise("0655912841"), "255655912841")
+        self.assertEqual(beem.normalise("0745680053"), "255745680053")
+
+    def test_something_that_cannot_receive_an_sms_is_refused(self):
+        """Refused here rather than paid for and rejected at the gateway. The
+        message is marked failed with a reason a person can read."""
+        for wrong in ("", "12345", "0812345678", "+254712345678", "not a phone"):
+            with self.subTest(value=wrong):
+                with self.assertRaises(ValueError):
+                    beem.normalise(wrong)
+
+
+@override_settings(**SMS_ON)
+class BeemClientTests(TestCase):
+    """The provider call itself, with `requests` mocked.
+
+    Mocked rather than hitting the gateway: a test suite that spends TZS 16 a
+    run and fails when the office wifi does is not a test suite.
+    """
+
+    def post(self, **response):
+        return mock.patch(
+            "appointments.notifications.beem.requests.post",
+            return_value=fake_response(**response),
+        )
+
+    def test_it_sends_what_the_gateway_documents(self):
+        with self.post(payload=accepted()) as posted:
+            beem.send("0712345678", "Hello", reference="agki-7")
+
+        url, kwargs = posted.call_args[0][0], posted.call_args[1]
+        self.assertTrue(url.endswith("/v1/send"))
+        self.assertEqual(kwargs["json"], {
+            "source_addr": "AGKI", "encoding": 0, "schedule_time": "",
+            "message": "Hello",
+            "recipients": [{"recipient_id": "agki-7", "dest_addr": "255712345678"}],
+        })
+        self.assertTrue(kwargs["headers"]["Authorization"].startswith("Basic "))
+
+    def test_it_returns_the_gateway_message_id(self):
+        with self.post(payload=accepted()):
+            self.assertEqual(beem.send("0712345678", "Hello"), "35918915")
+
+    def test_no_credentials_means_no_request_at_all(self):
+        with override_settings(BEEM_API_KEY="", BEEM_SECRET_KEY="", BEEM_SENDER_ID=""):
+            with mock.patch(
+                "appointments.notifications.beem.requests.post"
+            ) as posted:
+                with self.assertRaises(beem.SmsError):
+                    beem.send("0712345678", "Hello")
+
+        posted.assert_not_called()
+
+    def test_an_http_error_carries_the_gateway_s_own_reason(self):
+        """Their 401 says whether the key is wrong or the account is
+        suspended, and that sentence is what somebody will act on."""
+        with self.post(status_code=401, text="Invalid API key"):
+            with self.assertRaises(beem.SmsError) as refused:
+                beem.send("0712345678", "Hello")
+
+        self.assertIn("401", str(refused.exception))
+        self.assertIn("Invalid API key", str(refused.exception))
+
+    def test_a_rejection_is_a_failure_even_though_the_http_call_worked(self):
+        """HTTP 200 with REJECTED inside is the shape that would otherwise be
+        recorded as sent: the gateway answered, and nobody got a message. The
+        two rejections that will really happen are an empty account and a
+        sender ID not yet approved on a network."""
+        rejected = {"successful": False, "code": 102,
+                    "message": "Insufficient balance"}
+
+        with self.post(payload=rejected):
+            with self.assertRaises(beem.SmsError) as refused:
+                beem.send("0712345678", "Hello")
+
+        self.assertIn("Insufficient balance", str(refused.exception))
+
+    def test_an_unreachable_gateway_is_a_failure_not_a_crash(self):
+        with mock.patch(
+            "appointments.notifications.beem.requests.post",
+            side_effect=requests.ConnectionError("no route"),
+        ):
+            with self.assertRaises(beem.SmsError):
+                beem.send("0712345678", "Hello")
+
+
+@override_settings(NOTIFICATIONS_DELIVERY="queued")
+class SmsAndEmailTests(FlowTestCase):
+    """Both channels, whenever both can reach the person (AGKI, 2026-09-04).
+
+    13.1 sent one or the other, with email as a fallback. AGKI corrected it
+    from the deployment rather than the design: most patients here do not read
+    email often, so the text is the message that *arrives* - and the email is
+    the copy that still has the booking reference in it next week.
+    """
+
+    def test_without_credentials_nothing_changes(self):
+        """A laptop, a staging box, or the day before the gateway account
+        exists: queueing SMS there would fill the outbox with rows that can
+        only fail, three attempts each."""
+        notify("appointment.confirmed", self.make_appointment())
+
+        self.assertEqual(
+            {m.channel for m in NotificationLog.objects.all()}, {"email"}
+        )
+
+    @override_settings(**SMS_ON)
+    def test_everybody_reachable_gets_both(self):
+        """The doctor is given a number here because the shared fixture has
+        none - which is its own case, covered below."""
+        CustomUser.objects.filter(pk=self.doctor.pk).update(phone="0745680053")
+        appointment = Appointment.objects.select_related("slot__user").get(
+            pk=self.make_appointment().pk
+        )
+        NotificationLog.objects.all().delete()
+
+        notify("appointment.booked", appointment)
+        queued = NotificationLog.objects.all()
+
+        self.assertEqual(queued.count(), 4)
+        for audience, address, channel in (
+            ("patient", "0712345678", "sms"),
+            ("patient", "asha@example.com", "email"),
+            ("provider", "0745680053", "sms"),
+            ("provider", self.doctor.email, "email"),
+        ):
+            with self.subTest(audience=audience, channel=channel):
+                self.assertTrue(
+                    queued.filter(
+                        audience=audience, recipient=address, channel=channel
+                    ).exists()
+                )
+
+    @override_settings(**SMS_ON)
+    def test_each_channel_gets_its_own_words(self):
+        """An SMS is 160 characters and the email confirmation runs to about
+        five hundred. Reusing one for the other would bill four segments a
+        message, and read like a letter on a phone screen."""
+        appointment = self.make_appointment()
+        NotificationLog.objects.all().delete()
+
+        notify("appointment.confirmed", appointment)
+
+        text = NotificationLog.objects.get(channel="sms").body.strip()
+        email = NotificationLog.objects.get(channel="email").body.strip()
+
+        self.assertLessEqual(len(text), 160)
+        self.assertIn("CONFIRMED", text)
+        self.assertGreater(len(email), 160)
+        self.assertNotEqual(text, email)
+
+    @override_settings(**SMS_ON)
+    def test_the_text_can_be_acted_on_without_the_email(self):
+        """AGKI's reason for wanting links in the text: a patient who does not
+        open email gets a message they can do nothing with otherwise - no way
+        to see the appointment, and no way to cancel it."""
+        appointment = self.make_appointment()
+        NotificationLog.objects.all().delete()
+
+        notify("appointment.confirmed", appointment)
+
+        text = NotificationLog.objects.get(channel="sms").body
+        self.assertIn(
+            reverse("appointment_short_link", args=[appointment.bookingID]), text
+        )
+
+    @override_settings(**SMS_ON)
+    def test_a_confirmed_online_appointment_texts_the_meeting_link(self):
+        """The one detail a patient cannot get any other way at the moment
+        they need it."""
+        appointment = self.make_appointment(
+            appointmentMode=Appointment.Mode.ONLINE,
+            meeting_url="https://meet.example/agki-1",
+        )
+        NotificationLog.objects.all().delete()
+
+        notify("appointment.confirmed", appointment)
+
+        self.assertIn(
+            "https://meet.example/agki-1",
+            NotificationLog.objects.get(channel="sms").body,
+        )
+
+    @override_settings(**SMS_ON)
+    def test_somebody_with_no_phone_number_still_gets_the_email(self):
+        """A person gets the channels that can reach them, which for a doctor
+        who never gave a phone number is one of the two - not a skip, and not
+        a queued SMS to an empty string."""
+        CustomUser.objects.filter(pk=self.doctor.pk).update(phone="")
+        appointment = Appointment.objects.select_related("slot__user").get(
+            pk=self.make_appointment().pk
+        )
+        NotificationLog.objects.all().delete()
+
+        notify("appointment.booked", appointment)
+        queued = NotificationLog.objects.all()
+
+        self.assertEqual(
+            {m.channel for m in queued.filter(audience="patient")}, {"sms", "email"}
+        )
+        self.assertEqual(
+            {m.channel for m in queued.filter(audience="provider")}, {"email"}
+        )
+        self.assertFalse(queued.filter(status=NotificationLog.Status.SKIPPED))
+
+    @override_settings(**SMS_ON)
+    def test_a_failed_sms_does_not_take_the_email_with_it(self):
+        """The reason sending both is *safer* than falling back, not merely
+        more expensive: the email is already queued, so a rejected text - a
+        wrong number, a sender ID not yet approved on that network - costs the
+        text and nothing else."""
+        appointment = self.make_appointment()
+        NotificationLog.objects.all().delete()
+        notify("appointment.confirmed", appointment)
+
+        with mock.patch(
+            "appointments.notifications.beem.send",
+            side_effect=beem.SmsError("REJECTED_ROUTE_NOT_AVAILABLE"),
+        ):
+            for _ in range(NotificationLog.MAX_ATTEMPTS):
+                call_command("send_pending_notifications", stdout=StringIO())
+
+        text = NotificationLog.objects.get(channel="sms")
+        email = NotificationLog.objects.get(channel="email")
+        self.assertEqual(text.status, NotificationLog.Status.FAILED)
+        self.assertEqual(email.status, NotificationLog.Status.SENT)
+
+    @override_settings(**SMS_ON)
+    def test_a_failure_queues_nothing_new(self):
+        """`_fall_back()` was deleted with this change (plan 13.3). A failed
+        message must not re-queue itself under another name - the audit trail
+        would grow a row nobody sent."""
+        appointment = self.make_appointment()
+        NotificationLog.objects.all().delete()
+        notify("appointment.confirmed", appointment)
+        before = NotificationLog.objects.count()
+
+        with mock.patch(
+            "appointments.notifications.beem.send",
+            side_effect=beem.SmsError("nope"),
+        ), mock.patch(
+            "appointments.notifications.channels.EmailChannel.send",
+            side_effect=OSError("mail server refused"),
+        ):
+            for _ in range(NotificationLog.MAX_ATTEMPTS):
+                call_command("send_pending_notifications", stdout=StringIO())
+
+        self.assertEqual(NotificationLog.objects.count(), before)
+
+    @override_settings(**SMS_ON)
+    def test_a_delivered_sms_is_marked_sent(self):
+        appointment = self.make_appointment()
+        NotificationLog.objects.all().delete()
+        notify("appointment.confirmed", appointment)
+
+        with mock.patch(
+            "appointments.notifications.beem.requests.post",
+            return_value=fake_response(payload=accepted()),
+        ):
+            call_command("send_pending_notifications", stdout=StringIO())
+
+        text = NotificationLog.objects.get(channel="sms")
+        self.assertEqual(text.status, NotificationLog.Status.SENT)
+        self.assertIsNotNone(text.sent_at)
+
+
+@override_settings(SITE_URL="https://agkimedicallab.co.tz")
+class SmsCopyTests(TestCase):
+    """Every SMS template, measured against a real domain.
+
+    Two things here cost money quietly and nothing else in the system would
+    notice: a template that grows past a segment, and a character that is not
+    in the GSM-7 alphabet. `SITE_URL` is pinned to a domain the length of the
+    real one, because the links these carry are most of their length and a
+    test passing against `127.0.0.1:8000` would prove nothing (plan 13.3).
+    """
+
+    #: One SMS is 160 GSM-7 characters; past that it is split and each part is
+    #: charged, at 153 characters per part. Two is the ceiling agreed when the
+    #: texts started carrying links - the short URL is what keeps most of them
+    #: at one.
+    MAX_SEGMENTS = 2
+
+    @staticmethod
+    def segments(body):
+        return 1 if len(body) <= 160 else -(-len(body) // 153)
+
+    def rendered_messages(self):
+        """Every SMS this system can send, in **every mode it can carry**.
+
+        A ceiling measured on one mode is not a ceiling, and the first version
+        of this measured the wrong one: it used `online`, whose label is the
+        shortest of the three and which is the only mode that can carry a
+        meeting link. That made the messages look comfortably short while
+        `provider_travels` - "Provider travels to the patient", 31 characters
+        against "online call"'s 11 - was the case that would actually spill
+        into a second segment. Two mutations went unnoticed because of it.
+
+        So: three modes, a meeting link on the one that can have one, a
+        December date and a long domain.
+        """
+        from django.template.loader import render_to_string
+        from appointments.notifications import message_context
+
+        doctor = make_staff_user(
+            username="sms-copy-doctor", email="sms-copy@example.com",
+            role=CustomUser.Role.DOCTOR, first_name="Anna", last_name="Magembe",
+        )
+        slot = AvailableSlot.objects.create(
+            user=doctor, date=date(2026, 12, 31), time=time(15, 30),
+        )
+        appointment = Appointment.objects.create(
+            fullName="Asha Mbwana", birthDate=date(1990, 5, 1),
+            gender=Appointment.Gender.FEMALE, email="asha@example.com",
+            phone="0712345678", visitType=Appointment.VisitType.NEW_PATIENT,
+            reasonVisit=Appointment.ReasonForVisit.LAB_TEST, slot=slot,
+            appointmentMode=Appointment.Mode.ONLINE,
+        )
+
+        for mode in Appointment.Mode.values:
+            appointment.appointmentMode = mode
+            # Only an online appointment can carry one - pairing a meeting URL
+            # with a mode that travels is a state the flow cannot produce.
+            appointment.meeting_url = (
+                "https://meet.google.com/abc-defg-hij"
+                if mode == Appointment.Mode.ONLINE else ""
+            )
+            for event in event_registry.REGISTRY.values():
+                for audience in event.audience:
+                    context = message_context(
+                        event, appointment, audience,
+                        {"requested_mode": "Provider travels to the patient"},
+                    )
+                    body = render_to_string(
+                        event.template_for("sms"), context
+                    ).strip()
+                    yield event.name, audience, body
+
+    def test_no_sms_is_written_in_an_alphabet_that_halves_the_limit(self):
+        """**One character outside GSM-7 costs a segment on every message.**
+
+        A curly apostrophe, an en dash, an accented name: any of them switches
+        the whole message to UCS-2, where the limit falls from 160 characters
+        to 70. The templates are ASCII on purpose, and this is what keeps them
+        that way - it is not the kind of thing anyone notices in review, and
+        the bill is where it shows up.
+        """
+        for event, audience, body in self.rendered_messages():
+            with self.subTest(event=event, audience=audience):
+                outside = sorted({character for character in body if ord(character) > 127})
+                self.assertEqual(
+                    outside, [],
+                    "%s carries %r, which forces UCS-2 and a 70-character limit"
+                    % (event, outside),
+                )
+
+    def test_no_sms_costs_more_than_two_segments(self):
+        """A template that grows past this doubles what AGKI pays for that
+        event, for as long as nobody notices."""
+        for event, audience, body in self.rendered_messages():
+            with self.subTest(event=event, audience=audience):
+                self.assertTrue(body, "empty SMS body")
+                self.assertLessEqual(
+                    self.segments(body), self.MAX_SEGMENTS,
+                    "%s (%s) is %d characters - %d segments"
+                    % (event, audience, len(body), self.segments(body)),
+                )
+
+    def test_the_common_ones_still_fit_a_single_segment(self):
+        """The three a patient sees on an ordinary booking. Everything else is
+        allowed two; these are the volume, so they are held to one."""
+        common = {
+            ("appointment.booked", "patient"),
+            ("appointment.booked", "provider"),
+            ("appointment.confirmed", "patient"),
+        }
+
+        for event, audience, body in self.rendered_messages():
+            if (event, audience) not in common:
+                continue
+            with self.subTest(event=event, audience=audience):
+                self.assertEqual(
+                    self.segments(body), 1,
+                    "%s (%s) is %d characters - two segments on the message "
+                    "AGKI sends most often" % (event, audience, len(body)),
+                )
+
+    def test_every_text_can_be_acted_on(self):
+        """AGKI's instruction: most patients here do not read email often, so
+        a text with no way to act on it is a dead end. Every patient-facing
+        message carries a link - the booking, or the place to book again."""
+        for event, audience, body in self.rendered_messages():
+            if audience != "patient":
+                continue
+            with self.subTest(event=event):
+                self.assertIn("https://agkimedicallab.co.tz", body)
+
+    def test_every_event_has_an_sms_template(self):
+        """Otherwise the first SMS of that event fails at render time, in a
+        cron job, after the appointment has already moved."""
+        from django.template import TemplateDoesNotExist
+        from django.template.loader import get_template
+
+        for event in event_registry.REGISTRY.values():
+            with self.subTest(event=event.name):
+                try:
+                    get_template(event.template_for("sms"))
+                except TemplateDoesNotExist:
+                    self.fail("no SMS template for %s" % event.name)
+
+
+@override_settings(**SMS_ON)
+class SmsCheckCommandTests(TestCase):
+    """The network-free report and explicit live-send command."""
+
+    def run_it(self, *args, **kwargs):
+        out = StringIO()
+        call_command("sms_check", *args, stdout=out, **kwargs)
+        return out.getvalue()
+
+    def test_it_reports_without_touching_the_network(self):
+        with mock.patch(
+            "appointments.notifications.beem.requests.post"
+        ) as posted:
+            output = self.run_it()
+
+        posted.assert_not_called()
+        self.assertIn("Nothing sent", output)
+
+    def test_it_never_prints_the_key(self):
+        """A key pasted into a terminal is a key in somebody's scrollback, and
+        this is the command most likely to be run while screen-sharing."""
+        output = self.run_it()
+
+        self.assertNotIn("test-key", output)
+        self.assertIn("ends", output)
+
+    def test_it_warns_that_a_send_is_live(self):
+        self.assertIn("live and may consume credit", self.run_it())
+
+    @override_settings(SITE_URL="http://127.0.0.1:8000")
+    def test_it_warns_that_the_links_will_not_open(self):
+        self.assertIn("will not open on a phone", self.run_it())
+
+    @override_settings(BEEM_API_KEY="", BEEM_SECRET_KEY="", BEEM_SENDER_ID="")
+    def test_it_says_when_sms_is_off_entirely(self):
+        self.assertIn("No SMS will be queued", self.run_it())
+
+    def test_it_refuses_a_number_that_cannot_receive(self):
+        with self.assertRaises(CommandError):
+            self.run_it("--to", "0812345678")
+
+    def test_live_send_uses_beem_endpoint(self):
+        with mock.patch(
+            "appointments.notifications.beem.requests.post",
+            return_value=fake_response(payload=accepted()),
+        ) as posted:
+            self.run_it("--to", "0712345678")
+
+        self.assertTrue(
+            posted.call_args[0][0].endswith("/v1/send"),
+        )
+
+    def test_a_refusal_is_reported_as_a_command_error(self):
+        with mock.patch(
+            "appointments.notifications.beem.send",
+            side_effect=beem.SmsError("Insufficient balance"),
+        ):
+            with self.assertRaises(CommandError) as refused:
+                self.run_it("--to", "0712345678")
+
+        self.assertIn("Insufficient balance", str(refused.exception))

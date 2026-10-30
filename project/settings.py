@@ -412,6 +412,26 @@ DEFAULT_FROM_EMAIL = os.getenv(
 #
 # ROLLOUT: "queued" does nothing at all without the cron entry — see plan 3.7
 # and 9.12. That is the one failure mode of this design, and it is silent.
+# --- SMS, through Beem -----------------------------------------------------
+#
+# AGKI asked for text first and email behind it. The order is not set here: it
+# follows from whether the two values below are present, so a laptop or a
+# staging box with no gateway quietly stays email-only instead of queueing
+# messages that can only fail. `NOTIFICATION_CHANNELS` overrides that if AGKI
+# ever wants email first, or SMS alone.
+#
+# BEEM_SENDER_ID must be registered and approved in the Beem account.
+BEEM_API_KEY = os.getenv("BEEM_API_KEY", "")
+BEEM_SECRET_KEY = os.getenv("BEEM_SECRET_KEY", "")
+BEEM_SENDER_ID = os.getenv("BEEM_SENDER_ID", "")
+BEEM_BASE_URL = os.getenv("BEEM_BASE_URL", "https://apisms.beem.africa")
+BEEM_TIMEOUT = int(os.getenv("BEEM_TIMEOUT", "15"))
+
+# The suite must not behave differently on a machine that happens to have
+# gateway credentials in its `.env` - see the runner's own docstring.
+TEST_RUNNER = "project.test_runner.HermeticTestRunner"
+NOTIFICATION_CHANNELS = env_list("NOTIFICATION_CHANNELS")
+
 NOTIFICATIONS_DELIVERY = os.getenv(
     "NOTIFICATIONS_DELIVERY", "queued" if IS_PRODUCTION else "immediate"
 )

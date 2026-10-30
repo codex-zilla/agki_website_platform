@@ -172,6 +172,18 @@ class Appointment(models.Model):
         PROVIDER_TRAVELS = "provider_travels", "Provider travels to the patient"
         PATIENT_TRAVELS = "patient_travels", "Patient travels to the provider"
 
+    #: The same three modes in the fewest words that still say which is which.
+    #: A text message is charged by the character, and "Provider travels to the
+    #: patient" is 31 of them - a third of a segment spent on a phrase written
+    #: for a form label (plan 13.3). Neutral between the two readers on
+    #: purpose: the doctor's "you travel" and the patient's "the doctor
+    #: travels" would be two strings to keep in step for no gain.
+    SHORT_MODES = {
+        "online": "online call",
+        "provider_travels": "doctor travels",
+        "patient_travels": "at the lab",
+    }
+
     class VisitType(models.TextChoices):
         NEW_PATIENT = "new_patient", "New patient"
         FOLLOW_UP = "follow_up", "Follow-up"
@@ -345,6 +357,11 @@ class Appointment(models.Model):
         "An online appointment needs a meeting link. Confirming without one "
         "leaves both sides thinking it is settled with no way to meet."
     )
+
+    @property
+    def short_mode(self):
+        """The meeting mode in a handful of characters, for SMS."""
+        return self.SHORT_MODES.get(self.appointmentMode, "")
 
     def confirmation_problem(self):
         """Why this appointment cannot be confirmed yet, or None.
@@ -670,6 +687,12 @@ class NotificationLog(models.Model):
         null=True, blank=True,
     )
     event = models.CharField(max_length=50)
+    #: Who this was for. Needed since plan 13.1 so that a message which
+    #: fails on one channel can be re-rendered for the next one: the row
+    #: knows the address it tried, and an address is not a person - two
+    #: audiences can share one, and a phone number cannot be turned back
+    #: into "the patient" without guessing.
+    audience = models.CharField(max_length=20, blank=True)
     recipient = models.CharField(max_length=255)
     channel = models.CharField(max_length=10, choices=Channel.choices)
     status = models.CharField(

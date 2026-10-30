@@ -45,6 +45,9 @@ def message_context(event, appointment, audience, extra=None):
     the one thing that proves the record is theirs (design §8.1).
     """
     lookup = f"{_site_url()}{reverse('booking_id_lookup')}?bookingID={appointment.bookingID}"
+    # The same destination, 29 characters shorter, for the channel that is
+    # charged by the character (plan 13.3).
+    short = f"{_site_url()}{reverse('appointment_short_link', args=[appointment.bookingID])}"
     dashboard = f"{_site_url()}{reverse('doctor_appointment_details', args=[appointment.id])}"
     context = {
         "appointment": appointment,
@@ -57,6 +60,7 @@ def message_context(event, appointment, audience, extra=None):
         "is_patient": audience == PATIENT,
         "is_provider": audience == PROVIDER,
         "appointment_url": lookup,
+        "short_url": short,
         "dashboard_url": dashboard,
         "site_url": _site_url(),
     }
@@ -64,10 +68,16 @@ def message_context(event, appointment, audience, extra=None):
     return context
 
 
-def render_message(event, appointment, audience, extra=None):
+def render_message(event, appointment, audience, extra=None, channel="email"):
+    """The subject and body for one audience on one channel.
+
+    The subject is rendered for both channels and stored on both, though only
+    email shows it: `NotificationLog` is the audit trail as well as the queue,
+    and "what was this message about" should not depend on how it went out.
+    """
     context = message_context(event, appointment, audience, extra)
     subject = event.subject_for(audience).format(**context)
-    body = render_to_string(event.body_template, context)
+    body = render_to_string(event.template_for(channel), context)
     return subject, body.strip() + "\n"
 
 
@@ -81,24 +91,25 @@ def notify(event_name, appointment, to=None, channels=None, **extra):
     from appointments.models import NotificationLog
 
     event = event_registry.get(event_name)
+    order = tuple(channels or event.channels or site_channels())
     queued = []
 
-    for channel_name in channels or event.channels:
-        channel = channel_registry.get(channel_name)
-        for audience in event.audience:
+    # Every channel that can reach them, not the first one (AGKI, 2026-09-04).
+    # The text arrives; the email is the copy that still has the reference in
+    # it next week. A person with only one of the two gets that one, and only
+    # somebody with neither is recorded as skipped.
+    for audience in event.audience:
+        reached = False
+        for channel_name in order:
+            channel = channel_registry.get(channel_name)
             address = to or channel.address_for(audience, appointment)
             if not address:
-                # Nothing to send to — a provider with no phone number, say.
-                # Recorded rather than dropped: "we never had a way to reach
-                # them" is an answer, and silence is not.
-                NotificationLog.objects.create(
-                    appointment=appointment, event=event.name, recipient="",
-                    channel=channel_name, status=NotificationLog.Status.SKIPPED,
-                    error=f"No {channel_name} address for the {audience}.",
-                )
                 continue
 
-            subject, body = render_message(event, appointment, audience, extra)
+            reached = True
+            subject, body = render_message(
+                event, appointment, audience, extra, channel=channel_name
+            )
             queued.append(
                 NotificationLog.objects.create(
                     appointment=appointment,
@@ -106,9 +117,20 @@ def notify(event_name, appointment, to=None, channels=None, **extra):
                     recipient=address,
                     channel=channel_name,
                     status=NotificationLog.Status.PENDING,
+                    audience=audience,
                     subject=subject,
                     body=body,
                 )
+            )
+
+        if not reached:
+            # Recorded rather than dropped: "we never had a way to reach them"
+            # is an answer, and silence is not.
+            NotificationLog.objects.create(
+                appointment=appointment, event=event.name, recipient="",
+                channel=order[-1], status=NotificationLog.Status.SKIPPED,
+                audience=audience,
+                error=f"No way to reach the {audience} on {' or '.join(order)}.",
             )
 
     if delivery_mode() == "immediate":
@@ -122,6 +144,40 @@ def notify(event_name, appointment, to=None, channels=None, **extra):
 
 def delivery_mode():
     return getattr(settings, "NOTIFICATIONS_DELIVERY", "queued")
+
+
+def sms_is_configured():
+    """Has anybody actually set the gateway up?
+
+    Queueing SMS on a deployment with no credentials would fill the outbox
+    with rows that can only fail, three attempts each. The absence of a key is
+    a legitimate state - a developer's laptop, a staging box - not a
+    misconfiguration to shout about.
+    """
+    return bool(
+        getattr(settings, "BEEM_API_KEY", "")
+        and getattr(settings, "BEEM_SECRET_KEY", "")
+        and getattr(settings, "BEEM_SENDER_ID", "")
+    )
+
+
+def site_channels():
+    """Every channel a message goes out on, in order.
+
+    **SMS and email, both, whenever both can reach the person** (AGKI,
+    2026-09-04). 13.1 sent one or the other and used the second only as a
+    fallback; AGKI corrected it, and the reason is the deployment rather than
+    the design: most patients here do not read email often, so the text is the
+    message that arrives - and the email is the copy that still has the
+    booking reference in it next week when the text has scrolled away.
+
+    "First" survives as **order**, which is what the SMS templates are written
+    against: the text is the one that has to stand alone.
+    """
+    order = getattr(settings, "NOTIFICATION_CHANNELS", None)
+    if order:
+        return tuple(order)
+    return ("sms", "email") if sms_is_configured() else ("email",)
 
 
 def deliver(message):
@@ -170,6 +226,13 @@ def deliver(message):
     message.error = ""
     message.save(update_fields=["status", "sent_at", "error"])
     return True
+
+
+# `_fall_back()` stood here: it queued the next channel when one gave up for
+# good, which is what "SMS first, email second" needed while only one channel
+# was used at a time. Sending both up front (AGKI, 2026-09-04) makes it dead
+# code - a failed SMS has nothing left to chase, because the email was queued
+# beside it - and dead code that looks like a safety net is worse than none.
 
 
 def release_stale_claims():

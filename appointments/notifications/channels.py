@@ -17,6 +17,7 @@ integration, not a new data-capture form.
 from django.conf import settings
 from django.core.mail import send_mail
 
+from . import beem
 from .events import PATIENT, PROVIDER
 
 
@@ -56,12 +57,12 @@ class EmailChannel(Channel):
 
 
 class SmsChannel(Channel):
-    """Not implemented. Registered so the seam is real (decision 3).
+    """SMS through Beem.
 
-    What is missing is an account with a provider and a sender ID, not code:
-    see the notification services table in the implementation plan (Phase 3).
-    Until then, no template promises an SMS — a message telling a patient to
-    watch for a text that will never arrive is worse than sending nothing.
+    This was a stub that raised, kept honest by a test, so that the day a
+    provider was chosen the only unknown would be the provider's API. That is
+    how it turned out: the provider call lives in `beem.py` and this class
+    did not change shape at all.
     """
 
     name = "sms"
@@ -74,11 +75,21 @@ class SmsChannel(Channel):
         return None
 
     def send(self, message):
-        raise NotImplementedError(
-            "SmsChannel has no provider integration yet. Choose a provider, "
-            "add its credentials, and implement send() here; nothing else in "
-            "the notification layer needs to change."
-        )
+        # `reference` is the row's own id, so a message queried at the gateway
+        # months later can be tied back to the appointment it belongs to
+        # without keeping a second book of ids.
+        try:
+            beem.send(
+                to=message.recipient,
+                text=message.body,
+                reference=f"agki-{message.pk}",
+            )
+        except ValueError as unusable:
+            # A number that is not a Tanzanian mobile. Raised as the provider
+            # error so the drain records it and stops retrying something that
+            # cannot succeed by being tried again.
+            raise beem.SmsError(str(unusable)) from unusable
+
 
 
 REGISTRY = {channel.name: channel for channel in (EmailChannel(), SmsChannel())}

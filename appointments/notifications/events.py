@@ -35,16 +35,39 @@ class Event:
     subjects: dict = field(default_factory=dict)
     #: Template under appointments/notifications/, without the .txt
     template: str = ""
-    #: Channels to deliver on. Email only today; adding "sms" here is the
-    #: entire change needed once SmsChannel is implemented.
-    channels: tuple = ("email",)
+    #: Channels for this event specifically, in preference order. Empty means
+    #: "whatever the site is configured for", which is the normal case and is
+    #: resolved in `notifications.site_channels()`: SMS first and email behind
+    #: it once Beem credentials exist, email alone until they do.
+    #:
+    #: A deployment with no gateway configured must not queue SMS rows that
+    #: can only fail, and a test must not have to know whether SMS happens to
+    #: be switched on - which is why this is a site setting rather than seven
+    #: hard-coded tuples.
+    channels: tuple = ()
 
     def subject_for(self, audience):
         return self.subjects.get(audience, self.subject)
 
     @property
+    def slug(self):
+        return self.template or self.name.split(".")[-1]
+
+    @property
     def body_template(self):
-        return f"appointments/notifications/{self.template or self.name.split('.')[-1]}.txt"
+        return f"appointments/notifications/{self.slug}.txt"
+
+    def template_for(self, channel):
+        """The body to render for one channel.
+
+        SMS gets its **own** file rather than the email body, and that is not
+        tidiness: an SMS is 160 characters and the email confirmation runs to
+        about five hundred, so reusing it would bill four segments for every
+        message and read like a letter on a phone screen (plan 13.1).
+        """
+        if channel == "sms":
+            return f"appointments/notifications/sms/{self.slug}.txt"
+        return self.body_template
 
 
 # --- the eight events (plan 3.5) -------------------------------------------

@@ -15,6 +15,8 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
+
+from appointments import views as appointment_views
 from django.urls import path,include
 from django.conf import settings
 from django.conf.urls.static import static
@@ -23,6 +25,11 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('app.urls')),
     path('appointments/', include('appointments.urls')),
+    # Deliberately at the root and deliberately two characters: this is the
+    # link that goes in a text message, where every character is charged
+    # (plan 13.3). It redirects into the appointments app.
+    path('a/<str:booking_id>/', appointment_views.short_link,
+         name='appointment_short_link'),
     path('useraccount/', include('useraccount.urls')),
     path('doctorDashboard/', include('doctorDashboard.urls')),
     path('ecommerce/', include('ecommerce.urls')),

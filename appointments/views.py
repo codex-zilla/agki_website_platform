@@ -5,7 +5,10 @@ from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Q
+from urllib.parse import quote
+
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -588,6 +591,25 @@ def _matches_verification(appointment, answer):
         if parsed == appointment.birthDate:
             return True
     return False
+
+
+def short_link(request, booking_id):
+    """`/a/AGKI-2026-58614` -> the lookup form with the reference filled in.
+
+    Exists for SMS and nothing else (plan 13.3). The full link is
+    `/appointments/lookup/?bookingID=AGKI-2026-58614`, which is 75 characters
+    against a real domain; this is 46. **29 characters is the difference
+    between one segment and two** on most of the messages that carry it, and a
+    segment is a second charge for the same message - so the short URL is a
+    cost decision as much as a tidiness one.
+
+    It redirects rather than rendering, so there is exactly one lookup page to
+    maintain and exactly one place the verification gate lives (design §8.1).
+    An unknown or malformed reference is not checked here: the lookup form
+    already answers every failure with the same message, and confirming that a
+    booking ID exists is precisely what that sameness is there to prevent.
+    """
+    return redirect(f"{reverse('booking_id_lookup')}?bookingID={quote(booking_id)}")
 
 
 def booking_id_lookup(request):
