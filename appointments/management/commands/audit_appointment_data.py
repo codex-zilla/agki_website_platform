@@ -263,6 +263,7 @@ class Command(BaseCommand):
         rows = []
         oversubscribed = (
             AvailableSlot.objects.using(self.db)
+            .values("id", "user_id", "date", "time")
             .annotate(n=Count("appointment"))
             .filter(n__gt=1)
             .order_by("date", "time")
@@ -270,10 +271,10 @@ class Command(BaseCommand):
         for slot in oversubscribed:
             rows.append(
                 {
-                    "slot_id": slot.id,
-                    "doctor": self.username(slot.user_id),
-                    "date": str(slot.date),
-                    "time": str(slot.time),
+                    "slot_id": slot["id"],
+                    "doctor": self.username(slot["user_id"]),
+                    "date": str(slot["date"]),
+                    "time": str(slot["time"]),
                     # Named columns only, for the same reason as `username()`:
                     # the Appointment model declares `status`, `meeting_url`
                     # and friends, none of which exist before migration 0017.
@@ -285,7 +286,7 @@ class Command(BaseCommand):
                             "created_at": str(row["created_at"]),
                         }
                         for row in Appointment.objects.using(self.db)
-                        .filter(slot=slot)
+                        .filter(slot_id=slot["id"])
                         .order_by("created_at")
                         .values("id", "bookingID", "fullName", "created_at")
                     ],
@@ -505,8 +506,16 @@ class Command(BaseCommand):
 
     def check_slot_booking_flags(self):
         """Plan 4.4 — is_booked is written but never read, so it can be wrong."""
-        annotated = AvailableSlot.objects.using(self.db).annotate(
-            n=Count("appointment")
+        # Put values() before annotate().  On an old production database this
+        # command runs before the appointment redesign migrations have been
+        # applied.  If annotate() is called on the model queryset first,
+        # Django includes every model field in GROUP BY, including the newer
+        # offers_* columns.  SQLite then raises "no such column" before this
+        # audit can report the migration blockers it was written to find.
+        annotated = (
+            AvailableSlot.objects.using(self.db)
+            .values("id", "date", "time", "is_booked")
+            .annotate(n=Count("appointment"))
         )
         booked_but_empty = list(
             annotated.filter(is_booked=True, n=0)

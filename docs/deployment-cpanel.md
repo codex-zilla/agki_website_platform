@@ -76,10 +76,10 @@ These are the ones that cost time if you meet them for the first time at 11pm.
 > `BASE_DIR/.env`, meaning **next to `manage.py` and nowhere else**. A file anywhere else is
 > not an error; everything just silently defaults. If several security warnings appear at once,
 > check the file's location before changing any setting. Without it, `IS_PRODUCTION`
-is false and the site silently runs in development mode: **the email backend prints to a log
-instead of sending**, required settings stop being enforced, and `DEBUG` defaults to on. If
-password-reset or OTP emails have "not been arriving", this is the first thing to check. Note
-that `.env.prod` in the repo does **not** contain it.
+> is false and the site silently runs in development mode: **the email backend prints to a log
+> instead of sending**, required settings stop being enforced, and `DEBUG` defaults to on. If
+> password-reset or OTP emails have "not been arriving", this is the first thing to check. Note
+> that `.env.prod` in the repo does **not** contain it.
 
 **2. `.env.prod` is a template, not a config.** It carries `DATABASE_URL=`, `EMAIL_HOST_USER=`
 and `EMAIL_HOST_PASSWORD=` all empty, and a `django-insecure-…` secret key that was generated
@@ -214,8 +214,7 @@ print(d['ENGINE'], d['NAME'])
 "
 ```
 
-Expect `django.db.backends.sqlite3` and `/home/agkimed1/agki_medical_lab_website/db.sqlite3`. A `NotSupportedError: MySQL 8 or later
-is required (found 5.7.44)` here means `DATABASE_URL` is still set — in `.env`, or in cPanel's
+Expect `django.db.backends.sqlite3` and `/home/agkimed1/agki_medical_lab_website/db.sqlite3`. A `NotSupportedError: MySQL 8 or later is required (found 5.7.44)` here means `DATABASE_URL` is still set — in `.env`, or in cPanel's
 environment-variable panel, which reaches the shell through the virtualenv's activate script.
 Check both: `echo $DATABASE_URL` and `grep DATABASE_URL .env`.
 
