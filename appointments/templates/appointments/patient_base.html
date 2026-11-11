@@ -1,0 +1,766 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% comment %}
+    The patient counterpart of `doctorDashboard/doctor_base.html`.
+
+    Before this file there was no base at all: seven standalone documents, each
+    with its own <head>, its own ~500-line stylesheet, its own navbar and its
+    own footer. Roughly 3,000 of the flow's 5,197 lines were the same CSS
+    pasted six times, and it had already drifted — the choose-mode page never
+    got a navbar, so a patient answering the one question the flow asks them
+    had no way back to anything, and the search page ended in an empty
+    <footer> painted black with 3rem of padding.
+
+    `page_title` is a view context variable rather than a template block for
+    the reason plan 11.9 records: it is needed in the tab *and* in the <h1>,
+    and a block can only be rendered once.
+    {% endcomment %}
+    <title>{{ page_title|default:"Appointments" }} · AGKI Medical Laboratory</title>
+    <link rel="icon"
+          href="{% if site_settings.favicon %}{{ site_settings.favicon.url }}{% else %}{% static 'app/logo.png' %}{% endif %}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    {% comment %}
+    Bootstrap is deliberately not loaded here, though every page this replaces
+    pulled in both its CSS and its JS bundle. The flow used it for a grid and a
+    navbar toggle, both of which are a dozen lines of CSS; loading a framework
+    for that costs a patient on a phone connection ~90KB before anything of
+    theirs appears. The console keeps it — it uses components this side does
+    not.
+    {% endcomment %}
+    <style>
+        /* Tokens are the console's, so a patient and a doctor looking at the
+           same appointment see the same greens (plan 11.1-11.10). */
+        :root {
+            --green: #2d5a2d;
+            --green-mid: #4a7c59;
+            --accent: #7cc576;
+            --gradient: linear-gradient(135deg, #2d5a2d 0%, #4a7c59 100%);
+            --ground: #f5f8f4;
+            --panel: #ffffff;
+            --panel-2: #eef3ee;
+            --ink: #1c221e;
+            --ink-2: #454f47;
+            --dim: #64706a;
+            --line: #dde5df;
+            --ok: #1f7a4d;
+            --warn: #a35a00;
+            --info: #2b5f86;
+            --bad: #a32020;
+            --radius: 12px;
+            --shadow: 0 1px 2px rgba(20, 32, 22, .04), 0 8px 24px rgba(20, 32, 22, .06);
+            --shell: 1120px;
+        }
+
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--ground);
+            color: var(--ink-2);
+            line-height: 1.6;
+            font-size: 16px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        a { color: var(--green-mid); }
+
+        img { max-width: 100%; }
+
+        .pt-shell { max-width: var(--shell); margin: 0 auto; padding: 0 1.25rem; }
+
+        .pt-skip {
+            position: absolute; left: -9999px; top: 0; z-index: 100;
+            background: var(--green); color: #fff; padding: .6rem 1rem;
+            border-radius: 0 0 8px 0; font-weight: 600; text-decoration: none;
+        }
+        .pt-skip:focus { left: 0; color: #fff; }
+
+        :focus-visible { outline: 2px solid var(--green-mid); outline-offset: 2px; }
+
+        /* ---------------------------------------------------------------- header */
+        .pt-header {
+            background: var(--panel);
+            border-bottom: 1px solid var(--line);
+            position: sticky; top: 0; z-index: 40;
+        }
+
+        .pt-header-inner {
+            display: flex; align-items: center; gap: 1rem;
+            padding: .75rem 0; max-width: var(--shell); margin: 0 auto;
+            padding-left: 1.25rem; padding-right: 1.25rem;
+        }
+
+        .pt-brand {
+            display: flex; align-items: center; gap: .7rem;
+            text-decoration: none; color: var(--green); min-width: 0;
+        }
+
+        .pt-brand img { width: 38px; height: 38px; object-fit: contain; border-radius: 50%; flex: 0 0 auto; }
+
+        .pt-brand-copy { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+        .pt-brand-copy b { font-size: 1.02rem; letter-spacing: .01em; }
+        .pt-brand-copy span {
+            font-size: .6rem; letter-spacing: .14em; text-transform: uppercase; color: var(--dim);
+        }
+
+        .pt-nav {
+            margin-left: auto; display: flex; align-items: center; gap: 1.25rem;
+            font-size: .9rem;
+        }
+
+        .pt-nav a { color: var(--ink-2); text-decoration: none; font-weight: 500; white-space: nowrap; }
+        .pt-nav a:hover { color: var(--green); }
+        .pt-nav a.pt-nav-cta {
+            border: 1.5px solid var(--green); color: var(--green);
+            border-radius: 999px; padding: .35rem .95rem; font-weight: 600;
+        }
+        .pt-nav a.pt-nav-cta:hover { background: var(--green); color: #fff; }
+
+        /* ---------------------------------------------------------------- page head */
+        .pt-main { padding: 2rem 0 3.5rem; }
+
+        .pt-page-head { margin-bottom: 1.5rem; }
+        .pt-eyebrow {
+            font-size: .66rem; letter-spacing: .13em; text-transform: uppercase;
+            color: var(--green-mid); font-weight: 600;
+        }
+        .pt-page-head h1 {
+            font-size: 1.75rem; color: var(--ink); line-height: 1.2;
+            letter-spacing: -.01em; margin: .15rem 0 .35rem;
+        }
+        .pt-lead { color: var(--dim); max-width: 65ch; }
+
+        /* ---------------------------------------------------------------- surfaces */
+        .pt-card {
+            background: var(--panel); border: 1px solid var(--line);
+            border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.5rem;
+        }
+
+        .pt-card + .pt-card { margin-top: 1.25rem; }
+
+        .pt-card h2 {
+            font-size: 1.1rem; color: var(--ink); margin-bottom: .2rem; letter-spacing: -.005em;
+        }
+        .pt-card h3 { font-size: .98rem; color: var(--ink); margin-bottom: .3rem; }
+
+        .pt-sub { color: var(--dim); font-size: .9rem; }
+
+        .pt-grid { display: grid; gap: 1.25rem; }
+
+        .pt-divider { border: 0; border-top: 1px solid var(--line); margin: 1.25rem 0; }
+
+        /* ---------------------------------------------------------------- controls */
+        .pt-btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+            background: var(--gradient); color: #fff; border: 1px solid transparent;
+            border-radius: 9px; padding: .7rem 1.3rem; font-size: .93rem; font-weight: 600;
+            font-family: inherit; text-decoration: none; cursor: pointer;
+            min-height: 44px; transition: filter .2s, background .2s;
+        }
+        .pt-btn:hover { filter: brightness(1.08); color: #fff; }
+        .pt-btn:disabled, .pt-btn[aria-disabled="true"] {
+            background: var(--panel-2); color: var(--dim); cursor: not-allowed;
+            border-color: var(--line); filter: none;
+        }
+
+        .pt-btn.ghost {
+            background: transparent; color: var(--green); border-color: var(--line);
+        }
+        .pt-btn.ghost:hover { background: var(--panel-2); color: var(--green); filter: none; }
+
+        .pt-btn.danger { background: transparent; color: var(--bad); border-color: #e7c9c9; }
+        .pt-btn.danger:hover { background: #fbeded; color: var(--bad); filter: none; }
+
+        /* Centred, not stretched. A flex row defaults to `align-items:
+           stretch`, so anything in here that is not a button - the booking
+           code beside Print on the appointment page - grew to the button's
+           44px and rendered its text at the top of that box, reading as
+           top-aligned against its neighbour. Every other use of this class
+           holds buttons of one height, so centring changes nothing there and
+           stops the next non-button hitting the same thing. */
+        .pt-actions {
+            display: flex; flex-wrap: wrap; gap: .75rem; align-items: center;
+        }
+
+        /* ---------------------------------------------------------------- fields */
+        .pt-field { margin-bottom: 1.1rem; }
+
+        .pt-field label, .pt-label {
+            display: block; font-size: .84rem; font-weight: 600; color: var(--ink);
+            margin-bottom: .35rem;
+        }
+
+        .pt-req { color: var(--bad); }
+
+        .pt-input, .pt-select, .pt-textarea {
+            width: 100%; background: var(--panel); color: var(--ink);
+            border: 1px solid var(--line); border-radius: 9px;
+            padding: .65rem .85rem; min-height: 44px;
+            /* Family and size are inherited explicitly rather than through the
+               `font` shorthand, which resets weight too — the lesson from plan
+               11.8, where values came out lighter than their own labels. */
+            font-family: inherit; font-size: .95rem; font-weight: 500;
+        }
+        .pt-textarea { min-height: 110px; resize: vertical; }
+        .pt-input::placeholder, .pt-textarea::placeholder { font-weight: 400; color: #9aa69d; }
+
+        /* The select drew the operating system's own control - a grey native
+           arrow in a box the OS shaded itself, beside inputs this stylesheet
+           had drawn. On the specialty picker it was the first thing a patient
+           touches, and it looked borrowed from another page.
+
+           `appearance: none` takes the native widget away, which also takes
+           its arrow, so the chevron is drawn here as an inline SVG. It is a
+           data URI rather than a file for two reasons: it costs no request,
+           and it takes `stroke` from this palette (`%2364706a` is --dim,
+           URL-encoded because `#` ends a data URI). Only the closed control is
+           ours - the open list is drawn by the operating system, and no
+           amount of CSS changes that. */
+        .pt-select {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2364706a' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6.5 8 10.5 12 6.5'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right .8rem center;
+            background-size: 15px;
+            /* Room for the chevron, so a long specialty name does not run
+               underneath it. */
+            padding-right: 2.5rem;
+            cursor: pointer;
+        }
+
+        .pt-select:hover { border-color: #c3d3c6; }
+
+        /* Nothing chosen yet reads as empty, the way a placeholder does in the
+           inputs beside it. */
+        .pt-select:has(option[value=""]:checked) { color: var(--dim); font-weight: 400; }
+
+        /* The list itself is the OS's, but these two properties it does honour
+           - without them a dark-mode browser can draw dark text on a dark
+           list. */
+        .pt-select option { background: var(--panel); color: var(--ink); font-weight: 500; }
+
+        .pt-input:focus, .pt-select:focus, .pt-textarea:focus {
+            outline: none; border-color: var(--green-mid);
+            box-shadow: 0 0 0 3px rgba(74, 124, 89, .16);
+        }
+
+        /* The chevron follows the border. Green while the control is open or
+           focused, so the affordance and the focus ring say the same thing. */
+        .pt-select:focus {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%234a7c59' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6.5 8 10.5 12 6.5'/%3E%3C/svg%3E");
+        }
+
+        /* --- the listbox ------------------------------------------------
+           Plan 11.14 styled the **closed** control - the box, the border, the
+           chevron, the focus ring - and that looks the same everywhere. The
+           open list is a different thing: it is drawn by the browser, and only
+           Firefox honours `option { background; color }`. Chrome draws its own
+           and ignores them, which is why the last change appeared to work in
+           one browser and not the other (AGKI, 2026-09-03).
+
+           So the list is the page's own now. The `<select>` stays in the
+           markup and stays the thing that posts; the script below builds this
+           on top of it and keeps the two in step. With JavaScript off the
+           native control is what you get, styled as 11.14 left it.
+           ---------------------------------------------------------------- */
+        .pt-combo { position: relative; }
+
+        /* Transparent rather than `display: none`. A hidden `required` field
+           cannot be focused, and Chrome refuses to submit a form when it has
+           to report a problem on one - "an invalid form control is not
+           focusable". At zero opacity it still occupies its box, so the
+           browser's own validation bubble points at the right control. */
+        .pt-combo-native {
+            position: absolute; inset: 0; width: 100%; height: 100%;
+            opacity: 0; pointer-events: none;
+        }
+
+        .pt-combo-button {
+            width: 100%; text-align: left; cursor: pointer;
+            background: var(--panel); color: var(--ink);
+            border: 1px solid var(--line); border-radius: 9px;
+            padding: .65rem 2.5rem .65rem .85rem; min-height: 44px;
+            font-family: inherit; font-size: .95rem; font-weight: 500;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2364706a' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6.5 8 10.5 12 6.5'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right .8rem center;
+            background-size: 15px;
+        }
+        .pt-combo-button:hover { border-color: #c3d3c6; }
+        .pt-combo-button:focus-visible,
+        .pt-combo-button[aria-expanded="true"] {
+            outline: none; border-color: var(--green-mid);
+            box-shadow: 0 0 0 3px rgba(74, 124, 89, .16);
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%234a7c59' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6.5 8 10.5 12 6.5'/%3E%3C/svg%3E");
+        }
+        /* Nothing chosen reads as empty, the way a placeholder does in the
+           inputs beside it - the same rule the native control follows. */
+        .pt-combo-button.is-placeholder { color: var(--dim); font-weight: 400; }
+
+        .pt-combo-list {
+            position: absolute; z-index: 60; left: 0; right: 0; top: calc(100% + .35rem);
+            margin: 0; padding: .3rem; list-style: none;
+            background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+            box-shadow: 0 12px 34px rgba(20, 32, 22, .16);
+            max-height: 17rem; overflow-y: auto;
+        }
+        /* Opening upwards when there is no room below: a picker at the foot of
+           a phone screen otherwise renders off the bottom. */
+        .pt-combo-list.is-above { top: auto; bottom: calc(100% + .35rem); }
+
+        .pt-combo-option {
+            padding: .55rem .7rem; border-radius: 7px; cursor: pointer;
+            font-size: .93rem; color: var(--ink-2); line-height: 1.35;
+        }
+        /* One highlight, driven by the keyboard *and* the pointer, so arrowing
+           down and hovering cannot disagree about which row is next. */
+        .pt-combo-option.is-active { background: var(--panel-2); color: var(--green); }
+        .pt-combo-option[aria-selected="true"] {
+            background: #e9f2ea; color: var(--green); font-weight: 600;
+        }
+        .pt-combo-option.is-placeholder { color: var(--dim); }
+
+        .pt-help { font-size: .8rem; color: var(--dim); margin-top: .35rem; }
+
+        /* Radio and checkbox cards — the pattern the console's availability
+           page uses, sized for a thumb rather than a mouse. */
+        .pt-choice-group { display: grid; gap: .6rem; }
+        .pt-choice {
+            display: flex; gap: .75rem; align-items: flex-start;
+            border: 1px solid var(--line); border-radius: 10px; padding: .8rem 1rem;
+            cursor: pointer; background: var(--panel);
+        }
+        .pt-choice:hover { border-color: var(--green-mid); background: #f7fbf7; }
+        .pt-choice input { margin-top: .3rem; accent-color: var(--green); flex: 0 0 auto; }
+        .pt-choice-title { font-weight: 600; color: var(--ink); font-size: .93rem; }
+        .pt-choice-note { font-size: .84rem; color: var(--dim); }
+        .pt-choice:has(input:checked) { border-color: var(--green); background: #f2f8f2; }
+
+        /* ---------------------------------------------------------------- messages */
+        .pt-alert {
+            border: 1px solid var(--line); border-left: 4px solid var(--dim);
+            border-radius: 10px; padding: .9rem 1.1rem; background: var(--panel);
+            font-size: .92rem; margin-bottom: 1rem;
+        }
+        .pt-alert strong { color: var(--ink); }
+        .pt-alert.ok { border-left-color: var(--ok); }
+        .pt-alert.warn { border-left-color: var(--warn); }
+        .pt-alert.info { border-left-color: var(--info); }
+        .pt-alert.bad { border-left-color: var(--bad); }
+        .pt-alert ul { margin: .4rem 0 0 1.1rem; }
+
+        /* ---------------------------------------------------------------- chips */
+        .pt-chip {
+            display: inline-flex; align-items: center; gap: .35rem;
+            font-size: .74rem; font-weight: 600; letter-spacing: .02em;
+            border-radius: 999px; padding: .2rem .6rem;
+            border: 1px solid currentColor; color: var(--dim); background: transparent;
+        }
+        .pt-chip.ok { color: var(--ok); }
+        .pt-chip.warn { color: var(--warn); }
+        .pt-chip.info { color: var(--info); }
+        .pt-chip.bad { color: var(--bad); }
+
+        /* ---------------------------------------------------------------- tracker */
+        .pt-tracker {
+            display: flex; gap: 0; background: #f8faf7; list-style: none;
+            border: 1px solid var(--line); border-radius: var(--radius);
+            padding: 1.1rem 1.2rem 1.2rem; margin-bottom: 1.25rem;
+        }
+
+        .pt-stage { flex: 1 1 0; position: relative; min-width: 0; }
+
+        .pt-stage-dot {
+            width: 28px; height: 28px; border-radius: 50%;
+            display: grid; place-items: center; position: relative; z-index: 1;
+            font-size: .76rem; font-weight: 700;
+            background: #dfe7e0; border: 2px solid #dfe7e0; color: var(--dim);
+        }
+        .pt-stage.done .pt-stage-dot { background: var(--green); border-color: var(--green); color: #fff; }
+        .pt-stage.now .pt-stage-dot {
+            background: var(--panel); border-color: var(--green); color: var(--green);
+            box-shadow: 0 0 0 4px rgba(45, 90, 45, .13);
+        }
+        .pt-stage.stopped .pt-stage-dot { background: transparent; border-style: dashed; }
+        /* A round that has not started keeps the base dot. Written out
+           rather than left to the default so that a class the markup
+           uses is a class the stylesheet knows about - the rule the
+           console pages are each tested against. */
+        .pt-stage.ahead .pt-stage-dot { background: #dfe7e0; }
+
+        .pt-stage-line {
+            position: absolute; top: 14px; left: 28px; right: 0; height: 2px; background: #dfe7e0;
+        }
+        .pt-stage.done .pt-stage-line { background: var(--green); }
+        .pt-stage:last-child .pt-stage-line { display: none; }
+
+        .pt-stage-label {
+            font-size: .78rem; color: var(--dim); margin-top: .55rem;
+            padding-right: .9rem; line-height: 1.35;
+        }
+        .pt-stage.now .pt-stage-label { color: var(--green); font-weight: 600; }
+
+        .pt-stage-turn {
+            display: block; font-size: .62rem; letter-spacing: .08em;
+            text-transform: uppercase; color: var(--warn); font-weight: 700; margin-top: .1rem;
+        }
+
+        .pt-tracker-ended {
+            border: 1px solid var(--line); border-left: 4px solid var(--bad);
+            border-radius: var(--radius); background: var(--panel);
+            padding: 1rem 1.2rem; margin-bottom: 1.25rem;
+        }
+
+        /* ---------------------------------------------------------------- empty */
+        .pt-empty { text-align: center; padding: 3rem 1.5rem; color: var(--dim); }
+        .pt-empty i { font-size: 2rem; color: #c3d2c5; margin-bottom: .75rem; display: block; }
+        .pt-empty h2 { color: var(--ink); font-size: 1.15rem; margin-bottom: .35rem; }
+
+        /* ---------------------------------------------------------------- footer */
+        .pt-footer {
+            background: var(--ink); color: #c7d1c8; margin-top: auto;
+            padding: 2.5rem 0 1.5rem; font-size: .9rem;
+        }
+        .pt-footer-grid { display: grid; gap: 1.75rem; }
+        .pt-footer-grid span { display: block; padding: .15rem 0; }
+        @media (min-width: 700px) { .pt-footer-grid { grid-template-columns: repeat(3, 1fr); } }
+        .pt-footer h2 { font-size: .78rem; letter-spacing: .12em; text-transform: uppercase; color: #fff; margin-bottom: .6rem; }
+        .pt-footer a { color: #c7d1c8; text-decoration: none; display: block; padding: .15rem 0; }
+        .pt-footer a:hover { color: var(--accent); }
+        .pt-footer-note {
+            border-top: 1px solid #334134; margin-top: 1.75rem; padding-top: 1rem;
+            font-size: .8rem; color: #8f9c90;
+        }
+
+        /* ---------------------------------------------------------------- responsive
+           Four widths, the same plan as the console (plan 11.9) — but this side
+           is the one that matters most on a phone: a patient books a lab test
+           standing in a queue, not at a desk.
+
+             >= 1000  two columns wherever a page has a sidebar
+             760-999  single column, the summary moves above the form so the
+                      patient sees what they are booking before they type
+             <= 759   the tracker turns vertical: four labels across a phone
+                      truncate to nothing
+             <= 480   the brand's second line goes, nav scrolls sideways
+        */
+        @media (max-width: 759px) {
+            .pt-tracker { flex-direction: column; gap: .7rem; padding: 1rem; }
+            .pt-stage { display: flex; gap: .75rem; align-items: flex-start; }
+            .pt-stage-line { display: none; }
+            .pt-stage-label { margin-top: .1rem; padding-right: 0; }
+            .pt-page-head h1 { font-size: 1.45rem; }
+        }
+
+        @media (max-width: 640px) {
+            .pt-nav { gap: .9rem; font-size: .85rem; }
+            .pt-nav a.pt-nav-cta { padding: .3rem .75rem; }
+        }
+
+        @media (max-width: 480px) {
+            .pt-brand-copy span { display: none; }
+            .pt-header-inner { gap: .6rem; }
+            .pt-nav { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+            .pt-card { padding: 1.15rem; }
+            .pt-main { padding: 1.25rem 0 2.5rem; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: .001ms !important;
+                transition-duration: .001ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
+
+        {% block page_css %}{% endblock %}
+    </style>
+</head>
+<body>
+    <a class="pt-skip" href="#pt-content">Skip to content</a>
+
+    <header class="pt-header">
+        <div class="pt-header-inner">
+            <a class="pt-brand" href="{% url 'appointment_home' %}">
+                {% comment %}
+                The same mark the public navbar and the doctor console use,
+                resolved the same way: the logo an administrator uploaded in
+                SiteSettings, falling back to the bundled file. `alt=""`
+                because the name is the next element across.
+                {% endcomment %}
+                <img src="{% if site_settings.logo %}{{ site_settings.logo.url }}{% else %}{% static 'app/logo.png' %}{% endif %}"
+                     alt="" width="38" height="38">
+                <span class="pt-brand-copy">
+                    <b>AGKI Medical Lab</b>
+                    <span>Appointments</span>
+                </span>
+            </a>
+
+            <nav class="pt-nav" aria-label="Appointments">
+                <a href="{% url 'search_results' %}">Book an appointment</a>
+                {% comment %}
+                A "Contact" item stood here, pointing at the main site's
+                contact section. Removed at AGKI's request on 2026-09-02: a
+                patient halfway through booking clicked it and left the flow
+                for a marketing page, with the browser's back button as the
+                only way in again. The header now offers only the two things
+                this section does. Reaching AGKI is still one glance away - the
+                footer carries the real phone number and address, and the pages
+                that can strand somebody say so in their own copy.
+                {% endcomment %}
+                {% comment %}
+                The one thing every returning patient needs and the only thing
+                they can do without a booking ID already open, so it is the
+                button. There is no patient login by design (§8.1) — the
+                booking ID plus a phone number or date of birth is the key.
+                {% endcomment %}
+                <a class="pt-nav-cta" href="{% url 'booking_id_lookup' %}">Find my appointment</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="pt-main" id="pt-content">
+        <div class="pt-shell">
+            {% if messages %}
+            {% for message in messages %}
+            <div class="pt-alert {% if message.tags == 'error' %}bad{% elif message.tags == 'warning' %}warn{% elif message.tags == 'success' %}ok{% else %}info{% endif %}" role="status">
+                {{ message }}
+            </div>
+            {% endfor %}
+            {% endif %}
+
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <footer class="pt-footer">
+        <div class="pt-shell">
+            <div class="pt-footer-grid">
+                <div>
+                    <h2>Booking</h2>
+                    <a href="{% url 'search_results' %}">Find a doctor and a time</a>
+                    <a href="{% url 'booking_id_lookup' %}">Find my appointment</a>
+                    <a href="{% url 'appointment_home' %}">How booking works</a>
+                </div>
+                <div>
+                    {% comment %}
+                    Real contact details, from SiteSettings. What was here
+                    before was nine footer links to `#` and a tenth,
+                    "Login Your Practice", pointing patients at the staff
+                    console. A patient stuck mid-booking needs a phone number,
+                    not a dead Support link.
+                    {% endcomment %}
+                    <h2>Talk to us</h2>
+                    {% if site_settings.phone %}<a href="tel:{{ site_settings.phone }}">{{ site_settings.phone }}</a>{% endif %}
+                    {% if site_settings.email %}<a href="mailto:{{ site_settings.email }}">{{ site_settings.email }}</a>{% endif %}
+                    {% if site_settings.address_line %}<span>{{ site_settings.address_line }}</span>{% endif %}
+                </div>
+                <div>
+                    <h2>AGKI</h2>
+                    <a href="{% url 'home' %}">Main site</a>
+                    <a href="{% url 'home' %}#services">Services</a>
+                    <a href="{% url 'home' %}#team">Our team</a>
+                </div>
+            </div>
+            <div class="pt-footer-note">
+                &copy; {% now "Y" %} {{ site_settings.site_name|default:"AGKI Medical Laboratory" }}.
+                Appointments are requests until a doctor confirms them.
+            </div>
+        </div>
+    </footer>
+
+    {% comment %}
+    Every `<select>` on the page, wearing the page's own list.
+
+    Progressive enhancement, and the order matters: the `<select>` is rendered
+    by Django, carries the choices from the model, and remains the element that
+    posts. This script builds a button and a listbox beside it and writes back
+    to the select on every choice, firing `change` so anything listening still
+    hears it. With JavaScript off, or if this throws, the native control is
+    still there and still works.
+
+    Why it exists at all: the closed control was themed in 11.14, but the open
+    list is drawn by the browser. Firefox honours `option { background; color }`
+    and Chrome does not, so one browser looked right and the other did not.
+    {% endcomment %}
+    <script>
+        (function () {
+            "use strict";
+
+            var TYPE_AHEAD_MS = 700;
+
+            function build(select) {
+                if (!select.options.length || select.multiple) { return; }
+
+                var wrap = document.createElement('div');
+                wrap.className = 'pt-combo';
+                select.parentNode.insertBefore(wrap, select);
+                wrap.appendChild(select);
+
+                select.className = 'pt-combo-native';
+                select.setAttribute('tabindex', '-1');
+                select.setAttribute('aria-hidden', 'true');
+
+                var button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'pt-combo-button';
+                button.setAttribute('aria-haspopup', 'listbox');
+                button.setAttribute('aria-expanded', 'false');
+                if (select.id) {
+                    button.id = select.id + '-button';
+                    // The `<label for=…>` points at the select, which is now
+                    // hidden. Pointing it at the button as well keeps clicking
+                    // the label working and keeps the accessible name.
+                    var label = document.querySelector('label[for="' + select.id + '"]');
+                    if (label) { label.setAttribute('for', button.id); }
+                }
+
+                var list = document.createElement('ul');
+                list.className = 'pt-combo-list';
+                list.setAttribute('role', 'listbox');
+                list.hidden = true;
+                if (button.id) { list.id = button.id + '-list'; }
+
+                var rows = [];
+                Array.prototype.forEach.call(select.options, function (option, index) {
+                    var row = document.createElement('li');
+                    row.className = 'pt-combo-option';
+                    if (option.value === '') { row.className += ' is-placeholder'; }
+                    row.setAttribute('role', 'option');
+                    row.id = (list.id || 'pt-combo') + '-' + index;
+                    row.dataset.value = option.value;
+                    row.textContent = option.textContent.trim();
+                    row.setAttribute('aria-selected', option.selected ? 'true' : 'false');
+                    list.appendChild(row);
+                    rows.push(row);
+                });
+
+                wrap.appendChild(button);
+                wrap.appendChild(list);
+
+                var active = Math.max(select.selectedIndex, 0);
+                var typed = '';
+                var typedAt = 0;
+
+                function paintButton() {
+                    var option = select.options[select.selectedIndex];
+                    button.textContent = option ? option.textContent.trim() : '';
+                    button.classList.toggle(
+                        'is-placeholder', !option || option.value === ''
+                    );
+                }
+
+                function highlight(index) {
+                    if (index < 0 || index >= rows.length) { return; }
+                    rows.forEach(function (row) { row.classList.remove('is-active'); });
+                    active = index;
+                    rows[active].classList.add('is-active');
+                    button.setAttribute('aria-activedescendant', rows[active].id);
+                    // Only the list scrolls, never the page behind it.
+                    var row = rows[active];
+                    if (row.offsetTop < list.scrollTop) {
+                        list.scrollTop = row.offsetTop;
+                    } else if (row.offsetTop + row.offsetHeight > list.scrollTop + list.clientHeight) {
+                        list.scrollTop = row.offsetTop + row.offsetHeight - list.clientHeight;
+                    }
+                }
+
+                function open() {
+                    list.hidden = false;
+                    button.setAttribute('aria-expanded', 'true');
+                    // Upwards when the list would run off the bottom, which on
+                    // a phone is most of the time.
+                    var room = window.innerHeight - button.getBoundingClientRect().bottom;
+                    list.classList.toggle('is-above', room < list.offsetHeight + 16);
+                    highlight(Math.max(select.selectedIndex, 0));
+                }
+
+                function close() {
+                    list.hidden = true;
+                    list.classList.remove('is-above');
+                    button.setAttribute('aria-expanded', 'false');
+                    button.removeAttribute('aria-activedescendant');
+                }
+
+                function choose(index) {
+                    select.selectedIndex = index;
+                    rows.forEach(function (row, i) {
+                        row.setAttribute('aria-selected', i === index ? 'true' : 'false');
+                    });
+                    paintButton();
+                    // The page's own code, and Django's, listen to the select -
+                    // never to this button.
+                    select.dispatchEvent(new Event('change', { bubbles: true }));
+                    close();
+                    button.focus();
+                }
+
+                button.addEventListener('click', function () {
+                    if (list.hidden) { open(); } else { close(); }
+                });
+
+                button.addEventListener('keydown', function (event) {
+                    var key = event.key;
+                    if (key === 'ArrowDown' || key === 'ArrowUp' || key === 'Enter' || key === ' ') {
+                        event.preventDefault();
+                        if (list.hidden) { open(); return; }
+                    }
+                    if (list.hidden) { return; }
+
+                    if (key === 'ArrowDown') { highlight(active + 1); }
+                    else if (key === 'ArrowUp') { highlight(active - 1); }
+                    else if (key === 'Home') { event.preventDefault(); highlight(0); }
+                    else if (key === 'End') { event.preventDefault(); highlight(rows.length - 1); }
+                    else if (key === 'Enter' || key === ' ') { choose(active); }
+                    else if (key === 'Escape') { close(); }
+                    else if (key === 'Tab') { close(); }
+                    else if (key.length === 1) {
+                        // Type-ahead, the one thing people miss most when a
+                        // native select is replaced: typing "car" jumps to
+                        // Cardiology rather than to C, then A, then R.
+                        var now = Date.now();
+                        typed = (now - typedAt < TYPE_AHEAD_MS ? typed : '') + key.toLowerCase();
+                        typedAt = now;
+                        for (var i = 0; i < rows.length; i++) {
+                            if (rows[i].textContent.trim().toLowerCase().indexOf(typed) === 0) {
+                                highlight(i);
+                                break;
+                            }
+                        }
+                    }
+                });
+
+                rows.forEach(function (row, index) {
+                    row.addEventListener('click', function () { choose(index); });
+                    row.addEventListener('mousemove', function () { highlight(index); });
+                });
+
+                document.addEventListener('click', function (event) {
+                    if (!wrap.contains(event.target)) { close(); }
+                });
+
+                // Anything that sets the select directly - a reset, a browser
+                // restoring a form on Back - has to be visible here too.
+                select.addEventListener('change', paintButton);
+
+                paintButton();
+            }
+
+            try {
+                document.querySelectorAll('select.pt-select').forEach(build);
+            } catch (error) {
+                // A native select the page has already styled is a perfectly
+                // good fallback, and losing the whole page over a dropdown
+                // would not be.
+            }
+        }());
+    </script>
+
+    {% block page_js %}{% endblock %}
+</body>
+</html>

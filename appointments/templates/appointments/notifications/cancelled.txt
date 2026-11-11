@@ -1,0 +1,20 @@
+{% if is_patient %}Hello {{ appointment.fullName }},
+
+Your appointment on {{ slot_date }} at {{ slot_time }} has been cancelled.
+{% if appointment.cancellation_reason %}
+Reason given: {{ appointment.cancellation_reason }}
+{% endif %}
+You can book another time whenever suits you:
+
+  {{ site_url }}/appointments/search/
+{% else %}Hello {{ provider.get_full_name|default:provider.username }},
+
+The appointment with {{ appointment.fullName }} on {{ slot_date }} at
+{{ slot_time }} has been cancelled. The slot is free again and can be booked
+by someone else.
+{% if appointment.cancellation_reason %}
+Reason given: {{ appointment.cancellation_reason }}
+{% endif %}{% endif %}
+Booking reference: {{ booking_id }}
+
+AGKI Medical Laboratory

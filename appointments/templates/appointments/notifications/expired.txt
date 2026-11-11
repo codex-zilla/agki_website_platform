@@ -1,0 +1,24 @@
+{% comment %}
+Expiry is told plainly to both sides, and never silently (design §6.1). The
+patient is not left wondering; the doctor is not left thinking the slot is
+still spoken for.
+{% endcomment %}{% if is_patient %}Hello {{ appointment.fullName }},
+
+Your appointment request for {{ slot_date }} at {{ slot_time }} was not
+confirmed in time, so it has expired and the slot has been released.
+
+Nothing was wrong with your booking. If you would still like to be seen,
+please choose another time:
+
+  {{ site_url }}/appointments/search/
+{% else %}Hello {{ provider.get_full_name|default:provider.username }},
+
+The appointment request from {{ appointment.fullName }} for {{ slot_date }} at
+{{ slot_time }} expired without being confirmed, and the slot has been
+released. The patient has been told.
+
+  {{ dashboard_url }}
+{% endif %}
+Booking reference: {{ booking_id }}
+
+AGKI Medical Laboratory

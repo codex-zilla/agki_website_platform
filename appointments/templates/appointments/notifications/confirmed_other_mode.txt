@@ -1,0 +1,26 @@
+Hello {{ appointment.fullName }},
+
+Your appointment is confirmed, but not in the way you asked for.
+
+You asked to meet by: {{ requested_mode }}
+The doctor has confirmed: {{ appointment.get_appointmentMode_display }}
+{% if reason %}
+They said: {{ reason }}
+{% endif %}
+  Date:   {{ slot_date }}
+  Time:   {{ slot_time }}
+  Doctor: {{ provider.get_full_name|default:provider.username }}
+{% if appointment.meeting_url %}
+Join the call here at the appointment time:
+
+  {{ appointment.meeting_url }}
+{% endif %}
+Booking reference: {{ booking_id }}
+
+If that does not work for you, please cancel through the link below and book
+another time - the doctor will not be expecting you to accept a change you
+cannot make.
+
+  {{ appointment_url }}
+
+AGKI Medical Laboratory

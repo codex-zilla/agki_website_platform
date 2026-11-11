@@ -1,0 +1,11 @@
+{% comment %}
+Carries the link, at AGKI's instruction (plan 13.3): most patients here do
+not read email often, so a text with no way to act on it is a dead end.
+That costs a second segment on the longer messages - `short_url` is why it
+is only one extra rather than two.
+
+ASCII only, deliberately. One character outside the GSM-7 alphabet - a
+curly quote, an en dash - switches the whole message to UCS-2 and the
+limit falls from 160 characters to 70, which is a segment nobody intended
+to buy. A test asserts it.
+{% endcomment %}AGKI: request {{ booking_id }} for {{ slot_date|date:'j M' }} expired unconfirmed and the time was released. Book again: {{ site_url }}/appointments/

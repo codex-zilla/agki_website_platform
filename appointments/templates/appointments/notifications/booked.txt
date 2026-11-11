@@ -1,0 +1,52 @@
+{% comment %}
+Two audiences, one event. The doctor's half is decision 8: the message goes to
+the doctor being booked, not a central AGKI inbox, because this platform hosts
+doctors from other organisations who cannot be expected to watch somebody
+else's dashboard for work that belongs to them.
+
+The patient's half says what happens next rather than "confirmed" (design §6
+step 4). Nothing is confirmed at this point — the whole flow is a wait for
+someone else — and the page this replaces promised an instant confirmation it
+had no way to deliver.
+{% endcomment %}{% if is_provider %}Hello {{ provider.get_full_name|default:provider.username }},
+
+{{ appointment.fullName }} has requested an appointment with you:
+
+  Date:    {{ slot_date }}
+  Time:    {{ slot_time }}
+  How:     {{ appointment.get_appointmentMode_display }}
+  Reason:  {{ appointment.get_reasonVisit_display }}
+  Booking: {{ booking_id }}
+
+Please confirm or decline. The patient chose how to meet when they booked, so
+this is one decision rather than two - and if that way does not suit, you can
+confirm with a different one and they will be told. If nothing is confirmed,
+the appointment is released automatically shortly before the slot and the
+patient is told it did not go ahead.
+
+  {{ dashboard_url }}
+{% else %}Hello {{ appointment.fullName }},
+
+We have your booking request. Keep this reference:
+
+  Booking reference: {{ booking_id }}
+
+  Doctor: {{ provider.get_full_name|default:provider.username }}
+  Date:   {{ slot_date }}
+  Time:   {{ slot_time }}
+
+WHAT HAPPENS NEXT — this is not confirmed yet.
+
+  1. The doctor confirms the time is still workable. We email you either way.
+  2. If it is, you choose how you would like to meet: an online video call,
+     the doctor travels to you, or you travel to the doctor.
+  3. The doctor confirms your choice, and the appointment is settled.
+
+You can check where your request has got to at any time:
+
+  {{ appointment_url }}
+
+If your plans change, please cancel through that link so the time can be
+offered to someone else.
+{% endif %}
+AGKI Medical Laboratory

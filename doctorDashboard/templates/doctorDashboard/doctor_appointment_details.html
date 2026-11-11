@@ -25,19 +25,29 @@
                     </div>
                 </div>
             </div>
+            {% comment %}
+            One "Approve Patient" checkbox used to live here, for a flow with
+            two independent provider gates and four other endings (design §5).
+            The badge below is the real state; the decision buttons are further
+            down, and they are derived from the state machine rather than from a
+            template branch, so a button is never offered for a move the model
+            would refuse.
+            {% endcomment %}
             <div style="display: flex; gap: 1rem; align-items: center;">
-                {% if approval_status.is_approved %}
-                <span class="status-badge confirmed">Approved</span>
-                {% else %}
-                <span class="status-badge pending">Pending Approval</span>
-                <button class="card-action" onclick="openPatientApprovalModal()">
-                    <i class="fas fa-user-check"></i>
-                    Approve Patient
-                </button>
-                {% endif %}
+                <span class="status-badge {% if appointment.status == Status.CONFIRMED %}confirmed{% elif appointment.status == Status.COMPLETED %}completed{% elif appointment.status in ended_statuses %}cancelled{% else %}pending{% endif %}">
+                    {{ appointment.get_status_display }}
+                </span>
             </div>
         </div>
     </div>
+
+    {% if messages %}
+    {% for message in messages %}
+    <div class="card" style="margin-top: 1rem; border-left: 4px solid {% if message.tags == 'error' %}#dc3545{% else %}var(--accent-green, #7cc576){% endif %};">
+        <div class="card-body">{{ message }}</div>
+    </div>
+    {% endfor %}
+    {% endif %}
 
     <!-- Main Content Grid -->
     <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; margin-top: 2rem;">
@@ -56,59 +66,88 @@
                 </div>
                 <div class="card-body">
                     <div class="patient-info-grid">
+                        {% comment %}
+                        Icons and labels fixed here (plan 5.15, design §10
+                        dashboard #15). They were leftovers from the source
+                        template's unrelated fields: a wedding-ring icon on
+                        "Reason for Visiting", a gender icon on "Appointment
+                        Mode", an ID-card icon on "Concerns / Symptoms" and a
+                        label reading "Visit Times" for the visit *type*.
+
+                        The values now render their `get_..._display` labels
+                        rather than the stored value, so a doctor reads
+                        "Follow-up" instead of "follow_up" (plan 2.10 closed
+                        these choice lists; nothing was updated to display
+                        them).
+                        {% endcomment %}
                         <div class="info-row">
                             <div class="info-item">
                                 <label class="info-label">
-                                    <i class="fas fa-user-circle"></i>
-                                    Visit Times
+                                    <i class="fas fa-user-plus"></i>
+                                    Visit Type
                                 </label>
-                                <p class="info-value">{{appointment.visitType}}</p>
+                                <p class="info-value">{{ appointment.get_visitType_display|default:"—" }}</p>
                             </div>
                             <div class="info-item">
                                 <label class="info-label">
                                     <i class="fas fa-birthday-cake"></i>
                                     Date of Birth
                                 </label>
-                                <p class="info-value">{{appointment.birthDate}}</p>
+                                <p class="info-value">{{ appointment.birthDate }}</p>
                             </div>
                         </div>
 
                         <div class="info-row">
+                            <div class="info-item">
+                                <label class="info-label">
+                                    <i class="fas fa-handshake"></i>
+                                    Appointment Mode
+                                </label>
+                                <p class="info-value">
+                                    {% if appointment.appointmentMode %}
+                                    {{ appointment.get_appointmentMode_display }}
+                                    {% else %}
+                                    <span style="color:#888;">Not chosen yet — the patient picks after you confirm the time</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="info-item">
+                                <label class="info-label">
+                                    <i class="fas fa-clipboard-list"></i>
+                                    Reason for Visiting
+                                </label>
+                                <p class="info-value">{{ appointment.get_reasonVisit_display|default:"—" }}</p>
+                            </div>
+                        </div>
+
+                        <div class="info-row">
+                            <div class="info-item">
+                                <label class="info-label">
+                                    <i class="fas fa-notes-medical"></i>
+                                    Concerns / Symptoms
+                                </label>
+                                <p class="info-value">{{ appointment.symptoms|default:"None given" }}</p>
+                            </div>
                             <div class="info-item">
                                 <label class="info-label">
                                     <i class="fas fa-venus-mars"></i>
-                                    Appointment Mode
-                                </label>
-                                <p class="info-value">{{appointment.appointmentMode}}</p>
-                            </div>
-                            <div class="info-item">
-                                <label class="info-label">
-                                    <i class="fas fa-ring"></i>
-                                    Reason for Visiting
-                                </label>
-                                <p class="info-value">{{appointment.reasonVisit}}</p>
-                            </div>
-                        </div>
-
-                        <div class="info-row">
-                            
-                            <div class="info-item">
-                                <label class="info-label">
-                                    <i class="fas fa-id-card"></i>
-                                    Concerns / Symptoms
-                                </label>
-                                <p class="info-value">{{appointment.symptoms}}</p>
-                            </div>
-                            <div class="info-item">
-                                <label class="info-label">
-                                    <i class="fas fa-venus"></i>
                                     Gender
                                 </label>
-                                <p class="info-value">{{appointment.gender}}</p>
+                                <p class="info-value">{{ appointment.get_gender_display|default:"—" }}</p>
                             </div>
-                        </span>
-
                         </div>
+
+                        {% if appointment.meeting_url %}
+                        <div class="info-row">
+                            <div class="info-item">
+                                <label class="info-label">
+                                    <i class="fas fa-video"></i>
+                                    Meeting link
+                                </label>
+                                <p class="info-value"><a href="{{ appointment.meeting_url }}">{{ appointment.meeting_url }}</a></p>
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -181,7 +220,7 @@
                                 <div class="note-item">
                                     <div class="note-header">
                                         <div class="note-author">
-                                            <img src="{{i.added_by.image.url}}" alt="Doctor" class="note-avatar">
+                                            {% include "partials/avatar.html" with image=i.added_by.image alt=i.added_by.get_full_name css_class="note-avatar" only %}
                                             <div>
                                                 <div class="note-author-name">{{i.added_by.get_full_name}}</div>
                                                 <div class="note-timestamp">{{ i.created_at|date:"l, Y-m-d" }} at {{ i.created_at|time:"H:i" }}</div>
@@ -209,138 +248,169 @@
 
         <!-- Right Column -->
         <div>
-            <!-- Quick Actions -->
+            {% comment %}
+            The real actions (plan 5.1-5.4). What was here: Approve Patient
+            (one checkbox for a two-round flow), Schedule Appointment, Send
+            Message and Print Profile — three of which had no view behind them
+            at all — plus a "Documents" card listing a PDF that does not exist,
+            with an upload button that uploads nothing.
+
+            `decisions` comes from the state machine, so this panel shows
+            exactly the moves that are legal right now and nothing else.
+            {% endcomment %}
             <div class="card">
                 <div class="card-header">
                     <h3 class="card-title">
-                        <i class="fas fa-bolt"></i>
-                        Quick Actions
+                        <i class="fas fa-gavel"></i>
+                        Your decision
                     </h3>
                 </div>
                 <div class="card-body">
-                    <div class="action-buttons-vertical">
-                        <button class="action-btn primary" onclick="openPatientApprovalModal()">
-                            <i class="fas fa-user-check"></i>
-                            <span>Approve Patient</span>
-                        </button>
-                        <button class="action-btn success">
-                            <i class="fas fa-calendar-plus"></i>
-                            <span>Schedule Appointment</span>
-                        </button>
-                        <button class="action-btn info" onclick="openPatientNoteModal()">
-                            <i class="fas fa-sticky-note"></i>
-                            <span>Add Note</span>
-                        </button>
-                        <button class="action-btn secondary">
-                            <i class="fas fa-paper-plane"></i>
-                            <span>Send Message</span>
-                        </button>
-                        <button class="action-btn" style="background: #e8eaf6; color: #3f51b5;">
-                            <i class="fas fa-print"></i>
-                            <span>Print Profile</span>
-                        </button>
+                    {% if appointment.status == Status.PENDING_TIME %}
+                    <p style="color:#666; margin-bottom:1rem;">
+                        <strong>Round 1.</strong> The patient asked for this time.
+                        Confirming it asks them to choose how you will meet;
+                        declining releases the slot for someone else.
+                    </p>
+                    {% elif appointment.status == Status.MODE_PROPOSED %}
+                    <p style="color:#666; margin-bottom:1rem;">
+                        <strong>Round 2.</strong> The patient chose
+                        <strong>{{ appointment.get_appointmentMode_display }}</strong>.
+                        Confirming settles the appointment; rejecting sends them
+                        back to choose another way, with your reason.
+                    </p>
+                    {% elif appointment.status == Status.PENDING_MODE %}
+                    <p style="color:#666; margin-bottom:1rem;">
+                        Waiting on the <strong>patient</strong> to choose how to
+                        meet. Nothing for you to do until they do — we have
+                        emailed them.
+                    </p>
+                    {% endif %}
+
+                    {% if cutoff_passed and appointment.status in waiting_statuses %}
+                    <div class="alert-inline" style="background:#fff3cd; border-left:4px solid #ffc107; padding:0.85rem; border-radius:6px; margin-bottom:1rem;">
+                        <i class="fas fa-hourglass-end"></i>
+                        The confirmation window closed {{ cutoff_minutes }} minutes
+                        before the slot. This booking can no longer be confirmed
+                        and is being released.
                     </div>
+                    {% endif %}
+
+                    {% if decisions %}
+                    <div class="action-buttons-vertical">
+                        {% for action, decision in decisions %}
+                        <form method="post" action="{% url 'appointment_decision' appointment.id %}" style="margin-bottom:0.75rem;">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="{{ action }}">
+
+                            {% if decision.confirms and needs_meeting_url %}
+                            {% comment %}
+                            Decision B: the doctor supplies the link when they
+                            confirm an online appointment. Required, because an
+                            "online appointment" with no link is worse than an
+                            unconfirmed one — both sides think it is settled.
+                            The model refuses it too, so a POST that skips this
+                            field cannot get past it either.
+                            {% endcomment %}
+                            <label class="form-label" for="meeting_url">
+                                <i class="fas fa-video"></i> Meeting link (required)
+                            </label>
+                            <input type="url" class="form-control" id="meeting_url" name="meeting_url"
+                                   value="{{ appointment.meeting_url }}"
+                                   placeholder="https://meet.google.com/..." required>
+                            <small class="form-hint">Sent to the patient with the confirmation.</small>
+                            {% endif %}
+
+                            {% if decision.confirms %}
+                            {% comment %}
+                            The patient chose this when they booked (plan
+                            12.1), and the doctor may confirm a different one -
+                            AGKI's decision, and what keeps a booking alive
+                            when the way of meeting does not suit. The options
+                            are the ones **this slot offers**, so a doctor is
+                            never shown something they did not publish, and the
+                            view checks the same rule on POST.
+                            {% endcomment %}
+                            <label class="form-label" for="mode-{{ action }}">
+                                <i class="fas fa-handshake"></i> How you will meet
+                            </label>
+                            <select class="form-control" id="mode-{{ action }}" name="appointmentMode">
+                                {% for value, label in appointment.slot.offered_modes %}
+                                <option value="{{ value }}"
+                                        {% if value == appointment.appointmentMode %}selected{% endif %}>
+                                    {{ label }}{% if value == appointment.appointmentMode %} - as asked{% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <small class="form-hint">
+                                Changing this tells the patient, and they can cancel if it does not work.
+                            </small>
+                            {% endif %}
+
+                            {% if decision.reason_prompt %}
+                            <label class="form-label" for="reason-{{ action }}">{{ decision.reason_prompt }}</label>
+                            <input type="text" class="form-control" id="reason-{{ action }}" name="reason"
+                                   maxlength="255" placeholder="The patient is told what you write here">
+                            {% endif %}
+
+                            <button type="submit" class="action-btn {% if 'confirm' in action %}primary{% elif 'mark_completed' in action %}success{% else %}secondary{% endif %}" style="width:100%;">
+                                <span>{{ decision.label }}</span>
+                            </button>
+                        </form>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p style="color:#888; margin:0;">
+                        This appointment is settled — there is nothing left to decide.
+                    </p>
+                    {% endif %}
+
+                    <button class="action-btn info" style="width:100%; margin-top:0.5rem;" onclick="openPatientNoteModal()">
+                        <i class="fas fa-sticky-note"></i>
+                        <span>Add Note</span>
+                    </button>
                 </div>
             </div>
 
-            <!-- Document Upload -->
+            <!-- History -->
             <div class="card">
                 <div class="card-header">
                     <h3 class="card-title">
-                        <i class="fas fa-file-upload"></i>
-                        Documents
+                        <i class="fas fa-history"></i>
+                        History
                     </h3>
-                    <button class="btn-icon-action" title="Upload Document">
-                        <i class="fas fa-plus"></i>
-                    </button>
                 </div>
                 <div class="card-body">
-                    <div class="documents-list">
-                        <div class="document-item">
-                            <i class="fas fa-file-pdf"></i>
-                            <div class="document-info">
-                                <div class="document-name">Lab Results - Oct 2025.pdf</div>
-                                <div class="document-date">Oct 16, 2025</div>
-                            </div>
-                            <button class="btn-icon-action">
-                                <i class="fas fa-download"></i>
-                            </button>
-                        </div>
-                    </div>
+                    <ul style="list-style:none; padding:0; margin:0;">
+                        <li style="padding:0.5rem 0; border-bottom:1px solid #f0f0f0;">
+                            <strong>Requested</strong><br>
+                            <small style="color:#666;">{{ appointment.created_at|date:"d M Y, H:i" }}</small>
+                        </li>
+                        {% for transition in transitions %}
+                        <li style="padding:0.5rem 0; border-bottom:1px solid #f0f0f0;">
+                            <strong>{{ transition.to_status_label }}</strong><br>
+                            <small style="color:#666;">
+                                {{ transition.created_at|date:"d M Y, H:i" }} —
+                                {% if transition.actor %}{{ transition.actor.get_full_name|default:transition.actor.username }}{% else %}patient or system{% endif %}
+                            </small>
+                            {% if transition.note %}<br><small>{{ transition.note }}</small>{% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Patient Approval Modal -->
-<div class="modal-overlay" id="patientApprovalModal">
-    <div class="modal-container">
-        <form action="{% url 'appointment_approval' appointment.id %}" method="post">
-            {% csrf_token %}
-            <div class="modal-header">
-                <h3>
-                    <i class="fas fa-user-check"></i>
-                    Approve Patient Registration
-                </h3>
-                <button class="modal-close" onclick="closePatientApprovalModal()">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="approval-summary">
-                    <div class="summary-item">
-                        <span class="summary-label">Patient Name:</span>
-                        <span class="summary-value">{{appointment.fullName}}</span>
-                    </div>
-                    <div class="summary-item">
-                        <span class="summary-label">Patient ID:</span>
-                        <span class="summary-value">{{appointment.bookingID}}</span>
-                    </div>
-                    <div class="summary-item">
-                        <span class="summary-label">Appointment Date:</span>
-                        <span class="summary-value">{{ appointment.slot.date|date:"l, F j, Y" }}</span>
-                    </div>
-                    <div class="summary-item">
-                        <span class="summary-label">Appointment Time:</span>
-                        <span class="summary-value">{{ appointment.slot.time|time:"g:i A" }}</span>
-                    </div>
-                </div>
-
-                <!-- <div class="form-group">
-                    <label class="form-label">
-                        <i class="fas fa-user-md"></i>
-                        Assign Primary Doctor
-                    </label>
-                    <select class="form-control">
-                        <option>Dr. James Smith - Cardiology</option>
-                        <option>Dr. Emily Davis - General Practice</option>
-                        <option>Dr. Michael Brown - Internal Medicine</option>
-                        <option>Dr. Lisa Anderson - Family Medicine</option>
-                    </select>
-                </div> -->
-
-
-                <div class="checkbox-group">
-                    <input type="checkbox" id="scheduleOrientation" name="is_approved"
-                        {% if approval_status and approval_status.is_approved %}
-                            checked
-                        {% endif %}
-                    >
-                    <label for="scheduleOrientation">Check to Approve an Appointment</label>
-                </div>
-
-            </div>
-            <div class="modal-footer">
-                <button class="btn-secondary" onclick="closePatientApprovalModal()">Cancel</button>
-                <button type="submit" class="btn-primary">
-                    <i class="fas fa-check"></i>
-                    Approve Patient
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
+{% comment %}
+The "Approve Patient Registration" modal stood here. It posted a single
+`is_approved` checkbox to `appointment_approval`, which wrote the superseded
+`AppointmentApproval` row — one boolean for a flow with two independent
+provider gates, and no way at all to express declined, rejected, completed,
+no-show, cancelled or expired (design §5). Its replacement is the decision
+panel above, which runs every move through `transition_to`.
+{% endcomment %}
 
 <!-- Patient Note Modal -->
 <div class="modal-overlay" id="patientNoteModal">
@@ -363,18 +433,19 @@
                         <i class="fas fa-edit"></i>
                         Note Content
                     </label>
-                    <textarea class="form-control" id="patientNoteText" rows="3" name="note_text" placeholder="Enter your note here..."></textarea>
-                    <small class="form-hint">Add relevant information about the patient, observations, or important reminders.</small>
+                    <textarea class="form-control" id="patientNoteText" rows="3" name="note_text" required placeholder="Enter your note here..."></textarea>
+                    <small class="form-hint">Internal to the clinic — the patient does not see notes.</small>
                 </div>
 
-
-                <div class="checkbox-group">
-                    <input type="checkbox" id="shareWithPatient">
-                    <label for="shareWithPatient">Share note with patient</label>
-                </div>
+                {% comment %}
+                A "Share note with patient" checkbox stood here. It was bound
+                to no field and read by nothing, so a doctor could tick it,
+                believe the patient had been sent the note, and be wrong. The
+                hint above now says plainly who can see a note.
+                {% endcomment %}
             </div>
             <div class="modal-footer">
-                <button class="btn-secondary" onclick="closePatientNoteModal()">Cancel</button>
+                <button type="button" class="btn-secondary" onclick="closePatientNoteModal()">Cancel</button>
                 <button class="btn-primary" type="submit">
                     <i class="fas fa-save"></i>
                     Save Note
@@ -1008,6 +1079,16 @@
         margin-top: 0.5rem;
     }
 
+    /* The reason field sat directly on top of the button that submits it, so
+       "Decline this time" read as part of the input rather than as the action
+       on it. Written as adjacent-sibling rules rather than a bottom margin on
+       `.form-control`, because that class is used in the modals on this page
+       too, where `.form-group` already owns the spacing. */
+    .action-buttons-vertical .form-control + .action-btn,
+    .action-buttons-vertical .form-hint + .action-btn {
+        margin-top: 0.75rem;
+    }
+
     .checkbox-group {
         display: flex;
         align-items: center;
@@ -1152,19 +1233,21 @@
     }
 </style>
 
+{% comment %}
+The page's JavaScript, reduced to the two modal helpers that do something. It
+was ~200 lines, and the interesting part is that most of it could never have
+run: `confirmPatientApproval()` read three checkbox ids that do not exist on
+the page, `savePatientNote()` read two more, and both then popped an alert
+saying the thing had been saved -- having called nothing. A `DOMContentLoaded`
+block also bound "Opening appointment scheduler..." to `.action-btn.success`,
+which is now the real "Mark as completed" submit button.
+
+Removing the approval modal above would have broken the note modal too, for a
+reason worth naming: an `addEventListener` on the removed element throws, and
+everything after it in the same script never runs. That is exactly how the
+public booking form's fake submit handler stayed harmless for so long.
+{% endcomment %}
 <script>
-    // Patient Approval Modal Functions
-    function openPatientApprovalModal() {
-        document.getElementById('patientApprovalModal').classList.add('show');
-        document.body.style.overflow = 'hidden';
-    }
-
-    function closePatientApprovalModal() {
-        document.getElementById('patientApprovalModal').classList.remove('show');
-        document.body.style.overflow = 'auto';
-    }
-
-    // Patient Note Modal Functions
     function openPatientNoteModal() {
         document.getElementById('patientNoteModal').classList.add('show');
         document.body.style.overflow = 'hidden';
@@ -1175,209 +1258,20 @@
         document.body.style.overflow = 'auto';
     }
 
-    // Close modals on overlay click
-    document.getElementById('patientApprovalModal').addEventListener('click', function(e) {
-        if (e.target === this) {
-            closePatientApprovalModal();
-        }
-    });
+    const noteModal = document.getElementById('patientNoteModal');
+    if (noteModal) {
+        noteModal.addEventListener('click', function (event) {
+            if (event.target === this) {
+                closePatientNoteModal();
+            }
+        });
+    }
 
-    document.getElementById('patientNoteModal').addEventListener('click', function(e) {
-        if (e.target === this) {
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
             closePatientNoteModal();
         }
     });
-
-    // Close modals on Escape key
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            closePatientApprovalModal();
-            closePatientNoteModal();
-        }
-    });
-
-    // Confirm Patient Approval
-    function confirmPatientApproval() {
-        const sendWelcomeEmail = document.getElementById('sendWelcomeEmail').checked;
-        const createPatientPortal = document.getElementById('createPatientPortal').checked;
-        const scheduleOrientation = document.getElementById('scheduleOrientation').checked;
-        
-        // Simulate API call
-        console.log('Approving patient:', {
-            sendWelcomeEmail: sendWelcomeEmail,
-            createPatientPortal: createPatientPortal,
-            scheduleOrientation: scheduleOrientation
-        });
-
-        // Show success message
-        alert('Patient approved successfully! Welcome email sent.');
-        
-        // Close modal
-        closePatientApprovalModal();
-        
-        // Update UI
-        const statusBadge = document.querySelector('.status-badge');
-        if (statusBadge) {
-            statusBadge.className = 'status-badge confirmed';
-            statusBadge.textContent = 'Active Patient';
-        }
-
-        // Update approval button
-        const approvalBtn = document.querySelector('.card-header .card-action');
-        if (approvalBtn) {
-            approvalBtn.innerHTML = '<i class="fas fa-check-circle"></i> Approved';
-            approvalBtn.style.background = '#d4edda';
-            approvalBtn.style.color = '#155724';
-            approvalBtn.disabled = true;
-            approvalBtn.style.cursor = 'not-allowed';
-        }
-    }
-
-    // Save Patient Note
-    function savePatientNote() {
-        const noteText = document.getElementById('patientNoteText').value.trim();
-        const noteCategory = document.getElementById('noteCategory').value;
-        const markImportant = document.getElementById('markImportant').checked;
-        const shareWithPatient = document.getElementById('shareWithPatient').checked;
-        
-        if (!noteText) {
-            alert('Please enter a note before saving.');
-            return;
-        }
-
-        // In production: Make API call to save note
-        console.log('Saving patient note:', {
-            noteText: noteText,
-            category: noteCategory,
-            important: markImportant,
-            shareWithPatient: shareWithPatient
-        });
-
-        // Add note to UI
-        addPatientNoteToUI(noteText, noteCategory);
-
-        // Clear textarea
-        document.getElementById('patientNoteText').value = '';
-        document.getElementById('markImportant').checked = false;
-        document.getElementById('shareWithPatient').checked = false;
-
-        // Show success message
-        alert('Patient note saved successfully!');
-
-        // Close modal
-        closePatientNoteModal();
-    }
-
-    // Add patient note to UI
-    function addPatientNoteToUI(noteText, category) {
-        const notesContainer = document.querySelector('.notes-container');
-        const currentDate = new Date().toLocaleString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-
-        const noteHTML = `
-            <div class="note-item" style="animation: slideIn 0.3s ease;">
-                <div class="note-header">
-                    <div class="note-author">
-                        <img src="https://via.placeholder.com/40" alt="Doctor" class="note-avatar">
-                        <div>
-                            <div class="note-author-name">Dr. Current User</div>
-                            <div class="note-timestamp">${currentDate}</div>
-                        </div>
-                    </div>
-                    <button class="btn-icon-action" title="Delete Note" onclick="deleteNote(this)">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-                <div class="note-content">${noteText}</div>
-            </div>
-        `;
-
-        notesContainer.insertAdjacentHTML('afterbegin', noteHTML);
-    }
-
-
-
-    // Delete note function
-    function deleteNote(button) {
-        if (confirm('Are you sure you want to delete this note?')) {
-            const noteItem = button.closest('.note-item');
-            noteItem.style.opacity = '0';
-            noteItem.style.transform = 'translateX(-20px)';
-            setTimeout(() => {
-                noteItem.remove();
-            }, 300);
-        }
-    }
-
-    // Quick action handlers
-    document.addEventListener('DOMContentLoaded', function() {
-        // Schedule appointment
-        const scheduleBtn = document.querySelector('.action-btn.success');
-        if (scheduleBtn) {
-            scheduleBtn.addEventListener('click', function() {
-                alert('Opening appointment scheduler...');
-            });
-        }
-
-        // Create prescription
-        const prescriptionBtn = document.querySelector('.action-btn.warning');
-        if (prescriptionBtn) {
-            prescriptionBtn.addEventListener('click', function() {
-                alert('Opening prescription form...');
-            });
-        }
-
-        // Send message
-        const messageBtn = document.querySelectorAll('.action-btn.secondary')[0];
-        if (messageBtn) {
-            messageBtn.addEventListener('click', function() {
-                alert('Opening messaging interface...');
-            });
-        }
-
-        // Print profile
-        const printBtn = document.querySelectorAll('.action-btn')[5];
-        if (printBtn) {
-            printBtn.addEventListener('click', function() {
-                window.print();
-            });
-        }
-    });
-
-    // Animation for page load
-    window.addEventListener('load', function() {
-        const cards = document.querySelectorAll('.card');
-        cards.forEach((card, index) => {
-            card.style.opacity = '0';
-            card.style.transform = 'translateY(20px)';
-            setTimeout(() => {
-                card.style.transition = 'all 0.5s ease';
-                card.style.opacity = '1';
-                card.style.transform = 'translateY(0)';
-            }, index * 50);
-        });
-    });
-
-    // Add CSS animation
-    const style = document.createElement('style');
-    style.textContent = `
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateX(-20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
-    `;
-    document.head.appendChild(style);
 </script>
 
 {% endblock %}

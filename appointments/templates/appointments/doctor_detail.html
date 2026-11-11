@@ -1,0 +1,541 @@
+{% extends "appointments/patient_base.html" %}
+
+{% comment %}
+One doctor, and when they can be seen (plan 11.15).
+
+New in this phase. Availability used to be listed inside the results card, so
+the list of doctors was mostly a list of times — 59 chips across 20 day-groups
+for one doctor, six cards to a page — and the doctor's own qualifications,
+region and description had nowhere to live. The bio a doctor writes on their
+profile was shown to nobody.
+
+The day strip is a row of links, not a script. `?date=` keeps the page a plain
+GET: it works without JavaScript, it can be sent to somebody, and it comes back
+to the same day after a refresh. A date that is unparseable, or that has
+nothing on it, falls back to the first day that does rather than 404ing.
+{% endcomment %}
+
+{% block page_css %}
+        .dd-head { display: flex; gap: 1.1rem; align-items: flex-start; flex-wrap: wrap; }
+        .dd-avatar {
+            width: 68px; height: 68px; border-radius: 14px; object-fit: cover;
+            flex: 0 0 auto; border: 1px solid var(--line);
+        }
+        .dd-name { font-size: 1.25rem; font-weight: 700; color: var(--ink); line-height: 1.2; }
+        .dd-specialty { font-size: .9rem; color: var(--green-mid); font-weight: 600; }
+        .dd-meta { font-size: .86rem; color: var(--dim); margin-top: .15rem; }
+        .dd-next { margin-left: auto; }
+
+        .dd-bio { margin-top: 1.1rem; padding-top: 1rem; border-top: 1px solid var(--line); font-size: .93rem; }
+
+        /* The calendar, in the shape the console's availability page uses
+           (plan 11.1), at AGKI's instruction. The day strip this replaces
+           listed only the days that had something, scrolling sideways — with
+           a 30-day horizon that is twenty pills wide, which traded the page's
+           height for its width.
+
+           A grid says the same thing in five rows, and says more: a patient
+           can see that a doctor is free on Mondays, or not free next week,
+           which a strip of dates in a row does not show. */
+        .dd-cal {
+            display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px;
+        }
+        .dd-dow {
+            font-size: .66rem; letter-spacing: .08em; text-transform: uppercase;
+            color: var(--dim); text-align: center; padding-bottom: .1rem;
+        }
+        .dd-day {
+            border: 1px solid var(--line); border-radius: 8px; background: var(--panel);
+            min-height: 74px; padding: .35rem; display: flex; flex-direction: column;
+            gap: 3px; text-decoration: none; color: inherit;
+        }
+        .dd-num {
+            font-size: .72rem; color: var(--dim); text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Only a day with something to book is a link, so hovering a day that
+           cannot be clicked does not pretend otherwise. */
+        a.dd-day:hover { border-color: var(--green-mid); background: #f7fbf7; }
+        .dd-day.today { border-color: var(--green-mid); box-shadow: inset 0 0 0 1px var(--green-mid); }
+        .dd-day.today .dd-num { color: var(--green); font-weight: 700; }
+        .dd-day.past, .dd-day.outside { background: var(--panel-2); opacity: .55; }
+        .dd-day.on { border-color: var(--green); box-shadow: inset 0 0 0 2px var(--green); }
+
+        .dd-count {
+            font-size: .72rem; font-weight: 700; border-radius: 4px; padding: .15rem .3rem;
+            background: #e8f4ea; color: var(--ok); text-align: center;
+            margin-top: auto;
+        }
+        .dd-day.on .dd-count { background: var(--green); color: #fff; }
+
+        /* --- the period bar ------------------------------------------- */
+        .dd-bar {
+            display: flex; flex-wrap: wrap; gap: .6rem 1rem; align-items: center;
+            margin-bottom: 1rem;
+        }
+        .dd-period { display: flex; align-items: center; gap: .5rem; }
+        .dd-step {
+            width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center;
+            border: 1px solid var(--line); color: var(--ink-2); text-decoration: none;
+            font-size: 1.1rem; line-height: 1;
+        }
+        .dd-step:hover { border-color: var(--green-mid); color: var(--green); }
+        .dd-now { font-weight: 700; color: var(--ink); font-size: .95rem; }
+        .dd-today {
+            font-size: .8rem; font-weight: 600; color: var(--green); text-decoration: none;
+        }
+        .dd-seg {
+            margin-left: auto; display: inline-flex; border: 1px solid var(--line);
+            border-radius: 8px; overflow: hidden;
+        }
+        .dd-seg a {
+            padding: .35rem .85rem; font-size: .84rem; font-weight: 600;
+            color: var(--ink-2); text-decoration: none; background: var(--panel);
+        }
+        .dd-seg a.on { background: var(--green); color: #fff; }
+
+        /* --- the day modal --------------------------------------------
+           The same overlay-and-sheet the console's "Publish times" and "Add
+           one time" modals use, at AGKI's instruction. What it replaces was a
+           panel that unfolded under the calendar: on a month view that put the
+           times below five rows of grid, so choosing a day scrolled the thing
+           you had just clicked off the top of the screen. */
+        .dd-overlay {
+            display: none; position: fixed; inset: 0; z-index: 1200;
+            background: rgba(20, 28, 22, .55); padding: 1.5rem;
+            align-items: flex-start; justify-content: center; overflow-y: auto;
+        }
+        .dd-overlay.show { display: flex; }
+        .dd-sheet {
+            background: var(--panel); border-radius: 12px; width: 100%; max-width: 460px;
+            margin-top: 6vh; box-shadow: 0 20px 60px rgba(0, 0, 0, .28); overflow: hidden;
+        }
+        .dd-sheet-head {
+            display: flex; align-items: center; gap: 1rem;
+            padding: 1rem 1.25rem; border-bottom: 1px solid var(--line);
+        }
+        .dd-sheet-head h3 { margin: 0; font-size: 1.05rem; color: var(--ink); }
+        .dd-sheet-head span { font-size: .84rem; color: var(--dim); }
+        .dd-sheet-close {
+            margin-left: auto; background: none; border: 0; font-size: 1.4rem; line-height: 1;
+            color: var(--dim); cursor: pointer; text-decoration: none; padding: 0 .2rem;
+        }
+        .dd-sheet-body { padding: 1.25rem; }
+        .dd-sheet-foot {
+            display: flex; justify-content: flex-end; gap: .5rem;
+            padding: .9rem 1.25rem; border-top: 1px solid var(--line); background: var(--panel-2);
+            font-size: .84rem; color: var(--dim);
+        }
+        .dd-row {
+            display: flex; align-items: center; gap: .8rem; flex-wrap: wrap;
+            padding: .6rem .85rem; border: 1px solid var(--line); border-radius: 8px;
+            background: var(--panel); margin-bottom: .4rem; font-size: .88rem;
+        }
+        .dd-row .time {
+            font-weight: 600; font-variant-numeric: tabular-nums;
+            min-width: 72px; color: var(--ink);
+        }
+        .dd-row .pill {
+            font-size: .7rem; font-weight: 600; padding: .12rem .55rem; border-radius: 999px;
+            background: #e8f4ea; color: var(--ok);
+        }
+        .dd-row .act {
+            margin-left: auto; font-size: .84rem; font-weight: 600; color: var(--green);
+            text-decoration: none; min-height: 44px; display: inline-flex; align-items: center;
+        }
+        .dd-row .act:hover { color: var(--green-mid); }
+
+        @media (max-width: 640px) {
+            /* Two columns and the date spelled out, the same concession the
+               console makes: seven columns on a phone is seven cells too
+               narrow to read. */
+            .dd-cal { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .dd-dow { display: none; }
+            .dd-day { min-height: 62px; }
+            .dd-day::before {
+                content: attr(data-label); font-size: .68rem; color: var(--dim);
+            }
+            .dd-num { display: none; }
+            .dd-day.outside, .dd-day.past { display: none; }
+        }
+
+        .dd-part {
+            font-size: .68rem; letter-spacing: .08em; text-transform: uppercase;
+            color: var(--dim); font-weight: 600; margin: 1.1rem 0 .4rem;
+        }
+        .dd-times { display: flex; flex-wrap: wrap; gap: .45rem; }
+        .dd-time {
+            border: 1px solid #cfe0d1; background: #f2f8f2; color: var(--green);
+            border-radius: 8px; padding: .5rem .8rem; font-size: .89rem; font-weight: 600;
+            text-decoration: none; font-variant-numeric: tabular-nums;
+            /* 44px so it can be hit with a thumb: this page is used standing in
+               a queue far more often than at a desk. */
+            min-height: 44px; display: inline-flex; align-items: center;
+        }
+        .dd-time:hover { background: var(--green); color: #fff; border-color: var(--green); }
+
+        /* The margin is explicit because the rhythm the rest of the flow
+           relies on cannot reach here: `.pt-card + .pt-card` spaces adjacent
+           cards, and this grid is a plain wrapper sitting between the doctor's
+           card and the cards inside it — so the header card had nothing under
+           it and the two columns started flush against it. Same 1.25rem as the
+           gap inside the grid, so the spacing reads as one system. */
+        .dd-layout {
+            display: grid; gap: 1.25rem; align-items: start; margin-top: 1.25rem;
+        }
+        @media (min-width: 940px) { .dd-layout { grid-template-columns: 1.5fr 1fr; } }
+{% endblock %}
+
+{% block content %}
+
+<p style="margin-bottom: 1rem;">
+    <a class="pt-btn ghost" href="{% url 'search_results' %}">
+        <i class="fas fa-arrow-left"></i> All doctors
+    </a>
+</p>
+
+<div class="pt-card">
+    <div class="dd-head">
+        {% include "partials/avatar.html" with image=doctor.image alt=doctor.get_full_name css_class="dd-avatar" only %}
+        <div>
+            <h1 class="dd-name">Dr. {{ doctor.get_full_name|default:doctor.username }}</h1>
+            <div class="dd-specialty">
+                {% for specialty in specialties %}{{ specialty.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                {% if qualifications %}
+                    {% if specialties %} • {% endif %}
+                    {% for q in qualifications %}{{ q.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                {% endif %}
+            </div>
+            <div class="dd-meta">
+                {% if profile.region or profile.location %}
+                <i class="fas fa-map-marker-alt"></i>
+                {{ profile.region }}{% if profile.location %} — {{ profile.location }}{% endif %}
+                {% endif %}
+                {% if profile.years_of_experience %} · {{ profile.years_of_experience }} years experience{% endif %}
+                {% if profile.languages_spoken %} · {{ profile.languages_spoken }}{% endif %}
+            </div>
+        </div>
+        {% if next_slot %}
+        <span class="pt-chip ok dd-next">
+            <i class="fas fa-circle-check"></i>
+            Next: {{ next_slot.date|date:'D j M' }}, {{ next_slot.time|date:'g:i A' }}
+        </span>
+        {% endif %}
+    </div>
+
+    {% if profile.bio %}
+    {% comment %}
+    The doctor writes this on their own profile page and, until this page
+    existed, nobody outside the console ever saw it.
+    {% endcomment %}
+    <p class="dd-bio">{{ profile.bio }}</p>
+    {% endif %}
+</div>
+
+<div class="dd-layout">
+    <div>
+        <div class="pt-card">
+            <h2>Choose a time</h2>
+
+            {% if days %}
+            <p class="pt-sub" style="margin-bottom: 1rem;">
+                {{ day_count }} day{{ day_count|pluralize }} with availability in the next
+                {{ horizon_days }}. Times need at least {{ booking_notice }} notice.
+            </p>
+
+            {% comment %}
+            The same navigation the console's availability page carries, at
+            AGKI's instruction: ordinary links, so the browser's back button
+            works and a week can be bookmarked or sent to somebody. `date` is
+            deliberately dropped when the period changes — the day open in the
+            drawer belongs to the period it was chosen in.
+            {% endcomment %}
+            <div class="dd-bar">
+                <div class="dd-period">
+                    <a class="dd-step" href="?view={{ view_mode }}&amp;start={{ prev_start|date:'Y-m-d' }}"
+                       aria-label="Previous {{ view_mode }}">&lsaquo;</a>
+                    <span class="dd-now">{{ period_label }}</span>
+                    <a class="dd-step" href="?view={{ view_mode }}&amp;start={{ next_start|date:'Y-m-d' }}"
+                       aria-label="Next {{ view_mode }}">&rsaquo;</a>
+                    {% if not is_current_period %}
+                    <a class="dd-today" href="?view={{ view_mode }}">Today</a>
+                    {% endif %}
+                </div>
+
+                <div class="dd-seg">
+                    <a href="?view=week&amp;start={{ period_start|date:'Y-m-d' }}"
+                       class="{% if view_mode == 'week' %}on{% endif %}">Week</a>
+                    <a href="?view=month&amp;start={{ period_start|date:'Y-m-d' }}"
+                       class="{% if view_mode == 'month' %}on{% endif %}">Month</a>
+                </div>
+            </div>
+
+            <div class="dd-cal">
+                {% comment %}
+                Written out rather than looped over a `split` filter: that
+                filter lives in the console app, and the patient flow having to
+                load a template library from `doctorDashboard` to print seven
+                fixed words is a dependency for nothing.
+                {% endcomment %}
+                <div class="dd-dow">Mon</div>
+                <div class="dd-dow">Tue</div>
+                <div class="dd-dow">Wed</div>
+                <div class="dd-dow">Thu</div>
+                <div class="dd-dow">Fri</div>
+                <div class="dd-dow">Sat</div>
+                <div class="dd-dow">Sun</div>
+
+                {% for week in weeks %}
+                {% for day in week %}
+                {% comment %}
+                A day with times is a link; a day without is a plain cell.
+                Rendering both as links would offer a patient thirty clicks
+                that go nowhere, which is what the empty tiles on the old front
+                door did.
+                {% endcomment %}
+                {% if day.count %}
+                <a class="dd-day{% if day.date == selected_date %} on{% endif %}{% if day.is_today %} today{% endif %}{% if not day.in_period %} outside{% endif %}"
+                   href="?view={{ view_mode }}&amp;start={{ period_start|date:'Y-m-d' }}&amp;date={{ day.date|date:'Y-m-d' }}"
+                   data-label="{{ day.date|date:'D j M' }}"
+                   data-day="{{ day.date|date:'l, j F Y' }}"
+                   data-count="{{ day.count }}"
+                   {% if day.date == selected_date %}aria-current="date"{% endif %}>
+                    <span class="dd-num">{{ day.date|date:'j' }}</span>
+
+                    {% comment %}
+                    A count in both views. The week view listed the times
+                    themselves, copied from the console — where it is right,
+                    because a doctor scanning their own week is reading which
+                    times they published. A patient is not: the times open in
+                    the modal, so printing them in the cell as well said the
+                    same thing twice and made a week cell look like a different
+                    kind of thing from a month cell (AGKI, 2026-09-02).
+                    {% endcomment %}
+                    <span class="dd-count">{{ day.count }}</span>
+
+                    {% comment %}
+                    The day's times travel with the day, so the drawer needs no
+                    second query and cannot disagree with the calendar - the
+                    arrangement the console uses, and for the same reason.
+                    {% endcomment %}
+                    {% comment %}
+                    Marked with an attribute rather than a class: a
+                    `<template>` is never rendered, so a class on it would be a
+                    name the stylesheet has to carry a rule for and can never
+                    style - and "every class the markup uses is defined" is a
+                    rule this flow is tested against (plan 11.11).
+                    {% endcomment %}
+                    <template data-day-times>
+                        {% include "appointments/partials/day_times.html" with slots=day.slots only %}
+                    </template>
+                </a>
+                {% else %}
+                <div class="dd-day{% if day.is_today %} today{% endif %}{% if day.is_past %} past{% endif %}{% if not day.in_period %} outside{% endif %}"
+                     data-label="{{ day.date|date:'D j M' }}">
+                    <span class="dd-num">{{ day.date|date:'j' }}</span>
+                </div>
+                {% endif %}
+                {% endfor %}
+                {% endfor %}
+            </div>
+
+            {% comment %}
+            The day's times open here rather than being listed under the
+            calendar, in the row format the console's day drawer uses (plan
+            11.17). Rendered by the server for the day in `?date=`, so the page
+            works with JavaScript switched off; the script at the foot of the
+            page then swaps in another day's rows from the markup above without
+            a round trip.
+            {% endcomment %}
+            {% if period_has_times %}
+            <p class="pt-help" style="margin-top: 1.25rem;">
+                Pick a day with a green count on it to see its times.
+            </p>
+            {% else %}
+            <p class="pt-help" style="margin-top: 1.25rem;">
+                Nothing to book in {{ period_label }}. Try another
+                {{ view_mode }}.
+            </p>
+            {% endif %}
+
+            {% else %}
+            <div class="pt-empty">
+                <i class="fas fa-calendar-xmark"></i>
+                <h2>No times published</h2>
+                <p>
+                    This doctor has nothing bookable in the next {{ horizon_days }} days.
+                    They may publish more — or you can see who else is available.
+                </p>
+                <p style="margin-top: 1rem;">
+                    <a class="pt-btn" href="{% url 'search_results' %}">See other doctors</a>
+                </p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <aside>
+        <div class="pt-card">
+            <h2>How booking works</h2>
+            <p class="pt-sub" style="margin-bottom: .75rem;">
+                Picking a time sends a request. Nothing is settled until the doctor
+                confirms it — and then you choose how to meet.
+            </p>
+            <a class="pt-btn ghost" href="{% url 'appointment_home' %}">The four rounds</a>
+        </div>
+
+        <div class="pt-card">
+            <h2>Good to know</h2>
+            <ul style="margin-left: 1.1rem; font-size: .9rem; color: var(--dim);">
+                <li>Times need at least {{ booking_notice }} notice, so anything sooner is not offered.</li>
+                <li>You can book up to {{ horizon_days }} days ahead.</li>
+                {% if site_settings.phone %}
+                <li>Prefer to talk to someone? Call <a href="tel:{{ site_settings.phone }}">{{ site_settings.phone }}</a>.</li>
+                {% endif %}
+            </ul>
+        </div>
+    </aside>
+</div>
+
+{% comment %}
+The day modal. Outside the cards, as the console's overlays are, because a
+`position: fixed` element inside a card that establishes a containing block is
+a modal that quietly stops covering the page.
+
+It carries the `show` class when the URL names a day, so the page works with
+JavaScript switched off: every day in the calendar is an ordinary link to
+`?date=`, and this arrives already open. The script below only saves the round
+trip.
+{% endcomment %}
+<div class="dd-overlay{% if selected_date %} show{% endif %}" id="ddModal">
+    <div class="dd-sheet" role="dialog" aria-modal="true" aria-labelledby="ddModalDay">
+        <div class="dd-sheet-head">
+            <div>
+                <h3 id="ddModalDay">{{ selected_date|date:'l, j F Y' }}</h3>
+                <span id="ddModalCount">
+                    {{ selected_slots|length }} time{{ selected_slots|length|pluralize }} to book
+                </span>
+            </div>
+            <a class="dd-sheet-close" id="ddModalClose"
+               href="?view={{ view_mode }}&amp;start={{ period_start|date:'Y-m-d' }}"
+               aria-label="Close">&times;</a>
+        </div>
+
+        <div class="dd-sheet-body" id="ddModalRows">
+            {% include "appointments/partials/day_times.html" with slots=selected_slots only %}
+        </div>
+
+        <div class="dd-sheet-foot">
+            Choosing a time sends a request — the doctor confirms it afterwards.
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block page_js %}
+{% comment %}
+Progressive enhancement, not a requirement. Every day in the calendar is an
+ordinary link to `?date=`, and the server renders the modal already open for
+it — so this page selects days, opens the modal and books a time with
+JavaScript switched off. What the script adds is not making the round trip.
+
+The rows it moves were written by Django into each day's `<template>`, which is
+how the console's availability page does it: no second query, and the modal
+cannot show something the calendar does not.
+{% endcomment %}
+<script>
+    (function () {
+        "use strict";
+
+        var modal = document.getElementById('ddModal');
+        var rows = document.getElementById('ddModalRows');
+        var dayLabel = document.getElementById('ddModalDay');
+        var count = document.getElementById('ddModalCount');
+        var close = document.getElementById('ddModalClose');
+        if (!modal || !rows || !dayLabel || !count) { return; }
+
+        var lastOpener = null;
+
+        function open(cell) {
+            var data = cell.querySelector('[data-day-times]');
+            if (!data) { return; }
+
+            rows.innerHTML = '';
+            rows.appendChild(data.content.cloneNode(true));
+
+            dayLabel.textContent = cell.dataset.day || '';
+            var n = parseInt(cell.dataset.count, 10) || 0;
+            count.textContent = n + (n === 1 ? ' time to book' : ' times to book');
+
+            document.querySelectorAll('a.dd-day.on').forEach(function (other) {
+                other.classList.remove('on');
+                other.removeAttribute('aria-current');
+            });
+            cell.classList.add('on');
+            cell.setAttribute('aria-current', 'date');
+
+            modal.classList.add('show');
+            // The page behind a modal should not scroll under it.
+            document.body.style.overflow = 'hidden';
+
+            lastOpener = cell;
+            var first = rows.querySelector('a');
+            if (first) { first.focus(); }
+
+            // The address bar is deliberately **not** rewritten. It used to
+            // follow the open day, so `?date=` stayed in the URL and a
+            // refresh - or coming back through history - reopened the modal
+            // over a calendar nobody had asked to open (AGKI, 2026-09-02).
+            // A modal should be the result of a click, and only of a click.
+            // The server still honours `?date=` on the way in, which is what
+            // keeps the page working with JavaScript switched off.
+        }
+
+        function shut() {
+            modal.classList.remove('show');
+            document.body.style.overflow = '';
+            document.querySelectorAll('a.dd-day.on').forEach(function (cell) {
+                cell.classList.remove('on');
+                cell.removeAttribute('aria-current');
+            });
+            // Focus goes back where it came from, not to the top of the page.
+            if (lastOpener) { lastOpener.focus(); lastOpener = null; }
+        }
+
+        document.querySelectorAll('a.dd-day').forEach(function (cell) {
+            cell.addEventListener('click', function (event) {
+                // Modified clicks are the browser's business: a patient
+                // opening a day in a new tab should get one.
+                if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) {
+                    return;
+                }
+                event.preventDefault();
+                open(cell);
+            });
+        });
+
+        if (close) {
+            close.addEventListener('click', function (event) {
+                event.preventDefault();
+                shut();
+            });
+        }
+
+        // Clicking the backdrop, but not the sheet sitting on it.
+        modal.addEventListener('click', function (event) {
+            if (event.target === modal) { shut(); }
+        });
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape' && modal.classList.contains('show')) { shut(); }
+        });
+
+        // The server may have rendered it open, from `?date=` in the URL.
+        if (modal.classList.contains('show')) {
+            document.body.style.overflow = 'hidden';
+        }
+    }());
+</script>
+{% endblock %}

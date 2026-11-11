@@ -72,8 +72,15 @@
                     <li class="nav-item"><a class="nav-link nav-link-custom" href="#team">Our Team</a></li>
                     <li class="nav-item"><a class="nav-link nav-link-custom" href="#contact">Contact</a></li>
                 </ul>
-                <a href="{% url 'signin' %}" class="nav-appointment">
-                    <i class="fa-solid fa-mobile-screen-button"></i> Explore platform
+                {% comment %}
+                The header button used to be "Explore platform" pointing at
+                `signin` — so the one persistent call to action on a
+                patient-facing site sent patients to a doctor login. It books
+                now; Explore platform kept its own place among the hero CTAs
+                below, at AGKI's instruction (plan 11.12).
+                {% endcomment %}
+                <a href="{% url 'appointment_home' %}" class="nav-appointment">
+                    <i class="fa-regular fa-calendar-check"></i> Book appointment
                 </a>
             </div>
         </div>
@@ -113,6 +120,20 @@
                             class="fa-solid fa-arrow-right"></i>
                     </a>
                     {% endif %}
+                    {% comment %}
+                    The doctors' way in. Hardcoded rather than a third CMS field
+                    because it is a route into this system, not a piece of
+                    content — the URL is `reverse('signin')` and an editor
+                    should not be able to point it somewhere else.
+
+                    Quieter than the two above it, and on its own line below
+                    them once the screen narrows: the hero speaks to patients,
+                    and a clinician looking for their console will find one
+                    link as readily as three competing buttons.
+                    {% endcomment %}
+                    <a href="{% url 'signin' %}" class="hero-button-tertiary">
+                        <i class="fa-solid fa-mobile-screen-button"></i> Explore platform
+                    </a>
                 </div>
 
                 {% if hero_stats %}

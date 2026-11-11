@@ -47,5 +47,76 @@ class CustomUserAdmin(UserAdmin):
             OtpToken.objects.filter(user=obj).delete()
 
 
+class SuperuserOnlyAdmin(admin.ModelAdmin):
+    """Visible and editable only to superusers (design §4.3, binding).
+
+    Not merely "we didn't grant the Content Editors group these permissions".
+    That is true too — `cms/migrations/0003_content_editors_group.py`
+    enumerates that group's permissions and nothing here is in the list — but
+    it relies on nobody ever running a well-meaning "grant all". This makes
+    the rule code, so granting the permission is not enough to get in.
+
+    Used for booking *configuration*: appointment settings, the specialty
+    taxonomy. Note `cms.SiteSettings` is deliberately **not** in this
+    category — shared company identity stays with the CMS editors (decision
+    6). The boundary is identity vs. configuration, not which app renders it.
+    """
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+
+class TaxonomyAdmin(SuperuserOnlyAdmin):
+    """Shared by the two picked lists. Superuser-only, per design §4.3."""
+
+    list_display = ("name", "slug", "is_active", "order", "doctor_count")
+    list_editable = ("is_active", "order")
+    search_fields = ("name",)
+    prepopulated_fields = {"slug": ("name",)}
+
+    @admin.display(description="doctors")
+    def doctor_count(self, obj):
+        return obj.doctors.count()
+
+
+@admin.register(Specialty)
+class SpecialtyAdmin(TaxonomyAdmin):
+    """The taxonomy patients search doctors by (§5.5).
+
+    **This docstring used to say the table was "intentionally empty until AGKI
+    names their real specialties (step 9.6)", and that seeding it "would be
+    putting words in their mouth".** That was right while nobody had asked.
+    AGKI asked on 2026-09-01 - "add the most common qualifications and
+    specialization" - so migration 0013 seeds a starting list, and this note
+    is corrected rather than left contradicting the code beneath it.
+
+    The seed is a starting point, not a taxonomy: `is_active` retires a row
+    without deleting the links to it, `order` sets its place, and adding one
+    is a row here rather than a deploy.
+    """
+
+
+@admin.register(Qualification)
+class QualificationAdmin(TaxonomyAdmin):
+    """What a doctor is qualified as. AGKI's list to keep (design §4.3).
+
+    Replaces the free-text `CustomUser.qualifications`, which every doctor in
+    the database left empty - and which sat beside `Profile.expertise`, whose
+    one live value is "Cardiograph".
+    """
+
+
 admin.site.register(OtpToken)
 admin.site.register(Profile)

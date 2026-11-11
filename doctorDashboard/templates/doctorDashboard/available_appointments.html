@@ -1,134 +1,351 @@
 {% extends 'doctorDashboard/doctor_base.html' %}
 {% load static %}
 {% block content %}
-<!-- Dashboard Content -->
-<div class="dashboard-content">
-    <!-- Stats Cards -->
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-icon blue">
-                <i class="fas fa-calendar-check"></i>
-            </div>
-            <div class="stat-info">
-                <div class="stat-label">Today's Appointments</div>
-                <div class="stat-value">{{today_count}}</div>
-                <div class="stat-change positive">
-                    <i class="fas fa-arrow-up"></i> {{today_comparison}}% from yesterday
-                </div>
-            </div>
+{% comment %}
+Rebuilt to the design agreed with AGKI on 2026-09-01 (plan 11.4), in the system
+the availability page established: same tokens, same control bar, same
+left-rail state language, same type scale.
+
+Unlike that page, nothing here was invisible - all 32 classes it used came from
+the base. What was wrong was that it did not help anybody work, and that two
+things on it were untrue:
+
+  * a stat card labelled **"Total Appointments"** was fed by `total_patients`,
+    which counts distinct email addresses - so a patient seen four times
+    counted once and the figure was smaller than the number of rows beneath it;
+  * ordering was `-slot__date`, **descending**, so a booking for December sat
+    above one starting tomorrow morning.
+
+And it was one flat table of every appointment ever made: no search, no
+filter, no pagination, and no sign of whose turn it was - though
+`DOCTOR_ACTION_STATUSES` has drawn that line correctly since plan 5.13 and the
+sidebar bell already used it.
+
+Classes are `ap-` prefixed for the reason the availability page's are `av-`:
+a generic name can be silently supplied - or not supplied - by another page's
+<style> block, and a test asserts every one of them is defined here.
+{% endcomment %}
+
+<div class="dashboard-content ap">
+
+    <div class="ap-bar">
+        <div class="ap-title">
+            <p>Grouped by who is holding each one up.</p>
         </div>
 
-        <div class="stat-card">
-            <div class="stat-icon orange">
-                <i class="fas fa-user-check"></i>
-            </div>
-            <div class="stat-info">
-                <div class="stat-label">Pending Appointment</div>
-                <div class="stat-value">{{pending_count}}</div>
-            </div>
+        <div class="ap-tabs">
+            {% for name, label, count in list_views %}
+            <a href="?show={{ name }}{% if query %}&q={{ query|urlencode }}{% endif %}"
+               class="{% if show == name %}on{% endif %}">
+                {{ label }}{% if name != 'all' %} <b>{{ count }}</b>{% endif %}
+            </a>
+            {% endfor %}
         </div>
 
-        <div class="stat-card">
-            <div class="stat-icon green">
-                <i class="fas fa-clock"></i>
-            </div>
-            <div class="stat-info">
-                <div class="stat-label">Total Appointments</div>
-                <div class="stat-value">{{total_patients}}</div>
-                
-            </div>
-        </div>
-
-        <!-- <div class="stat-card">
-            <div class="stat-icon red">
-                <i class="fas fa-dollar-sign"></i>
-            </div>
-            <div class="stat-info">
-                <div class="stat-label">Revenue (This Month)</div>
-                <div class="stat-value">$-</div>
-                <div class="stat-change positive">
-                    <i class="fas fa-arrow-up"></i> -% increase
-                </div>
-            </div>
-        </div> -->
+        <form class="ap-search" method="get">
+            <input type="hidden" name="show" value="{{ show }}">
+            <input type="search" name="q" value="{{ query }}"
+                   placeholder="Search name or AGKI-…" aria-label="Search appointments">
+            <button type="submit" class="ap-btn ghost">Search</button>
+            {% if query %}<a class="ap-clear" href="?show={{ show }}">Clear</a>{% endif %}
+        </form>
     </div>
 
+    {% if messages %}
+    <div class="ap-messages">
+        {% for message in messages %}
+        <div class="ap-message {{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
 
-    <!-- Today's Appointments -->
-    <div class="card">
-        <div class="card-header">
-            <h2 class="card-title">
-                <i class="fas fa-calendar-day"></i>
-                Appointments
-            </h2>
-            
+    <div class="ap-metrics">
+        <div class="ap-metric warn">
+            <div class="n">{{ needs_you_count }}</div>
+            <div class="k">Needs you</div>
         </div>
-        <div class="card-body">
-            <div class="appointments-table">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Time</th>
-                            <th>Patient</th>
-                            <th>Type</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        
-                        {% if all_appointments %}
-                        {% for i in all_appointments %}
-                        <tr>
-                            <td><strong>{{i.slot.time}}</strong></td>
-                            <td>
-                                <div class="patient-info">
-                                    <!-- <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop" alt="Patient" class="patient-avatar"> -->
-                                    <div>
-                                        <div class="patient-name">{{i.fullName}}</div>
-                                        <div class="patient-id">ID: {{i.bookingID}}</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td>{{i.reasonVisit}}</td>
-                            <td>
-                                {% if i.appointmentapproval.is_approved %}
-                                    <span class="status-badge confirmed">Confirmed</span>
-                                {% else %}
-                                    <span class="status-badge pending">Pending</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <div class="action-buttons">
-                                    <a href="{% url 'doctor_appointment_details' i.id %}" style="text-decoration: none;">
-                                    <button class="btn-action view" title="View Details">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                    </a>
-                                    <!-- <button class="btn-action edit" title="Edit">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="btn-action delete" title="Cancel">
-                                        <i class="fas fa-times"></i>
-                                    </button> -->
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                        {% else %}
-                        <tr>
-                            <td colspan="5" style="text-align: center; padding: 2rem; color: #666;">
-                                No appointments scheduled for today.
-                            </td>
-                        </tr>
-                        {% endif %}
-
-                    </tbody>
-                </table>
-            </div>
+        <div class="ap-metric ok">
+            <div class="n">{{ today_count }}</div>
+            <div class="k">Today</div>
+        </div>
+        <div class="ap-metric info">
+            <div class="n">{{ upcoming_count }}</div>
+            <div class="k">Upcoming</div>
+        </div>
+        <div class="ap-metric">
+            {% comment %}
+            Counts appointments, and says so. This card read "Total
+            Appointments" over `total_patients` - distinct email addresses -
+            so it was smaller than the table below it and nothing explained
+            why. The patient figure is still available, under its own name.
+            {% endcomment %}
+            <div class="n">{{ total_appointments }}</div>
+            <div class="k">Appointments</div>
+        </div>
+        <div class="ap-metric">
+            <div class="n">{{ total_patients }}</div>
+            <div class="k">Patients</div>
         </div>
     </div>
 
+    {% if appointments %}
+    <div class="ap-list">
+        {% for i in appointments %}
+        <div class="ap-row {% if i.status == Status.CONFIRMED and not i.slot_has_passed %}set{% elif i.status in ended_statuses or i.status == Status.COMPLETED %}over{% elif i.status == Status.PENDING_MODE %}theirs{% else %}mine{% endif %}">
+
+            <div class="ap-when">
+                {% comment %}
+                The year stays. This page spans everything ever booked, and a
+                row reading "Tue 2 Sep" is the same failure as the one the Date
+                column was added to fix - "09:00" that could be this morning or
+                eight months ago.
+                {% endcomment %}
+                <div class="d">{{ i.slot.date|date:"D d M Y" }}</div>
+                <div class="t">{{ i.slot.time|time:"g:i A" }}</div>
+            </div>
+
+            <div class="ap-who">
+                <div class="n">{{ i.fullName }}</div>
+                <div class="m">
+                    {{ i.get_reasonVisit_display }} &middot;
+                    <span class="ref">{{ i.bookingID }}</span>
+                    {% if i.appointmentMode %} &middot; {{ i.get_appointmentMode_display }}{% endif %}
+                    {% if sees_every_doctor %}
+                    &middot; {{ i.slot.user.get_full_name|default:i.slot.user.username }}
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="ap-right">
+                {% comment %}
+                The pill says what to do, not what the row is: "Confirm the
+                time" rather than "Pending time". The status name is a database
+                value; a doctor reading a list wants an instruction. The status
+                itself is still rendered - by `get_status_display`, from
+                `status`, which is the guarantee plan 5.14 established when this
+                column read the superseded `AppointmentApproval` and showed six
+                outcomes as "Pending".
+                {% endcomment %}
+                <span class="ap-pill {% if i.status == Status.CONFIRMED and not i.slot_has_passed %}set{% elif i.status in ended_statuses or i.status == Status.COMPLETED %}over{% elif i.status == Status.PENDING_MODE %}theirs{% else %}mine{% endif %}">
+                    {{ i.get_status_display }}
+                </span>
+
+                {% for action, decision in i.inline_actions %}
+                {% comment %}
+                Posts to `appointment_decision`, the endpoint the detail page
+                uses, with the same guards. Only decisions that need nothing
+                else appear here: a reason, a meeting link or a closed
+                confirmation window all send the doctor to the detail page
+                instead, because a button that can only fail is worse than no
+                button (plan 4.9).
+                {% endcomment %}
+                <form method="post" action="{% url 'appointment_decision' i.id %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="{{ action }}">
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button type="submit" class="ap-act">{{ decision.label }}</button>
+                </form>
+                {% endfor %}
+
+                <a class="ap-act link" href="{% url 'doctor_appointment_details' i.id %}">
+                    {% if i.page_actions %}Open to decide{% else %}Open{% endif %}
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if page.paginator.num_pages > 1 %}
+    <div class="ap-pager">
+        {% if page.has_previous %}
+        <a href="?show={{ show }}&q={{ query|urlencode }}&page={{ page.previous_page_number }}">&lsaquo;</a>
+        {% endif %}
+        <span class="now">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+        {% if page.has_next %}
+        <a href="?show={{ show }}&q={{ query|urlencode }}&page={{ page.next_page_number }}">&rsaquo;</a>
+        {% endif %}
+        <span class="tally">
+            {{ page.paginator.count }} in {{ show|cut:"_" }}{% if query %} matching &ldquo;{{ query }}&rdquo;{% endif %}
+        </span>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="ap-empty">
+        {% if not has_any %}
+        {% comment %}
+        Two empty states, because they mean different things. This one is an
+        empty system. The old page said "No appointments scheduled for today"
+        on a page not scoped to today, so an empty list read as a quiet day
+        rather than as a system nobody has booked (design §10 dashboard #12).
+        {% endcomment %}
+        <h3>No appointments yet.</h3>
+        <p>Bookings appear here as soon as patients make them.</p>
+        {% elif query %}
+        <h3>Nothing matches &ldquo;{{ query }}&rdquo;</h3>
+        <p>Try a patient's name, or a booking reference like AGKI-4M2P.</p>
+        <a class="ap-btn ghost" href="?show={{ show }}">Clear the search</a>
+        {% else %}
+        <h3>Nothing in this view</h3>
+        <p>
+            {% if show == 'needs_you' %}Nothing is waiting on you right now.
+            {% else %}There are no appointments here at the moment.{% endif %}
+        </p>
+        <a class="ap-btn ghost" href="?show=all">See all appointments</a>
+        {% endif %}
+    </div>
+    {% endif %}
 </div>
 
+<style>
+/* ------------------------------------------------------------------------
+   The availability page's system, applied here. Prefixed `ap-` so a class
+   can never be silently supplied - or not supplied - by another page's
+   <style> block; a test asserts every one used below is defined below.
+   ------------------------------------------------------------------------ */
+.ap {
+    --ap-ink: #1c221e;
+    --ap-ink-2: #4a554d;
+    --ap-muted: #6b7770;
+    --ap-line: #dde5df;
+    --ap-line-2: #c3d0c6;
+    --ap-surface: #fff;
+    --ap-surface-2: #f2f6f2;
+    --ap-brand: var(--primary-green, #2d5a2d);
+    --ap-brand-wash: #e9f2ea;
+    --ap-ok: #1f7a4d;
+    --ap-ok-wash: #e4f3ea;
+    --ap-warn: #a35a00;
+    --ap-warn-wash: #fbeeda;
+    --ap-info: #2b5f86;
+    --ap-info-wash: #e2eef7;
+    --ap-dim: #64706a;
+    --ap-dim-wash: #e9ecea;
+    --ap-bad: #a32020;
+    --ap-bad-wash: #fae8e8;
+}
+
+/* --- control bar ------------------------------------------------------ */
+.ap-bar {
+    display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+    padding-bottom: 1rem; border-bottom: 1px solid var(--ap-line); margin-bottom: 1rem;
+}
+.ap-title { margin-right: auto; }
+.ap-title h2 { margin: 0; font-size: 1.35rem; letter-spacing: -.01em; color: var(--ap-ink); }
+.ap-title p { margin: .15rem 0 0; font-size: .85rem; color: var(--ap-muted); }
+
+.ap-tabs { display: inline-flex; border: 1px solid var(--ap-line); border-radius: 8px; overflow: hidden; flex-wrap: wrap; }
+.ap-tabs a {
+    padding: .4rem .8rem; font-size: .82rem; text-decoration: none; white-space: nowrap;
+    color: var(--ap-muted); background: #fff; border-right: 1px solid var(--ap-line);
+}
+.ap-tabs a:last-child { border-right: 0; }
+.ap-tabs a.on { background: var(--ap-brand-wash); color: var(--ap-brand); font-weight: 600; }
+.ap-tabs a b { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.ap-search { display: flex; align-items: center; gap: .4rem; margin: 0; }
+.ap-search input[type="search"] {
+    font: inherit; font-size: .86rem; color: var(--ap-ink); min-width: 190px;
+    border: 1px solid var(--ap-line-2); border-radius: 8px; padding: .45rem .7rem; background: #fff;
+}
+.ap-clear { font-size: .8rem; color: var(--ap-muted); text-decoration: none; }
+.ap-clear:hover { color: var(--ap-brand); }
+
+.ap-btn {
+    font: inherit; font-size: .84rem; font-weight: 600; cursor: pointer;
+    background: var(--ap-brand); color: #fff; border: 1px solid var(--ap-brand);
+    padding: .45rem .85rem; border-radius: 8px; text-decoration: none; display: inline-block;
+}
+.ap-btn.ghost { background: #fff; color: var(--ap-ink-2); border-color: var(--ap-line-2); }
+.ap-btn.ghost:hover { background: var(--ap-surface-2); }
+
+/* --- messages --------------------------------------------------------- */
+.ap-messages { display: grid; gap: .5rem; margin-bottom: 1rem; }
+.ap-message {
+    padding: .7rem 1rem; border-radius: 8px; font-size: .9rem;
+    background: var(--ap-brand-wash); color: var(--ap-brand);
+    border-left: 3px solid var(--ap-brand);
+}
+.ap-message.error { background: var(--ap-bad-wash); color: var(--ap-bad); border-left-color: var(--ap-bad); }
+.ap-message.warning { background: var(--ap-warn-wash); color: var(--ap-warn); border-left-color: var(--ap-warn); }
+
+/* --- metric strip ----------------------------------------------------- */
+.ap-metrics {
+    display: flex; gap: 2rem; flex-wrap: wrap;
+    padding-bottom: 1rem; border-bottom: 1px solid var(--ap-line); margin-bottom: 1.25rem;
+}
+.ap-metric .n {
+    font-size: 1.5rem; font-weight: 700; letter-spacing: -.02em; line-height: 1.1;
+    color: var(--ap-ink); font-variant-numeric: tabular-nums;
+}
+.ap-metric .k { font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ap-muted); }
+.ap-metric.warn .n { color: var(--ap-warn); }
+.ap-metric.ok .n { color: var(--ap-ok); }
+.ap-metric.info .n { color: var(--ap-info); }
+
+/* --- the list --------------------------------------------------------- */
+.ap-list { display: grid; gap: .4rem; }
+.ap-row {
+    display: grid; grid-template-columns: 148px 1fr auto; gap: 1rem; align-items: center;
+    border: 1px solid var(--ap-line); border-left: 3px solid var(--ap-rail, var(--ap-line-2));
+    border-radius: 9px; background: var(--ap-surface); padding: .7rem .9rem;
+}
+.ap-row.mine   { --ap-rail: var(--ap-warn); }
+.ap-row.theirs { --ap-rail: var(--ap-info); }
+.ap-row.set    { --ap-rail: var(--ap-ok); }
+.ap-row.over   { --ap-rail: var(--ap-dim); background: var(--ap-surface-2); }
+
+.ap-when { font-variant-numeric: tabular-nums; }
+.ap-when .d { font-size: .76rem; color: var(--ap-muted); }
+.ap-when .t { font-size: .95rem; font-weight: 700; letter-spacing: -.01em; color: var(--ap-ink); }
+.ap-who .n { font-weight: 600; color: var(--ap-ink); }
+.ap-who .m { font-size: .8rem; color: var(--ap-muted); }
+.ap-who .m .ref { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+
+.ap-right { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; justify-content: flex-end; }
+.ap-right form { margin: 0; }
+.ap-pill { font-size: .7rem; font-weight: 600; padding: .15rem .6rem; border-radius: 999px; white-space: nowrap; }
+.ap-pill.mine   { background: var(--ap-warn-wash); color: var(--ap-warn); }
+.ap-pill.theirs { background: var(--ap-info-wash); color: var(--ap-info); }
+.ap-pill.set    { background: var(--ap-ok-wash);   color: var(--ap-ok); }
+.ap-pill.over   { background: var(--ap-dim-wash);  color: var(--ap-dim); }
+
+.ap-act {
+    font: inherit; font-size: .78rem; font-weight: 600; cursor: pointer;
+    border-radius: 7px; padding: .3rem .7rem; text-decoration: none;
+    border: 1px solid var(--ap-brand); background: var(--ap-brand); color: #fff;
+}
+.ap-act:hover { filter: brightness(1.12); }
+.ap-act.link { background: none; border: 0; color: var(--ap-brand); padding: .3rem .2rem; }
+.ap-act.link:hover { text-decoration: underline; filter: none; }
+
+/* --- pager and empty state -------------------------------------------- */
+.ap-pager {
+    display: flex; align-items: center; gap: .6rem; justify-content: center;
+    margin-top: 1.1rem; font-size: .84rem; color: var(--ap-muted);
+}
+.ap-pager a, .ap-pager .now {
+    border: 1px solid var(--ap-line); border-radius: 7px; padding: .25rem .7rem;
+    background: #fff; text-decoration: none; color: var(--ap-ink-2);
+}
+.ap-pager .now { background: var(--ap-brand-wash); color: var(--ap-brand); border-color: var(--ap-brand); font-weight: 600; }
+.ap-pager .tally { border: 0; background: none; }
+
+.ap-empty {
+    text-align: center; padding: 3rem 1rem; color: var(--ap-muted);
+    border: 1px dashed var(--ap-line-2); border-radius: 10px;
+}
+.ap-empty h3 { margin: 0 0 .3rem; color: var(--ap-ink); font-size: 1.05rem; }
+.ap-empty p { margin: 0 0 1rem; font-size: .9rem; }
+
+@media (max-width: 900px) {
+    .ap-title { width: 100%; margin-right: 0; }
+    .ap-search { width: 100%; }
+    .ap-search input[type="search"] { flex: 1; min-width: 0; }
+}
+@media (max-width: 700px) {
+    .ap-row { grid-template-columns: 1fr; gap: .5rem; }
+    .ap-right { justify-content: flex-start; }
+}
+</style>
 {% endblock %}

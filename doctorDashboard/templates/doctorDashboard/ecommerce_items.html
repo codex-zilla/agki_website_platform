@@ -247,9 +247,7 @@
                 <button type="button" class="btn btn-primary" onclick="editCurrentProduct()">
                     <i class="fas fa-edit me-2"></i>Edit Product
                 </button>
-                <button type="button" class="btn btn-danger" onclick="deleteCurrentProduct()">
-                    <i class="fas fa-trash me-2"></i>Delete Product
-                </button>
+                {# No Delete button: product deletion happens in the Django admin now (plan 1.4). #}
             </div>
         </div>
     </div>
@@ -391,33 +389,9 @@
     </div>
 </div>
 
-<!-- Delete Product Modal -->
-<div class="modal fade" id="deleteProductModal" tabindex="-1" aria-labelledby="deleteProductModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title" id="deleteProductModalLabel">
-                    <i class="fas fa-trash me-2"></i>Delete Product
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p>Are you sure you want to delete "<span id="deleteProductName"></span>"?</p>
-                <p class="text-danger"><strong>Warning:</strong> This action cannot be undone. All product data will be permanently deleted.</p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <form id="deleteProductForm" method="POST" style="display: inline;">
-                    {% csrf_token %}
-                    <input type="hidden" name="product_id" id="deleteProductId">
-                    <button type="submit" class="btn btn-danger">
-                        <i class="fas fa-trash me-2"></i>Delete Product
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
+{% comment %} The Delete Product modal was removed with the endpoint it posted to (plan
+   1.4). Ecommerce is frozen and this page is read-only; deletion lives in the
+   Django admin, which confirms, checks permissions and leaves a LogEntry. {% endcomment %}
 
 <style>
 /* Product-specific styles */
@@ -778,35 +752,8 @@ function formatDateTime(dateTimeString) {
     }
 }
 
-// Delete product
-function deleteProduct(productId, productName) {
-    document.getElementById('deleteProductId').value = productId;
-    document.getElementById('deleteProductName').textContent = productName;
-    
-    // Set form action
-    const form = document.getElementById('deleteProductForm');
-    form.action = `/products/delete/${productId}/`;
-    
-    // Close view modal if open
-    const viewModal = bootstrap.Modal.getInstance(document.getElementById('viewProductModal'));
-    if (viewModal) viewModal.hide();
-    
-    // Show delete modal
-    const deleteModal = new bootstrap.Modal(document.getElementById('deleteProductModal'));
-    deleteModal.show();
-}
-
-// Delete current product from details modal
-function deleteCurrentProduct() {
-    if (currentProductId && currentProductData) {
-        // Close view modal
-        const viewModal = bootstrap.Modal.getInstance(document.getElementById('viewProductModal'));
-        if (viewModal) viewModal.hide();
-        
-        // Show delete modal
-        deleteProduct(currentProductId, currentProductData.title);
-    }
-}
+// deleteProduct()/deleteCurrentProduct() removed with the endpoint they
+// targeted, `/products/delete/<id>/` (plan 1.4). That URL no longer exists.
 
 // Edit current product
 function editCurrentProduct() {
@@ -919,17 +866,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Form validation
     validateProductForm();
-    
-    // Handle delete form submission
-    const deleteForm = document.getElementById('deleteProductForm');
-    if (deleteForm) {
-        deleteForm.addEventListener('submit', function(event) {
-            event.preventDefault();
-            if (confirm('Are you absolutely sure? This action cannot be undone.')) {
-                this.submit();
-            }
-        });
-    }
     
     // Clear form when modal is hidden
     const addProductModal = document.getElementById('addProductModal');

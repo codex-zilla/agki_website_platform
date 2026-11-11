@@ -1,0 +1,13 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<h1>{{ title }}</h1>
+<p>She will get an SMS with this time.</p>
+<ul>{% for b in bookings %}<li>{{ b.reference }} - {{ b.service.name_en }} at {{ b.provider.name }}</li>{% endfor %}</ul>
+<form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <input type="hidden" name="action" value="confirm">
+  <input type="hidden" name="apply" value="1">
+  <input type="submit" value="Confirm and notify">
+</form>
+{% endblock %}

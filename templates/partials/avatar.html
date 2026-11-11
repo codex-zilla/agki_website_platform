@@ -1,0 +1,32 @@
+{% comment %}
+Render a person's photo, or a neutral icon when they have none.
+
+`CustomUser.image` is nullable and half the accounts in the database have no
+file, so `{{ user.image.url }}` on its own raises ValueError and 500s the whole
+page (implementation plan 1.1). `doctors.html` was the one template in the
+codebase that got this right; this is that pattern, factored out so the next
+template gets it for free instead of re-deriving it.
+
+    {% include "partials/avatar.html" with image=user.image alt=user.username css_class="user-avatar-top" only %}
+
+    image      an ImageField value. Falsy (no file) selects the fallback.
+    alt        alt text. Also the fallback's accessible label.
+    css_class  the class the surrounding page already styles. Applied to both
+               branches, which is what keeps the fallback the same size and
+               shape as the photo would have been - every one of these classes
+               sets width/height/border-radius/border.
+    icon       Font Awesome name without the `fa-`, default `user-md`.
+
+`only` is deliberate at every call site: the partial should not silently pick
+up a `user` or `image` from the surrounding context if a caller forgets to
+pass one. Better a missing avatar than the wrong person's face.
+{% endcomment %}
+{% if image %}
+    <img src="{{ image.url }}" alt="{{ alt }}" class="{{ css_class }}">
+{% else %}
+    <div class="{{ css_class }}"
+         style="display: flex; align-items: center; justify-content: center; background: var(--gradient-green); color: #fff;"
+         role="img" aria-label="{{ alt }}">
+        <i class="fas fa-{{ icon|default:'user-md' }}"></i>
+    </div>
+{% endif %}

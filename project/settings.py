@@ -103,6 +103,7 @@ INSTALLED_APPS = [
     'doctorDashboard',
     'ecommerce',
     'cms',
+    'afya',  # Afya Mfukoni: AI health guide, SMS/USSD/WhatsApp, payments
     'django_ckeditor_5',
     'adminsortable2',
     # google login
@@ -143,6 +144,21 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                # The staff console's sidebar badges. Every page in that app
+                # renders the sidebar, so a per-view value would be right on
+                # two pages and stale on the rest (plan 5.13). Returns nothing
+                # for anonymous visitors and for accounts with no console role.
+                'doctorDashboard.context_processors.dashboard_badges',
+                # The AGKI mark in the console sidebar. Resolves the uploaded
+                # `SiteSettings.logo` exactly as the public navbar does, and
+                # lazily, so a page that does not render it pays nothing.
+                'doctorDashboard.context_processors.console_brand',
+                # `SiteSettings` for the patient booking flow - its header
+                # logo, its footer phone number and address. `app.views` still
+                # passes its own for the public site and wins, since view
+                # context overrides a processor. Lazy: pages that never read
+                # it pay nothing.
+                'cms.context_processors.site_settings',
             ],
         },
     },
@@ -165,6 +181,78 @@ DATABASES = {
         conn_max_age=int(os.getenv("DATABASE_CONN_MAX_AGE", "0")),
         conn_health_checks=env_bool("DATABASE_CONN_HEALTH_CHECKS", IS_PRODUCTION),
     )
+}
+
+if DATABASES["default"]["ENGINE"].endswith("sqlite3"):
+    # SQLite locks the *whole file* for the duration of a write, and Passenger
+    # runs several worker processes against that one file. The default wait is
+    # 5 seconds, after which a concurrent write gives up with
+    # "database is locked" — an error the visitor sees, for a delay they would
+    # not have noticed. Twenty seconds turns almost all of those into a pause.
+    #
+    # This is a mitigation, not a fix. The fix is a database server; see the
+    # deployment runbook §3. Note in particular that `select_for_update()`
+    # raises `NotSupportedError` on SQLite whatever the timeout, so the
+    # appointment booking flow cannot ship against it.
+    DATABASES["default"].setdefault("OPTIONS", {}).setdefault("timeout", 20)
+
+if DATABASES["default"]["ENGINE"].endswith("mysql"):
+    # Two settings that MySQL gets wrong by default, both silently.
+    #
+    # `utf8mb4` is the only charset in MySQL that stores the whole of Unicode.
+    # The one confusingly named `utf8` is a three-byte subset that cannot hold
+    # an emoji or several scripts, and inserting one either errors or truncates
+    # depending on the mode below.
+    #
+    # `STRICT_TRANS_TABLES` is the mode Django's own deployment docs ask for.
+    # Without it MySQL silently truncates a value too long for its column and
+    # carries on — a patient's name quietly cut to 100 characters, with no
+    # error anywhere. Django validates lengths itself, but only for data that
+    # arrives through a form; a management command or a data migration writes
+    # straight past that.
+    DATABASES["default"].setdefault("OPTIONS", {}).update(
+        {
+            "charset": "utf8mb4",
+            "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
+        }
+    )
+
+# Two caches, because the two things being cached want opposite properties
+# (pre-flight decision 0.5).
+#
+# `default` stays in-process. It holds rendered page content — the homepage's
+# five-minute `_home_content` cache — where per-worker copies are harmless
+# (each worker just misses once) and where every read must be free. Pointing
+# this at the database would turn a zero-query cache hit into a query, which
+# is the opposite of what the cache is for.
+#
+# `ratelimit` is shared, and the backend is the entire point. Passenger runs
+# several worker processes; with a per-process cache each keeps its own
+# counter, so "5 attempts per 10 minutes" silently means 5 x however many
+# workers are up. A limit that weakens as the site scales reads as protection
+# without being any. DatabaseCache rather than Redis/memcached because this is
+# shared cPanel hosting with neither available, and the database is already
+# the shared state every worker agrees on.
+#
+# ROLLOUT: `python manage.py createcachetable` must be run once per
+# environment before the rate limiter works — see plan 9.11. Test databases
+# get the table automatically (Django's `create_test_db` runs the same
+# command for every db-backed cache).
+RATELIMIT_CACHE_ALIAS = "ratelimit"
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+    },
+    RATELIMIT_CACHE_ALIAS: {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": os.getenv("RATELIMIT_CACHE_TABLE", "django_cache"),
+        "OPTIONS": {
+            # Cull aggressively: these are throwaway counters, and an
+            # unbounded cache table on shared hosting is a slow leak.
+            "MAX_ENTRIES": 5000,
+        },
+    },
 }
 
 
@@ -287,6 +375,9 @@ SOCIALACCOUNT_EMAIL_VERIFICATION = os.getenv(
 
 # enable social account adapter verify user email
 SOCIALACCOUNT_ADAPTER = 'useraccount.adapters.SocialAccountAdapter'
+# Applies the is_approved gate to allauth's login paths, which do not go
+# through useraccount.backends.EmailBackend (plan 1.10).
+ACCOUNT_ADAPTER = 'useraccount.adapters.AccountAdapter'
 
 
 # Email Configuration
@@ -307,6 +398,62 @@ EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 DEFAULT_FROM_EMAIL = os.getenv(
     "DEFAULT_FROM_EMAIL",
     EMAIL_HOST_USER or "webmaster@localhost",
+)
+
+# How appointment notifications are delivered.
+#
+#   "queued"    - notify() writes NotificationLog rows and returns; the cron
+#                 job `send_pending_notifications` delivers them. A patient
+#                 submitting a booking never waits on an SMTP handshake, and a
+#                 mail server having a bad afternoon cannot fail a booking that
+#                 has already been recorded.
+#   "immediate" - send inline, on transaction commit. The default outside
+#                 production so a developer sees the message in their console
+#                 without running cron.
+#
+# ROLLOUT: "queued" does nothing at all without the cron entry — see plan 3.7
+# and 9.12. That is the one failure mode of this design, and it is silent.
+# --- SMS, through Beem -----------------------------------------------------
+#
+# AGKI asked for text first and email behind it. The order is not set here: it
+# follows from whether the two values below are present, so a laptop or a
+# staging box with no gateway quietly stays email-only instead of queueing
+# messages that can only fail. `NOTIFICATION_CHANNELS` overrides that if AGKI
+# ever wants email first, or SMS alone.
+#
+# BEEM_SENDER_ID must be registered and approved in the Beem account.
+BEEM_API_KEY = os.getenv("BEEM_API_KEY", "")
+BEEM_SECRET_KEY = os.getenv("BEEM_SECRET_KEY", "")
+BEEM_SENDER_ID = os.getenv("BEEM_SENDER_ID", "")
+BEEM_BASE_URL = os.getenv("BEEM_BASE_URL", "https://apisms.beem.africa")
+BEEM_TIMEOUT = int(os.getenv("BEEM_TIMEOUT", "15"))
+
+# --- Afya Mfukoni ------------------------------------------------------------
+#
+# Shared secret every gateway webhook (SMS, USSD, payments) must send as
+# ?token=... or an X-Afya-Token header. Empty means webhooks only work with
+# DEBUG on.
+AFYA_WEBHOOK_TOKEN = os.getenv("AFYA_WEBHOOK_TOKEN", "")
+# Tanzania's national emergency number. Confirm before launch.
+AFYA_EMERGENCY_NUMBER = os.getenv("AFYA_EMERGENCY_NUMBER", "112")
+# Commission on each mobile-money visit: 5%, capped at TSh 2,000.
+AFYA_COMMISSION_RATE = os.getenv("AFYA_COMMISSION_RATE", "0.05")
+AFYA_COMMISSION_CAP_TSH = int(os.getenv("AFYA_COMMISSION_CAP_TSH", "2000"))
+# Mobile-money gateway class. The sandbox moves no money.
+AFYA_PAYMENT_GATEWAY = os.getenv("AFYA_PAYMENT_GATEWAY", "afya.payments.SandboxGateway")
+# WhatsApp Cloud API (Meta). Leave empty to disable sending.
+AFYA_WHATSAPP_TOKEN = os.getenv("AFYA_WHATSAPP_TOKEN", "")
+AFYA_WHATSAPP_PHONE_ID = os.getenv("AFYA_WHATSAPP_PHONE_ID", "")
+AFYA_WHATSAPP_VERIFY_TOKEN = os.getenv("AFYA_WHATSAPP_VERIFY_TOKEN", "")
+AFYA_WHATSAPP_APP_SECRET = os.getenv("AFYA_WHATSAPP_APP_SECRET", "")
+
+# The suite must not behave differently on a machine that happens to have
+# gateway credentials in its `.env` - see the runner's own docstring.
+TEST_RUNNER = "project.test_runner.HermeticTestRunner"
+NOTIFICATION_CHANNELS = env_list("NOTIFICATION_CHANNELS")
+
+NOTIFICATIONS_DELIVERY = os.getenv(
+    "NOTIFICATIONS_DELIVERY", "queued" if IS_PRODUCTION else "immediate"
 )
 
 if IS_PRODUCTION and EMAIL_BACKEND.endswith("smtp.EmailBackend"):

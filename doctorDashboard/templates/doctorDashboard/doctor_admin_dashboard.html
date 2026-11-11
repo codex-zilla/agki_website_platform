@@ -1,179 +1,330 @@
 {% extends 'doctorDashboard/doctor_base.html' %}
 {% load static %}
 {% block content %}
+{% comment %}
+Rebuilt to the design agreed with AGKI on 2026-09-01 (plan 11.5), in the system
+11.1 and 11.4 established.
 
-<div class="dashboard-content">
+**What this page was doing was worse than looking dated.** The status column
+read `i.appointmentapproval.is_approved` - the superseded `AppointmentApproval`
+model, which nothing has written to since Phase 5 and which the plan records as
+"written by nothing at all", kept read-only for one release as insurance. A
+missing related object resolves to empty in a template, which is falsy, so
+every row took the else branch: **confirmed, completed, cancelled and waiting
+all rendered "Pending"**. Verified by rendering four appointments in four
+states and getting one label back. That is plan 5.14's bug, fixed on the
+appointments list and never brought here.
 
-    <!-- Stats Cards -->
-    <div class="stats-grid">
+Four controls did nothing: "View All", "Full Calendar" and the week's prev/next
+were bare `<button>` elements on a page containing **no script block and zero
+`onclick` attributes** - so unlike the availability page's dead navigation,
+they were not even calling functions that were missing.
 
-        <!-- Today's Appointments -->
-        <div class="stat-card">
-            <div class="stat-icon blue">
-                <i class="fas fa-calendar-check"></i>
-            </div>
-            <div class="stat-info">
-                <div class="stat-label">Today's Appointments</div>
-                <div class="stat-value">{{ today_count }}</div>
-                <div class="stat-change {% if today_comparison >= 0 %}positive{% else %}negative{% endif %}">
-                    <i class="fas {% if today_comparison >= 0 %}fa-arrow-up{% else %}fa-arrow-down{% endif %}"></i>
-                    {{ today_comparison|default:0 }} from yesterday
-                </div>
-            </div>
-        </div>
+Also fixed here: `{{ i.reasonVisit }}` rendered `lab_test` rather than its
+label (plan 5.15's bug, in a third place); the "Pending" card counted
+`WAITING_STATUSES`, which includes the patient's turn; "N new this week"
+counted anyone who booked, however long they had been a patient; and a Date
+column carried a full date on every row of a list that is one day.
 
-        <!-- Total Patients -->
-        <div class="stat-card">
-            <div class="stat-icon green">
-                <i class="fas fa-user-check"></i>
-            </div>
-            <div class="stat-info">
-                <div class="stat-label">Total Patients</div>
-                <div class="stat-value">{{ total_patients }}</div>
-                <div class="stat-change positive">
-                    <i class="fas fa-arrow-up"></i> {{ new_patients_week }} new this week
-                </div>
-            </div>
-        </div>
+Classes are `db-` prefixed, and a test asserts every one is defined here.
+{% endcomment %}
 
-        <!-- Pending Appointments -->
-        <div class="stat-card">
-            <div class="stat-icon orange">
-                <i class="fas fa-clock"></i>
-            </div>
-            <div class="stat-info">
-                <div class="stat-label">Pending Appointments</div>
-                <div class="stat-value">{{ pending_count }}</div>
-                <div class="stat-change">
-                    <i class="fas fa-minus"></i> Requires confirmation
-                </div>
-            </div>
-        </div>
+<div class="dashboard-content db">
 
-        <!-- Revenue -->
-        <!-- <div class="stat-card">
-            <div class="stat-icon red">
-                <i class="fas fa-dollar-sign"></i>
-            </div>
-            <div class="stat-info">
-                <div class="stat-label">Revenue (This Month)</div>
-                <div class="stat-value">$-</div>
-                <div class="stat-change positive">
-                    <i class="fas fa-arrow-up"></i> % increase
-                </div>
-            </div>
-        </div> -->
+    <div class="db-hello">
+        <h2>
+            {% if sees_every_doctor %}Good day{% else %}Good day, {{ request.user.get_full_name|default:request.user.username }}{% endif %}
+        </h2>
+        <p>
+            {{ today|date:"l, j F Y" }} &middot;
+            {{ today_count }} appointment{{ today_count|pluralize }} today{% if needs_you_count %},
+            {{ needs_you_count }} waiting on you{% endif %}
+        </p>
     </div>
 
+    {% if messages %}
+    <div class="db-messages">
+        {% for message in messages %}
+        <div class="db-message {{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
 
-    <!-- Today's Appointments -->
-    <div class="card">
-        <div class="card-header">
-            <h2 class="card-title">
-                <i class="fas fa-calendar-day"></i>
-                Today's Appointments
-            </h2>
-            <button class="card-action">
-                <i class="fas fa-eye"></i> View All
-            </button>
-        </div>
-        <div class="card-body">
-            <div class="appointments-table">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Time</th>
-                            <th>Patient</th>
-                            <th>Type</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% if today_appointments %}
-                            {% for i in today_appointments %}
-                            
-                            <tr>
-                                <td><strong>{{ i.slot.date|date:"l, F j, Y" }}</strong></td>
-                                <td><strong>{{ i.slot.time|time:"g:i A" }}</strong></td>
-                                <td>
-                                    <div class="patient-info">
-                                        <div>
-                                            <div class="patient-name">{{i.fullName}}</div>
-                                            <div class="patient-id">ID: {{i.bookingID}}</div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td>{{i.reasonVisit}}</td>
-                                <td>
-                                    {% if i.appointmentapproval.is_approved %}
-                                        <span class="status-badge confirmed">Confirmed</span>
-                                    {% else %}
-                                        <span class="status-badge pending">Pending</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <a href="{% url 'doctor_appointment_details' i.id %}" style="text-decoration: none;">
-                                        <button class="btn-action view" title="View Details">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
-                                        </a>
-                                    </div>
-                                </td>
-                            </tr>
-
-                            {% endfor %}
-                        {% else %}
-                            <tr>
-                                <td colspan="6" style="text-align:center;">No appointments today</td>
-                            </tr>
-                        {% endif %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+    {% comment %}
+    Every figure goes somewhere. A dashboard number that cannot be clicked
+    makes the reader find the same thing again by hand on another page.
+    {% endcomment %}
+    <div class="db-metrics">
+        <a class="db-metric warn" href="{% url 'available_appointments' %}?show=needs_you">
+            <span class="n">{{ needs_you_count }}</span>
+            <span class="k">Needs you</span>
+            <span class="go">Answer them &rarr;</span>
+        </a>
+        <a class="db-metric ok" href="{% url 'available_appointments' %}?show=upcoming">
+            <span class="n">{{ today_count }}</span>
+            <span class="k">Today</span>
+            <span class="go">See today &rarr;</span>
+        </a>
+        <a class="db-metric info" href="{% url 'doctor_availability' %}?start={{ week_start|date:'Y-m-d' }}">
+            <span class="n">{{ week_count }}</span>
+            <span class="k">This week</span>
+            <span class="go">Open the week &rarr;</span>
+        </a>
+        <a class="db-metric" href="{% url 'available_appointments' %}?show=all">
+            <span class="n">{{ total_patients }}</span>
+            <span class="k">Patients</span>
+            <span class="go">{{ patients_booking_this_week }} booked this week</span>
+        </a>
     </div>
 
+    <div class="db-panel">
+        <h3>Today</h3>
+        <span class="db-rule"></span>
+        <a href="{% url 'available_appointments' %}?show=all">All appointments &rarr;</a>
+    </div>
 
-    <!-- Weekly Calendar Overview -->
-    <div class="card">
-        <div class="card-header">
-            <h2 class="card-title">
-                <i class="fas fa-calendar-week"></i>
-                This Week's Schedule
-            </h2>
-            <button class="card-action">
-                <i class="fas fa-calendar-alt"></i> Full Calendar
-            </button>
-        </div>
-        <div class="card-body">
-            <div class="calendar-header">
-                <div class="calendar-nav">
-                    <button><i class="fas fa-chevron-left"></i></button>
-                    <div class="calendar-month">{{ current_month }}</div>
-                    <button><i class="fas fa-chevron-right"></i></button>
+    {% if today_appointments %}
+    <div class="db-list">
+        {% for i in today_appointments %}
+        <div class="db-row {% if i.status in ended_statuses or i.status == Status.COMPLETED %}done{% elif i.inline_actions or i.page_actions %}mine{% elif i.is_now %}now{% else %}set{% endif %}">
+            <div class="db-t">{{ i.slot.time|time:"g:i A" }}</div>
+
+            <div class="db-who">
+                <div class="n">{{ i.fullName }}</div>
+                <div class="m">
+                    {% comment %}
+                    `get_reasonVisit_display`, not the raw value. 2.10 closed
+                    the choice lists and this page was never updated, so a
+                    doctor read "lab_test" (plan 5.15).
+                    {% endcomment %}
+                    {{ i.get_reasonVisit_display }} &middot;
+                    <span class="ref">{{ i.bookingID }}</span>
+                    {% if i.appointmentMode %} &middot; {{ i.get_appointmentMode_display }}{% endif %}
+                    {% if sees_every_doctor %}
+                    &middot; {{ i.slot.user.get_full_name|default:i.slot.user.username }}
+                    {% endif %}
                 </div>
             </div>
 
-            <div class="calendar-grid">
-                {% for day in weekly_data %}
-                    <div class="calendar-day {% if day.count > 0 %}has-appointments{% endif %} {% if day.is_today %}today{% endif %}">
-                        <div class="day-number">{{ day.day_number }}</div>
-                        <div class="day-appointments">
-                            {% if day.count > 0 %}
-                                {{ day.count }} appointment{{ day.count|pluralize }}
-                            {% else %}
-                                Available
-                            {% endif %}
-                        </div>
-                    </div>
+            <div class="db-right">
+                {% comment %}
+                From `status`, through `get_status_display`. What was here read
+                the superseded `AppointmentApproval`, so every appointment on
+                this page said "Pending" whatever had actually happened to it.
+                {% endcomment %}
+                <span class="db-pill {% if i.status in ended_statuses or i.status == Status.COMPLETED %}done{% elif i.inline_actions or i.page_actions %}mine{% else %}set{% endif %}">
+                    {{ i.get_status_display }}{% if i.is_now %} &middot; now{% endif %}
+                </span>
+
+                {% for action, decision in i.inline_actions %}
+                <form method="post" action="{% url 'appointment_decision' i.id %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="{{ action }}">
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button type="submit" class="db-act">{{ decision.label }}</button>
+                </form>
                 {% endfor %}
+
+                <a class="db-act link" href="{% url 'doctor_appointment_details' i.id %}">
+                    {% if i.page_actions %}Open to decide{% else %}Open{% endif %}
+                </a>
             </div>
         </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="db-empty">
+        <h4>Nothing booked today</h4>
+        <p>Times you publish appear on the week below.</p>
+    </div>
+    {% endif %}
+
+    <div class="db-panel">
+        <h3>{{ week_label }}</h3>
+        <span class="db-rule"></span>
+        {% comment %}
+        Links, not buttons. The pair that stood here were bare `<button>`
+        elements on a page with no script at all, so the week never moved -
+        the same failure plan 5.5 replaced on the availability page, where
+        making them links also meant a week could be bookmarked or sent to
+        somebody.
+        {% endcomment %}
+        <a href="?start={{ prev_start|date:'Y-m-d' }}">&lsaquo; prev</a>
+        <a href="?start={{ next_start|date:'Y-m-d' }}">next &rsaquo;</a>
+        {% if not is_this_week %}<a href="?">This week</a>{% endif %}
+        <a href="{% url 'doctor_availability' %}?start={{ week_start|date:'Y-m-d' }}">Manage availability &rarr;</a>
     </div>
 
+    <div class="db-week">
+        {% for day in week %}
+        <a class="db-day {% if day.is_today %}today{% endif %} {% if day.nothing_published %}empty{% endif %}"
+           href="{% url 'doctor_availability' %}?start={{ day.date|date:'Y-m-d' }}">
+            <span class="dn">{{ day.date|date:"D" }}</span>
+            <span class="num">{{ day.date|date:"j" }}</span>
+            <span class="bar"><i style="width: {{ day.fill }}%"></i></span>
+            {% if day.nothing_published %}
+            {% comment %}
+            The old strip said "Available" for a day with no appointments -
+            a claim about published availability, made while counting
+            appointments, and false for precisely the day worth catching.
+            {% endcomment %}
+            <span class="sub">Nothing<br>published</span>
+            {% else %}
+            <span class="sub"><b>{{ day.booked }}</b> booked<br>of {{ day.published }}</span>
+            {% endif %}
+        </a>
+        {% endfor %}
+    </div>
 </div>
 
+<style>
+/* ------------------------------------------------------------------------
+   The system 11.1 established, applied here. `db-` prefixed so a class can
+   never be silently supplied - or not supplied - by another page's <style>
+   block; a test asserts every one used below is defined below.
+   ------------------------------------------------------------------------ */
+.db {
+    --db-ink: #1c221e;
+    --db-ink-2: #4a554d;
+    --db-muted: #6b7770;
+    --db-line: #dde5df;
+    --db-line-2: #c3d0c6;
+    --db-surface: #fff;
+    --db-surface-2: #f2f6f2;
+    --db-brand: var(--primary-green, #2d5a2d);
+    --db-brand-wash: #e9f2ea;
+    --db-ok: #1f7a4d;
+    --db-ok-wash: #e4f3ea;
+    --db-warn: #a35a00;
+    --db-warn-wash: #fbeeda;
+    --db-info: #2b5f86;
+    --db-info-wash: #e2eef7;
+    --db-dim: #64706a;
+    --db-dim-wash: #e9ecea;
+    --db-bad: #a32020;
+    --db-bad-wash: #fae8e8;
+}
+
+/* --- greeting --------------------------------------------------------- */
+.db-hello { padding-bottom: .9rem; border-bottom: 1px solid var(--db-line); margin-bottom: 1.1rem; }
+.db-hello h2 { margin: 0; font-size: 1.35rem; letter-spacing: -.015em; color: var(--db-ink); }
+.db-hello p { margin: .15rem 0 0; font-size: .86rem; color: var(--db-muted); }
+
+/* --- messages --------------------------------------------------------- */
+.db-messages { display: grid; gap: .5rem; margin-bottom: 1rem; }
+.db-message {
+    padding: .7rem 1rem; border-radius: 8px; font-size: .9rem;
+    background: var(--db-brand-wash); color: var(--db-brand); border-left: 3px solid var(--db-brand);
+}
+.db-message.error { background: var(--db-bad-wash); color: var(--db-bad); border-left-color: var(--db-bad); }
+.db-message.warning { background: var(--db-warn-wash); color: var(--db-warn); border-left-color: var(--db-warn); }
+
+/* --- metric strip ----------------------------------------------------- */
+.db-metrics { display: flex; gap: .6rem; flex-wrap: wrap; margin-bottom: .5rem; }
+.db-metric {
+    display: block; text-decoration: none; min-width: 140px;
+    border: 1px solid var(--db-line); border-left: 3px solid var(--db-mc, var(--db-line-2));
+    border-radius: 9px; padding: .6rem .85rem; background: var(--db-surface);
+}
+.db-metric:hover { border-color: var(--db-brand); background: var(--db-surface-2); }
+.db-metric.warn { --db-mc: var(--db-warn); }
+.db-metric.ok   { --db-mc: var(--db-ok); }
+.db-metric.info { --db-mc: var(--db-info); }
+.db-metric .n {
+    display: block; font-size: 1.5rem; font-weight: 700; letter-spacing: -.02em; line-height: 1.1;
+    color: var(--db-ink); font-variant-numeric: tabular-nums;
+}
+.db-metric.warn .n { color: var(--db-warn); }
+.db-metric.ok .n   { color: var(--db-ok); }
+.db-metric.info .n { color: var(--db-info); }
+.db-metric .k {
+    display: block; font-size: .66rem; letter-spacing: .09em; text-transform: uppercase;
+    color: var(--db-muted);
+}
+.db-metric .go { display: block; font-size: .72rem; color: var(--db-brand); margin-top: .15rem; }
+
+/* --- panel headings --------------------------------------------------- */
+.db-panel { display: flex; align-items: baseline; gap: .7rem; margin: 1.6rem 0 .7rem; flex-wrap: wrap; }
+.db-panel h3 { margin: 0; font-size: 1rem; letter-spacing: -.01em; color: var(--db-ink); }
+.db-rule { flex: 1; height: 1px; background: var(--db-line); min-width: 1rem; }
+.db-panel a { font-size: .8rem; color: var(--db-brand); text-decoration: none; white-space: nowrap; }
+.db-panel a:hover { text-decoration: underline; }
+
+/* --- today's list ----------------------------------------------------- */
+.db-list { display: grid; gap: .4rem; }
+.db-row {
+    display: grid; grid-template-columns: 84px 1fr auto; gap: 1rem; align-items: center;
+    border: 1px solid var(--db-line); border-left: 3px solid var(--db-rail, var(--db-line-2));
+    border-radius: 9px; background: var(--db-surface); padding: .7rem .9rem;
+}
+.db-row.mine { --db-rail: var(--db-warn); }
+.db-row.set  { --db-rail: var(--db-ok); }
+.db-row.done { --db-rail: var(--db-dim); background: var(--db-surface-2); }
+.db-row.now  { --db-rail: var(--db-brand); box-shadow: inset 0 0 0 1px var(--db-brand-wash); }
+.db-t {
+    font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.01em;
+    color: var(--db-ink); font-size: .95rem;
+}
+.db-who .n { font-weight: 600; color: var(--db-ink); }
+.db-who .m { font-size: .8rem; color: var(--db-muted); }
+.db-who .m .ref { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.db-right { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; justify-content: flex-end; }
+.db-right form { margin: 0; }
+.db-pill { font-size: .7rem; font-weight: 600; padding: .15rem .6rem; border-radius: 999px; white-space: nowrap; }
+.db-pill.mine { background: var(--db-warn-wash); color: var(--db-warn); }
+.db-pill.set  { background: var(--db-ok-wash);   color: var(--db-ok); }
+.db-pill.done { background: var(--db-dim-wash);  color: var(--db-dim); }
+.db-act {
+    font: inherit; font-size: .78rem; font-weight: 600; cursor: pointer; text-decoration: none;
+    border-radius: 7px; padding: .3rem .7rem;
+    border: 1px solid var(--db-brand); background: var(--db-brand); color: #fff;
+}
+.db-act:hover { filter: brightness(1.12); }
+.db-act.link { background: none; border: 0; color: var(--db-brand); padding: .3rem .2rem; }
+.db-act.link:hover { text-decoration: underline; filter: none; }
+
+/* --- the week --------------------------------------------------------- */
+.db-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.db-day {
+    display: block; text-decoration: none; text-align: center;
+    border: 1px solid var(--db-line); border-radius: 8px; padding: .5rem .35rem;
+    background: var(--db-surface); color: var(--db-ink);
+}
+.db-day:hover { border-color: var(--db-brand); background: var(--db-surface-2); }
+.db-day.today { border-color: var(--db-brand); box-shadow: inset 0 0 0 1px var(--db-brand); }
+.db-day .dn {
+    display: block; font-size: .64rem; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--db-muted);
+}
+.db-day .num {
+    display: block; font-size: 1.05rem; font-weight: 700; letter-spacing: -.01em;
+    font-variant-numeric: tabular-nums;
+}
+.db-day .bar {
+    display: block; height: 4px; border-radius: 2px; background: var(--db-surface-2);
+    margin: .35rem 0 .3rem; overflow: hidden;
+}
+.db-day .bar i { display: block; height: 100%; background: var(--db-warn); }
+.db-day .sub { display: block; font-size: .66rem; color: var(--db-muted); line-height: 1.35; }
+.db-day .sub b { color: var(--db-warn); font-weight: 600; }
+.db-day.empty .sub { color: var(--db-dim); }
+.db-day.empty .bar { background: var(--db-dim-wash); }
+
+/* --- empty ------------------------------------------------------------ */
+.db-empty {
+    text-align: center; padding: 2.2rem 1rem; color: var(--db-muted);
+    border: 1px dashed var(--db-line-2); border-radius: 10px;
+}
+.db-empty h4 { margin: 0 0 .3rem; color: var(--db-ink); font-size: 1rem; }
+.db-empty p { margin: 0; font-size: .88rem; }
+
+@media (max-width: 900px) {
+    .db-metric { flex: 1 1 45%; min-width: 0; }
+}
+@media (max-width: 700px) {
+    .db-row { grid-template-columns: 1fr; gap: .5rem; }
+    .db-right { justify-content: flex-start; }
+    .db-week { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+</style>
 {% endblock %}

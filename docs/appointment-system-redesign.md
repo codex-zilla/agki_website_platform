@@ -33,6 +33,35 @@ This document was written before the website CMS work shipped. It has since been
 
 All nine open decisions are now answered (§12). One answer changes this design more than the other eight combined, so it is recorded here rather than buried in a table.
 
+### ⚠️ Superseded on 2026-09-03: the flow is a **single** confirmation
+
+AGKI collapsed the two provider confirmations into one (plan 12.1). The patient
+now chooses **how they want to meet on the booking form**, from the ways that
+slot actually offers, and the doctor confirms the time and the mode together.
+
+> "the double checking of the doctor confirming the availability then confirming
+> mode of meeting is a bit boring, so I would like the process to be a single
+> process such that a patient creates a booking with all the required
+> information including the mode of meeting then the doctor confirms it once"
+
+Two things make that work without losing bookings, and the second was AGKI's
+own addition:
+
+* **The doctor may confirm a different mode** than the one asked for, with the
+  patient told and free to cancel. Without it, a patient who asks a doctor to
+  travel to them and gets a doctor who does not would have to be declined
+  outright over something a sentence settles.
+* **A published time carries the ways it can be worked.** `AvailableSlot` grew
+  `offers_online`, `offers_provider_travels` and `offers_patient_travels`, set
+  when a doctor publishes availability. A patient is never offered a way that
+  was always going to be refused, so the mismatch is rare before it is handled.
+
+`PENDING_MODE` and `MODE_PROPOSED` remain in `Status` because the audit trail
+recorded them and history is append-only; migration 0027 moved every live row
+out of them. What follows in this section is the flow as it was, kept because
+the reasoning still explains why the states exist and why a boolean could
+never have expressed any of it.
+
 ### The booking flow is a two-round negotiation, not a single form
 
 AGKI described how it actually works:
@@ -57,6 +86,25 @@ From decision 8: *"this app consists of doctors not only from AGKI."* Two conseq
 
 - **New-booking notifications go to the provider being booked**, not to a central AGKI inbox — the opposite of what §12 originally recommended, and correct: an external provider can't watch an AGKI dashboard for work that belongs to them.
 - §3's "provider list scoped to actual AGKI staff" is too narrow. The scoping rule is *providers who take appointments on this platform*, which is `role=doctor` plus published availability, regardless of employer.
+
+### Doctors register themselves, and registration approves the account (AGKI, 2026-08-29)
+
+The open-platform premise above has a consequence this document never drew: if the doctors on this platform are not AGKI's staff, **AGKI cannot be the one who creates their accounts.** A doctor outside the lab signs up for themselves — through the public form or through "Sign in with Google" — and `useraccount.signup` already works this way, offering `role=doctor` from a closed, server-validated set.
+
+**And registration approves the account.** `is_approved` stops meaning *"an administrator has admitted this person"* and starts meaning *"this account has not been switched off."* A self-registered doctor signs in and reaches their console immediately.
+
+This is a **change of meaning, not the removal of a gate.** Everything §4.2 describes stays exactly where it is:
+
+| Gate | Before | After |
+| --- | --- | --- |
+| Email verification — OTP for the form, Google's own for OAuth | Required | **Unchanged.** Still the one thing proving the registrant controls the address they gave |
+| `is_approved` | *Admission*: defaults `False`, an administrator grants it | ***Revocation***: granted at registration, an administrator withdraws it |
+| `is_active` | Administrator kill-switch | **Unchanged** |
+| Enforcement at login | `EmailBackend.user_can_authenticate` + `ACCOUNT_ADAPTER.pre_login` | **Unchanged.** Both still refuse an unapproved account, and still end its live session |
+
+The reason to change the default rather than delete the field is that the second half of its job is the half that now matters. An open platform needs a switch that takes a listing down; it does not need a queue nobody has committed to staffing, because an unstaffed queue is only a slower way of saying no.
+
+**What this deliberately does not answer is whether the person is really a doctor.** Nothing above checks a medical qualification — email verification proves control of an inbox, not a licence. Until §4.5 exists, *anyone who can receive email can register as a doctor here and be publicly bookable by patients.* AGKI has accepted that in order to open the platform, and asked for the verification method to be designed separately. It is recorded in §4.5, and as the top open risk in the plan, rather than being left implicit — because it is the one thing in this document that can reach a patient.
 
 ### Second-order consequence worth surfacing now
 
@@ -98,15 +146,15 @@ So this redesign:
 
 **Corrected twice after AGKI review (§0.1, decision E).** Earlier versions of this table deleted video consultation *and* specialty search as MediBook cruft. Both are real: one is a service AGKI offers, the other is how patients find the right doctor. The table below keeps what is real and removes only what nothing backs.
 
-| Old (MediBook) concept | New (AGKI) concept |
-|---|---|
-| "Doctor" search by specialty (Cardiologist, Dentist...) | **Kept, and made real (decision E).** Patients need to find the right doctor quickly, and with doctors from multiple organisations that only matters more. Backed by a proper `Specialty` taxonomy instead of the template's hardcoded grid — see **§5.5** |
-| "Video Consultation" as a hardcoded badge on every card | **Kept as a real appointment mode**, but as one of three the *patient chooses after the doctor confirms the time* (§6) — not a decorative badge asserting every doctor offers it |
-| "Digital Prescriptions", "Secure Payments", "Insurance" | Removed — nothing backs any of them. Online payment is a dedicated project if wanted later (§8.4) |
-| Reason for visit: "Consultation", "Medication Management"... | A closed choice list covering both lab work and consultation (§5.1) — the platform does both |
-| Rating / "Accepting New Patients" filters | Removed — rating is computed from a table **nothing ever writes to** (§5.4), and the badge was hardcoded `true` |
-| Gender / experience / region / language filters | **Kept where the data is real** (§5.5). `Profile` already stores `region`, `years_of_experience` and `languages_spoken`, and they hold live values today |
-| Branding: "MediBook" | AGKI branding — sourced from `cms.SiteSettings` rather than hardcoded, see **§3.1** |
+| Old (MediBook) concept                                       | New (AGKI) concept                                                                                                                                                                                                                                                         |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "Doctor" search by specialty (Cardiologist, Dentist...)      | **Kept, and made real (decision E).** Patients need to find the right doctor quickly, and with doctors from multiple organisations that only matters more. Backed by a proper `Specialty` taxonomy instead of the template's hardcoded grid — see **§5.5** |
+| "Video Consultation" as a hardcoded badge on every card      | **Kept as a real appointment mode**, but as one of three the *patient chooses after the doctor confirms the time* (§6) — not a decorative badge asserting every doctor offers it                                                                                 |
+| "Digital Prescriptions", "Secure Payments", "Insurance"      | Removed — nothing backs any of them. Online payment is a dedicated project if wanted later (§8.4)                                                                                                                                                                        |
+| Reason for visit: "Consultation", "Medication Management"... | A closed choice list covering both lab work and consultation (§5.1) — the platform does both                                                                                                                                                                             |
+| Rating / "Accepting New Patients" filters                    | Removed — rating is computed from a table**nothing ever writes to** (§5.4), and the badge was hardcoded `true`                                                                                                                                                   |
+| Gender / experience / region / language filters              | **Kept where the data is real** (§5.5). `Profile` already stores `region`, `years_of_experience` and `languages_spoken`, and they hold live values today                                                                                                    |
+| Branding: "MediBook"                                         | AGKI branding — sourced from`cms.SiteSettings` rather than hardcoded, see **§3.1**                                                                                                                                                                               |
 
 The reframing still isn't cosmetic: the insurance upload, prescriptions and the fake rating filter go. It just no longer throws out search, teleconsultation or the working filters along with them.
 
@@ -137,23 +185,31 @@ If these templates are rebuilt with AGKI's details typed in, the result is two s
 
 ### 4.1 The four access mechanisms
 
-| Mechanism | Kind | What it actually grants |
-|---|---|---|
-| `is_superuser` | Django flag | Everything. The only thing that reaches `AppointmentSettings`, `Specialty`, and the ecommerce views (§4.4) |
-| `is_staff` | Django flag | Permission to open `/admin/` at all. Necessary, never sufficient — model permissions still apply on top |
-| `Content Editors` group | Django group | The `cms` models only: marketing content and `SiteSettings`. **Never** appointments, dashboard or ecommerce (§4.3) |
-| `CustomUser.role` | Application field | Which *operational console* the account belongs to. Nothing to do with Django admin access |
+| Mechanism                 | Kind              | What it actually grants                                                                                                      |
+| ------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `is_superuser`          | Django flag       | Everything. The only thing that reaches`AppointmentSettings`, `Specialty`, and the ecommerce views (§4.4)               |
+| `is_staff`              | Django flag       | Permission to open`/admin/` at all. Necessary, never sufficient — model permissions still apply on top                    |
+| `Content Editors` group | Django group      | The`cms` models only: marketing content and `SiteSettings`. **Never** appointments, dashboard or ecommerce (§4.3) |
+| `CustomUser.role`       | Application field | Which*operational console* the account belongs to. Nothing to do with Django admin access                                  |
 
 `role` answers "what is this person's job here," not "what may they open." That is why an account can be `role=doctor` **and** a superuser (one currently is), and why a Content Editor has `is_staff=True` with no `role` at all.
 
 ### 4.1.1 Roles
 
-| Role value | Who | Console access |
-|---|---|---|
-| `doctor` | A doctor taking appointments — AGKI staff *or* external (§0.1). Kept as the existing DB value to avoid a churny rename | `doctorDashboard`, scoped to **their own** slots, appointments, notes and confirmations |
-| `admin` | Lab administrator | `doctorDashboard` across **all** doctors: every appointment, every doctor's availability, staff activation |
-| *(empty)* | Accounts with no operational role — Content Editors, and the two superuser developer accounts | No `doctorDashboard` access. `/admin/` if `is_staff` |
-| ~~`receptionist`~~ | — | **Dropped (decision 4).** AGKI has no front-desk role today. The value stays in `Role.choices` since it already shipped and costs nothing, but no UI, permission or code path assumes it exists. Adding it later is a permission change, not a redesign |
+| Role value            | Who                                                                                                                       | Console access                                                                                                                                                                                                                                                  |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `doctor`            | A doctor taking appointments — AGKI staff*or* external (§0.1). Kept as the existing DB value to avoid a churny rename | `doctorDashboard`, scoped to **their own** slots, appointments, notes and confirmations                                                                                                                                                                 |
+| `admin`             | Lab administrator                                                                                                         | `doctorDashboard` across **all** doctors: every appointment, every doctor's availability, staff activation                                                                                                                                              |
+| *(empty)*           | Accounts with no operational role — Content Editors, and the two superuser developer accounts                            | No`doctorDashboard` access. `/admin/` if `is_staff`                                                                                                                                                                                                       |
+| ~~`receptionist`~~ | —                                                                                                                        | **Dropped (decision 4).** AGKI has no front-desk role today. The value stays in `Role.choices` since it already shipped and costs nothing, but no UI, permission or code path assumes it exists. Adding it later is a permission change, not a redesign |
+
+**How an account acquires `role=doctor` (amended 2026-08-29, §0.1):** by registering at all. **No registration route asks.** `signup` assigns `doctor`, and so does `SocialAccountAdapter.save_user`; `role` is never read from a request body on either, so the `role='4491'` failure has nothing left to recur through.
+
+**This is the second amendment to this paragraph on the same day, and the first one was too timid.** It said `signup` "validates `role` against `{doctor, receptionist}` and refuses `admin`", and that "the *choice* is now the registrant's, because on an open platform there is nobody else to make it". The premise was wrong: there was no choice to hand over. **Decision 4 records the receptionist role as one that does not exist** — nobody holds it, nothing assumes it — so the form was asking every registrant to pick between a real account type and an imaginary one, and the server was carefully validating the answer. Validating an input is strictly weaker than not having one: the input is gone, and with it the check.
+
+`admin` stays assignable only through `CustomUserAdmin`, unchanged. The `Role.RECEPTIONIST` enum value also stays, per decision 4 — retiring the *choice* is not the same as retiring the value, and nothing assumes either way.
+
+**Through Google there is likewise no choice.** AGKI's decision of 2026-08-29: only doctors self-register, so a new Google account has exactly one possible meaning and `SocialAccountAdapter.save_user` assigns `role=doctor` from it. This is the strictest of the three routes — `role` never appears in a request — and it applies only to accounts that are genuinely new. Somebody who already has an account is matched on their email address and connected to it, keeping whatever role they hold, so an administrator who signs in with Google is not quietly turned into a doctor.
 
 ### 4.1.2 Landing page after sign-in — and a live mismatch to fix
 
@@ -161,11 +217,11 @@ If these templates are rebuilt with AGKI's details typed in, the result is two s
 
 **That contradicts the table above**, and it is not hypothetical. Checked against the live database:
 
-| Account | `role` | `is_staff` | `is_superuser` | Lands on | Should be |
-|---|---|---|---|---|---|
-| `kulwa_cherehani` | `admin` | ✅ | ❌ | `/admin/` | **`doctorDashboard`** — she is the lab administrator and never reaches the console she administers |
-| `mccoln` | `doctor` | ✅ | ✅ | `doctorDashboard` | Correct — a doctor is a doctor first, and `/admin/` is one click away |
-| `codex`, `zilla` | *(empty)* | ✅ | ✅ | `/admin/` | Correct |
+| Account              | `role`    | `is_staff` | `is_superuser` | Lands on            | Should be                                                                                                   |
+| -------------------- | ----------- | ------------ | ---------------- | ------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `kulwa_cherehani`  | `admin`   | ✅           | ❌               | `/admin/`         | **`doctorDashboard`** — she is the lab administrator and never reaches the console she administers |
+| `mccoln`           | `doctor`  | ✅           | ✅               | `doctorDashboard` | Correct — a doctor is a doctor first, and`/admin/` is one click away                                     |
+| `codex`, `zilla` | *(empty)* | ✅           | ✅               | `/admin/`         | Correct                                                                                                     |
 
 **Fix:** `post_login_redirect` routes **both** operational roles to the dashboard — `role in (doctor, admin)` → `doctorDashboard`, before the `is_staff` check. `is_staff` with no operational role continues to `/admin/`, which is right for a Content Editor. This is a small change to already-shipped code, and it is covered by the existing `PostLoginRedirectTests` matrix in `useraccount/tests.py`, which needs a `role=admin` row added.
 
@@ -175,7 +231,11 @@ If these templates are rebuilt with AGKI's details typed in, the result is two s
 2. Add one small decorator, `@role_required("admin", "doctor")`, applied per-view: `doctors()` and `activate_deactivate_doctor()` are `admin`-only, while `doctor_availability()` / `available_appointments()` / the confirmation views work for both. **`ecommerce_items()` is not in this scheme at all** — it is `is_superuser`-only per §4.4, which is a stricter gate than any role.
 3. Object-level scoping stays as-is where it already exists (`Appointment.objects.filter(slot__user=doctor)` in `doctor_appointment_details`) — it was correctly written, it just had no auth wall in front of it. Add an `admin`-role bypass so admins can see everything, not just their own slot's appointments.
 4. **Fix the login gate to actually mean something:** `signin()` currently only checks `is_active`. Change it to also require `is_approved` (matching the model's own comment: *"added so as to add admin approval to login"*), with a clear message ("Your account is pending admin approval") when it fails. This makes the Activate/Deactivate control in `doctors.html` finally control something real.
+
+   **Amended 2026-08-29 (§0.1).** The enforcement stands exactly as written, and shipped as written. What changed is the field's default, and therefore what the gate *is*: `is_approved` is granted at registration, so it no longer holds a new doctor in a queue — it is how an administrator withdraws access from an account that already has it. The message changes with it. "Your account is pending admin approval" is now wrong for the only people who can ever read it, since nobody is pending anything; they have been switched off.
 5. **Fix the Activate/Deactivate control itself:** today the button's label/icon/badge reflect `is_active` but the POST only flips `is_approved` (Critical #9 from the audit) — two different fields, one of them unreachable from the UI. Redesign: a single "Account status" control per staff row with two independent, clearly-labeled toggles — **Approved for login** (`is_approved`, what gates `signin()` per point 4 above) and **Active** (Django's `is_active`, an admin kill-switch that also works with `login_required`'s built-in behavior). Stop conflating them in one button.
+
+   **Amended 2026-08-29:** the split and both labels survive unchanged; only `is_approved`'s starting value moves (§0.1). "Approved for login" becomes a switch that starts **on**, which makes the pair finally read as one idea — two flags that both default to allowing access, and that an administrator takes away independently.
 6. **Role-based post-login redirect** — the mechanism shipped (§0), but it needs the one correction in **§4.1.2**: `role=admin` must route to `doctorDashboard`, not `/admin/`. Today the lab administrator never lands on the console she administers.
 
 ### 4.3 Who may edit this system's content (AGKI decision, binding)
@@ -205,6 +265,22 @@ Redesign:
 2. `ecommerce_items` becomes **read-only and superuser-only** — not `role=admin`, *superuser*. It stays only as a convenience view; anything that mutates a product happens in the Django admin.
 3. The sidebar link renders only for superusers, so a provider never sees a control they can't use.
 4. `ecommerce/`'s own views, models and templates are **not touched** by this project. Its redesign is a separate piece of work, and this one should leave it exactly as found apart from removing the foreign delete endpoint pointed at it.
+
+---
+
+### 4.5 Proving a self-registered doctor is a doctor (deferred — AGKI, 2026-08-29)
+
+Self-registration (§0.1) raises a question the closed-staff model never had to answer, and this document deliberately does **not** answer it: nothing establishes that the person who registered is a licensed doctor. AGKI's instruction is to open registration now and design verification separately. It is recorded here rather than in a code comment, because the next person to touch accounts needs to find it.
+
+Three constraints to hold now, so that the later work is additive rather than a rewrite:
+
+1. **Do not overload `is_approved`.** It now means *"not switched off"* and it gates **login**. Credential verification is a different question with a different answer: it gates **being bookable by a patient**, and a doctor whose paperwork is still under review should still reach their own console. Making one boolean carry both is the `AppointmentApproval` mistake (§5) repeated one layer up — a single bit asked to express two independent decisions, which is exactly the shape Phase 2 spent its time removing.
+2. **The eventual field belongs on `Profile`, not `CustomUser`.** It is professional information, sitting beside `qualifications` and `specialties`; `Profile` already exists for every account (§5.3) and is what the public listing reads from.
+3. **The likely shape**, for whoever picks this up: a registration-number field — in Tanzania, the Medical Council of Tanganyika register — a document upload, and an administrator review queue producing `unverified → pending → verified | rejected`. §6 step 2 then lists `verified` doctors, and the rest keep a working console without a public listing. None of it is built now, and none of it should be guessed at before AGKI says what evidence they will accept and who reviews it.
+
+**Google shortens the path further, and that is worth stating rather than discovering.** A form registration still has to clear an emailed one-time code before the account is usable — which was true of the code's intent and **not** of its behaviour until the Phase 10 gate test found `signup` writing `is_active=True` back over the signal that had just switched it off (plan 10.y). Until that fix, neither route proved anything about the registrant at all. A Google registration clears verification and approval in the same moment — Google has vouched for the address, decision F grants the rest, and §4.1.1 assigns the doctor role — so the distance from a stranger to an account listed as a doctor is one click on a button that says "Sign in with Google". Nothing in that sequence is wrong given decision F; it simply means this section's problem arrives sooner than it looks like it will.
+
+**Until it exists, the mitigation is `is_approved` used in its new direction:** an administrator told that a listing is fraudulent withdraws approval, which ends that session immediately (§4.2 point 4) and — per §6 step 2 — removes the doctor from the public search at the same moment. That is a reaction, not a control. Saying so plainly is the point of this section — but it is at least a reaction that works: withdrawal ends the session, removes the card, stops the specialty counting them, and refuses the booking URL, all from one flag, and each of those is held by a test that has been shown to fail without it (plan 10.3).
 
 ---
 
@@ -373,6 +449,7 @@ Fix: create the `Profile` in a `post_save` signal on `CustomUser` (with a data m
 
 1. **Remove all three read sites now.** `search_results`, `booking_form` and `appointment_detail` stop computing averages from an empty table and stop rendering "No ratings yet" as though it were data.
 2. **Keep the model, but fix its shape first.** As written it is `Rating(doctor, rating_value, feedback, recommended)` with **no link to an appointment** — so there is nothing to stop one person rating a provider a hundred times, and no way to tell which visit a rating refers to. The integration point that makes it easy later is:
+
    ```python
    class Rating(models.Model):
        appointment = models.OneToOneField(Appointment, on_delete=models.CASCADE)  # NEW - one rating per visit
@@ -396,10 +473,10 @@ Patients must be able to find a doctor by specialty. The template faked this wit
 
 **What's wrong with it.** `expertise` is free text, and already shows the drift that guarantees:
 
-| Field | A live value today | Problem |
-|---|---|---|
-| `expertise` | `"Cardiograph"` | A cardiograph is an ECG *machine*. The specialty is *Cardiology*. Free text lets a near-miss look like data |
-| `languages_spoken` | `"Kiswahili"` on one profile, `"Swahili and English"` on another | Same language spelled two ways, and two languages in one string. Filtering on this cannot work |
+| Field                | A live value today                                                   | Problem                                                                                                        |
+| -------------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `expertise`        | `"Cardiograph"`                                                    | A cardiograph is an ECG*machine*. The specialty is *Cardiology*. Free text lets a near-miss look like data |
+| `languages_spoken` | `"Kiswahili"` on one profile, `"Swahili and English"` on another | Same language spelled two ways, and two languages in one string. Filtering on this cannot work                 |
 
 This is the `role='4491'` lesson again: a field that is searched must be a closed set, or search silently misses people.
 
@@ -436,7 +513,17 @@ class CustomUser(AbstractUser):
     qualifications = models.CharField(max_length=255, blank=True)   # DONE - split out of role
 ```
 
-Already shipped. Everything else (`is_active`, `is_approved`, `image`) is reused as-is.
+Already shipped. `is_active` and `image` are reused as-is.
+
+**`is_approved` changes its default, and with it its meaning (§0.1, 2026-08-29):**
+
+```python
+    is_approved = models.BooleanField(default=True)   # was default=False
+```
+
+The field is untouched in every other respect and is still enforced at login by `EmailBackend.user_can_authenticate` and `ACCOUNT_ADAPTER.pre_login`. **Changing the default rather than assigning `is_approved=True` at each registration site is deliberate.** Four sites create accounts — the public form, allauth's social signup, the console's Add New Doctor, and `createsuperuser` — so four assignments would be four places to forget, and the fourth already carries a special case in `useraccount/signals.py` that exists only to work around the wrong default. More to the point, *not revoked* is precisely what a default expresses: an account constructed in a shell, a fixture or a test has not been switched off by anybody, and under the new meaning it should not be born as though it had.
+
+**A default does not backfill.** Existing rows keep whatever they hold, so the change needs a one-time data migration alongside it — plan 10.2.
 
 ---
 
@@ -445,7 +532,9 @@ Already shipped. Everything else (`is_active`, `is_approved`, `image`) is reused
 Every step below is a **real Django `POST` to a real view** — no `e.preventDefault()` decorative flows, no client-side-only "success" alerts.
 
 1. **Home** (`appointment_home`) — AGKI-branded, states plainly this is for booking a lab visit or sample collection, one CTA: "Book an appointment."
-2. **Provider / date selection** (`search_results`) — server-rendered list of providers with published availability, each showing their real slots. **Widened per decision 5:** the current hard-coded 5-day window becomes the same week/month horizon the provider publishes against (§7), so a patient can see and book further out than the day after tomorrow. Providers are listed by `role` and published availability, **not** by whether a `Profile` row happens to exist (§5.3). **Gains a real specialty filter and a browse-by-specialty grid** (§5.5, decision E) — the thing the template only pretended to have. Removed: the rating filter and the "Accepting New Patients" badge (a table nothing writes to, and a hardcoded `true`), and the fake "show more slots" button. The "Video Consultation" badge also goes — not because video isn't real (§0.1), but because asserting it per-provider on a card was never backed by data; mode is negotiated per appointment.
+2. **Provider / date selection** (`search_results`) — server-rendered list of providers with published availability, each showing their real slots. **Widened per decision 5:** the current hard-coded 5-day window becomes the same week/month horizon the provider publishes against (§7), so a patient can see and book further out than the day after tomorrow. Providers are listed by `role` and published availability, **not** by whether a `Profile` row happens to exist (§5.3). **Also filtered on `is_approved`, as of §0.1:** with approval granted at registration, an *un*approved account is one an administrator has switched off, and an account that cannot sign in cannot confirm a booking — so listing them guarantees an expired appointment. It is also the only lever §4.5 leaves against a fraudulent listing, and a lever that removes someone's login while leaving them on the search page is not one.
+
+**The rule has one home: `CustomUser.PUBLICLY_BOOKABLE`** (`role=doctor`, `is_active`, `is_approved`), read by the list, by the specialty counts, and by `booking_form` — which **refuses** a slot belonging to a doctor who fails it, on GET and POST alike. Hiding the card while the booking URL still worked would have been a change of appearance rather than of behaviour, and a slot id is a small integer anybody can type. **Gains a real specialty filter and a browse-by-specialty grid** (§5.5, decision E) — the thing the template only pretended to have. Removed: the rating filter and the "Accepting New Patients" badge (a table nothing writes to, and a hardcoded `true`), and the fake "show more slots" button. The "Video Consultation" badge also goes — not because video isn't real (§0.1), but because asserting it per-provider on a card was never backed by data; mode is negotiated per appointment.
 3. **Booking form** (`booking_form`) — collects patient info and `reasonVisit` from the closed choice list (§5.1). **It does not ask for the meeting mode**: per §0.1 that is chosen later, once the provider has confirmed the time. The submit button is a plain HTML form submit — no JS intercepts it. Server-side: wrap the slot claim in `select_for_update()`, **actually check `is_booked`** (today nothing does), and return a clear "This slot was just taken, please pick another" error instead of silently creating a conflicting row. Result: `status=PENDING_TIME`, and a `booking.created` notification to **the provider being booked** (§9.1).
 4. **Confirmation** (`booking_success_page`) — shows the booking ID and sets the signed, appointment-scoped session marker (§8.1). Emails the patient their reference **and what happens next**: that the provider will confirm the time, and that they'll be emailed when it's their turn to choose a meeting mode. The old template promised an instant confirmation the flow can't deliver.
 5. **Round 1 — provider confirms the time** (`doctorDashboard`, §7). On confirm → `PENDING_MODE` and the patient is emailed a link back. On decline → `TIME_DECLINED`, the slot is freed for someone else, and the patient is told (with the provider's reason, if given).
@@ -695,7 +784,7 @@ Both apps still have empty `tests.py` files. The CMS work established the patter
 3. **Migration 3 (requires care):** `Appointment.slot` `ForeignKey` → `OneToOneField`, and `on_delete` `CASCADE` → `PROTECT`. Verify first that nothing violates it — `AvailableSlot.objects.annotate(c=Count('appointment')).filter(c__gt=1)` — and note this **is not currently guaranteed**: §10 #6 confirms two appointments can already share a slot, so on real data this query may well return rows that need resolving by hand before the constraint can be applied.
 4. **Migration 4:** drop `Appointment.age`; convert `visitType`/`reasonVisit`/`gender` to `choices` (audit existing free-text values first and map them — the `role='4491'` precedent says assume dirty data); reshape `Rating` per §5.4 (`appointment` OneToOne, `doctor` → `provider`) even though nothing reads it yet, so the table is ready when the feature is built.
 5. **Migration 5:** create `Profile` rows for every account missing one, and add the `post_save` signal (§5.3), so doctor visibility stops depending on whether someone once opened a page. **Five of ten accounts currently have no Profile**, so this is a real backfill, not a formality.
-5a. **Migration 6 — specialty (§5.5):** create `Specialty`, add `Profile.specialties`, seed the taxonomy with the specialties AGKI actually offers, and migrate `expertise` where it maps cleanly. **Print the unmappable values and stop short of guessing** — the one live value, `"Cardiograph"`, is an ECG machine rather than a specialty and needs a person to decide it means Cardiology. Drop `expertise` only after the mapping is confirmed.
+   5a. **Migration 6 — specialty (§5.5):** create `Specialty`, add `Profile.specialties`, seed the taxonomy with the specialties AGKI actually offers, and migrate `expertise` where it maps cleanly. **Print the unmappable values and stop short of guessing** — the one live value, `"Cardiograph"`, is an ECG machine rather than a specialty and needs a person to decide it means Cardiology. Drop `expertise` only after the mapping is confirmed.
 6. **Flow rollout:** the two-round negotiation (§6) and the notification layer (§9.1) ship together — the flow is unusable without the emails that tell each party it is their turn.
    6a. **Expiry (§6.1) ships with the flow, not after it.** The `expire_stale_appointments` command, its cron entry, the booking lead-time guard and the confirm-view cutoff checks are one unit: shipping the two-round flow without expiry means every unanswered booking holds its slot forever. Add the cron entry as an explicit rollout step — it is a host configuration change, easy to forget, and silent when missed.
 7. **Content/branding pass** (domain reframing, template rebuild, `SiteSettings` wiring) ships last, once the data and security layers are stable.
@@ -706,25 +795,27 @@ Both apps still have empty `tests.py` files. The CMS work established the patter
 
 **All resolved.** Recorded with their answers so they aren't re-litigated.
 
-| #  | Decision                             | AGKI's answer                                                                                                                                                                                                                         | Where it lands                                                                                                                                                                       |
-| -- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1  | Provider terminology                 | *(superseded — see the ecommerce answer below, which AGKI gave against this number)*                                                                                                                                               | —                                                                                                                                                                                   |
-| — | **Ecommerce**                  | **Freeze it.** It needs its own redesign later; for now only a superuser may access or configure it                                                                                                                             | §4.4 —`delete_item` removed outright, product list superuser-only, `ecommerce/` itself untouched                                                                               |
-| 2  | Appointment modes / home collection  | **Three modes, chosen in a second round after the provider confirms the time**: online video call, provider travels to patient, patient travels to provider. Video consultation is a **real service**, not template cruft | §0.1, §3, §5 state machine, §6 steps 5-7                                                                                                                                         |
-| 3  | SMS reminders                        | **Email now, but architect for SMS** so adding it isn't a rewrite                                                                                                                                                               | §9.1 — event-based notifications, channel interface,`SmsChannel` stub, `NotificationLog`                                                                                       |
-| 4  | Receptionist role                    | **Does not exist today**                                                                                                                                                                                                        | §4.1 — dropped from the design; the enum value stays but nothing assumes it                                                                                                        |
-| 5  | `doctor_schedule.html`             | **Delete it — provided `doctor_availability` gives a real week/month timetable**, which AGKI needs for booking to be realistic                                                                                               | §7 — timetable navigation becomes a requirement and a prerequisite for the deletion; §6 step 2 widens the patient-facing horizon to match                                         |
-| 6  | Shared branding from`SiteSettings` | **Yes — the CMS manager keeps `SiteSettings`.** It is shared site identity and affects no booking or dashboard behaviour                                                                                                     | §3.1, §4.3 point 3 — boundary is*identity vs. configuration*                                                                                                                    |
-| 7  | `Rating`                           | **Drop it now, but leave the architecture ready** so it's easy to add later                                                                                                                                                     | §5.4 — read sites removed, model reshaped with an`appointment` OneToOne, `appointment.completed` event reserved as the trigger                                                 |
-| 8  | Booking notifications                | **Notify the provider being booked**, not AGKI — the platform hosts providers beyond AGKI                                                                                                                                      | §9.1; also corrects §3's "AGKI staff only" framing (§0.1)                                                                                                                         |
-| 9  | Cancellation window                  | **Recommendation accepted** — configurable cut-off                                                                                                                                                                             | §5 / §6 step 9 — cancellation allowed up to N hours before the slot, N on`AppointmentSettings` (§4.3)                                                                          |
-| B  | Video link for online appointments   | **The doctor supplies it when confirming the mode**                                                                                                                                                                             | §6 —`meeting_url`, required when confirming an `ONLINE` appointment; sent to the patient on confirmation, never shown before                                                   |
-| C  | Provider non-response                | **Release the appointment 30 minutes before the booked time, and log it against that doctor for auditing.** Same cutoff applies when the *patient* is the one who hasn't responded, logged as such                            | §6.1 — new`EXPIRED` state (distinct from cancelled and declined), slot freed, `AppointmentTransition` naming who was waited on, both parties notified, cron + view-level guard |
-| E | Specialty search | **Keep it — patients need to find the right doctor easily**, more so with doctors from several organisations | §3, §5.5 — real `Specialty` taxonomy (a model, not an enum, so AGKI can add one without a deploy), M2M from `Profile`, superuser-managed; `expertise` migrated with unmappable values reported rather than guessed |
-| D  | Minimum booking notice               | **2 hours**                                                                                                                                                                                                                     | §6.1 —`MINIMUM_BOOKING_NOTICE`; slots inside the window are refused *and* not offered. Leaves a 90-minute margin for the doctor to answer before the 30-minute cutoff          |
+| #  | Decision                             | AGKI's answer                                                                                                                                                                                                                         | Where it lands                                                                                                                                                                                                             |
+| -- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1  | Provider terminology                 | *(superseded — see the ecommerce answer below, which AGKI gave against this number)*                                                                                                                                               | —                                                                                                                                                                                                                         |
+| — | **Ecommerce**                  | **Freeze it.** It needs its own redesign later; for now only a superuser may access or configure it                                                                                                                             | §4.4 —`delete_item` removed outright, product list superuser-only, `ecommerce/` itself untouched                                                                                                                     |
+| 2  | Appointment modes / home collection  | **Three modes, chosen in a second round after the provider confirms the time**: online video call, provider travels to patient, patient travels to provider. Video consultation is a **real service**, not template cruft | §0.1, §3, §5 state machine, §6 steps 5-7                                                                                                                                                                               |
+| 3  | SMS reminders                        | **Email now, but architect for SMS** so adding it isn't a rewrite                                                                                                                                                               | §9.1 — event-based notifications, channel interface,`SmsChannel` stub, `NotificationLog`                                                                                                                             |
+| 4  | Receptionist role                    | **Does not exist today**                                                                                                                                                                                                        | §4.1 — dropped from the design; the enum value stays but nothing assumes it                                                                                                                                              |
+| 5  | `doctor_schedule.html`             | **Delete it — provided `doctor_availability` gives a real week/month timetable**, which AGKI needs for booking to be realistic                                                                                               | §7 — timetable navigation becomes a requirement and a prerequisite for the deletion; §6 step 2 widens the patient-facing horizon to match                                                                               |
+| 6  | Shared branding from`SiteSettings` | **Yes — the CMS manager keeps `SiteSettings`.** It is shared site identity and affects no booking or dashboard behaviour                                                                                                     | §3.1, §4.3 point 3 — boundary is*identity vs. configuration*                                                                                                                                                          |
+| 7  | `Rating`                           | **Drop it now, but leave the architecture ready** so it's easy to add later                                                                                                                                                     | §5.4 — read sites removed, model reshaped with an`appointment` OneToOne, `appointment.completed` event reserved as the trigger                                                                                       |
+| 8  | Booking notifications                | **Notify the provider being booked**, not AGKI — the platform hosts providers beyond AGKI                                                                                                                                      | §9.1; also corrects §3's "AGKI staff only" framing (§0.1)                                                                                                                                                               |
+| 9  | Cancellation window                  | **Recommendation accepted** — configurable cut-off                                                                                                                                                                             | §5 / §6 step 9 — cancellation allowed up to N hours before the slot, N on`AppointmentSettings` (§4.3)                                                                                                                |
+| B  | Video link for online appointments   | **The doctor supplies it when confirming the mode**                                                                                                                                                                             | §6 —`meeting_url`, required when confirming an `ONLINE` appointment; sent to the patient on confirmation, never shown before                                                                                         |
+| C  | Provider non-response                | **Release the appointment 30 minutes before the booked time, and log it against that doctor for auditing.** Same cutoff applies when the *patient* is the one who hasn't responded, logged as such                            | §6.1 — new`EXPIRED` state (distinct from cancelled and declined), slot freed, `AppointmentTransition` naming who was waited on, both parties notified, cron + view-level guard                                       |
+| E  | Specialty search                     | **Keep it — patients need to find the right doctor easily**, more so with doctors from several organisations                                                                                                                   | §3, §5.5 — real`Specialty` taxonomy (a model, not an enum, so AGKI can add one without a deploy), M2M from `Profile`, superuser-managed; `expertise` migrated with unmappable values reported rather than guessed |
+| D  | Minimum booking notice               | **2 hours**                                                                                                                                                                                                                     | §6.1 —`MINIMUM_BOOKING_NOTICE`; slots inside the window are refused *and* not offered. Leaves a 90-minute margin for the doctor to answer before the 30-minute cutoff                                                |
+| F  | Doctor registration & approval       | **Doctors self-register — the platform is open to any doctor, not only AGKI's — and registration approves the account.** Whether a registrant is really a doctor is a separate problem, deferred to §4.5                                | §0.1, §4.5, §5.6 — `is_approved` flips to `default=True` and changes meaning from *admission* to *revocation*; login enforcement is unchanged; §6 step 2 gains an `is_approved` filter; credential verification later gets its own field on `Profile`, never by overloading `is_approved`. Plan Phase 10 |
 
 **Still genuinely open — carried forward, not blocking:**
 
 | Question                                       | Why it matters                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Is anyone bookable *not* a doctor?** | The real question behind "provider terminology," which was badly framed the first time. "Doctor / Provider / Consultant" were never roles or qualifications —`role` is access control and `qualifications` already holds credentials (MD, MBBS) — they were candidate **display nouns** for "the person you are booking with." The original doc assumed a lab would have phlebotomists and lab scientists taking bookings, which would make "Doctor" wrong. AGKI has since said the platform *is* doctors. **Proceeding with "Doctor" throughout**, with `qualifications` shown alongside the name. Only revisit if nurses or technicians become directly bookable |
+| **How do we know a registrant is really a doctor?** | The question §4.5 exists for, and the sharpest one in this document. Under decision F, control of an email address is the only thing standing between a stranger and a publicly bookable doctor listing on a medical platform. AGKI accepted that deliberately in order to open the platform, and it is a **temporary** position: until it changes, the mitigation is purely reactive — withdrawing `is_approved` after somebody complains. What is needed is AGKI naming the evidence they will accept (registration number, certificate, both) and who reviews it. **Decide it before the platform is promoted to patients**, not after |

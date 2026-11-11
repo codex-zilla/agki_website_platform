@@ -1,0 +1,38 @@
+{% comment %}
+The four rounds, and whose turn it is.
+
+Takes `journey` — the dict `appointments.journey.journey_for` builds — and
+nothing else, so the same strip renders on the booking form, the success page,
+the choose-mode page and the appointment detail page without four copies of an
+`{% templatetag openblock %} if {% templatetag closeblock %}` ladder.
+
+What this replaces on the booking form was "Select Time / Patient Info /
+Confirmation": three steps for a flow with four rounds, ending two rounds early,
+so a patient who reached the success page read "Request sent" as a confirmation.
+
+An ended appointment gets a sentence instead of a half-drawn strip. Grey dots
+after a cancellation say nothing a patient can use.
+{% endcomment %}
+{% if journey.ended %}
+<div class="pt-tracker-ended" role="status">
+    <strong>{{ appointment.get_status_display }}.</strong>
+    {{ journey.ended.detail }}
+</div>
+{% else %}
+<ol class="pt-tracker" aria-label="Progress of this booking">
+    {% for stage in journey.stages %}
+    <li class="pt-stage {{ stage.state }}">
+        <span class="pt-stage-line" aria-hidden="true"></span>
+        <span class="pt-stage-dot" aria-hidden="true">
+            {% if stage.state == 'done' %}<i class="fas fa-check"></i>{% else %}{{ forloop.counter }}{% endif %}
+        </span>
+        <span class="pt-stage-label">
+            {{ stage.label }}
+            {% if stage.state == 'now' %}
+            <span class="pt-stage-turn">{% if stage.mine %}your turn{% else %}waiting for the doctor{% endif %}</span>
+            {% endif %}
+        </span>
+    </li>
+    {% endfor %}
+</ol>
+{% endif %}

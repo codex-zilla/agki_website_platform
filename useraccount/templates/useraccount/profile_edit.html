@@ -1,496 +1,598 @@
 {% extends 'doctorDashboard/doctor_base.html' %}
 {% load static %}
 {% block content %}
+{% comment %}
+Rebuilt to the design agreed with AGKI on 2026-09-01 (plan 11.6), and revised
+once before building: the first version rendered **all 32 options at once** -
+fourteen qualification chips and eighteen specialty chips, always on screen -
+which pushed the rest of the form below the fold. AGKI rejected it, rightly: a
+picker that costs a screen and a half is worse than the typing it replaces.
 
-<div class="dashboard-content">
-    <!-- Page Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h2 class="page-title mb-2">Edit Profile</h2>
-            <p class="text-muted mb-0">Update your personal information and profile settings</p>
-        </div>
-        <div>
-            <a href="{% url 'profile' %}" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left me-2"></i>Back to Profile
-            </a>
-        </div>
-    </div>
+Both fields now cost one line until they are used. Selections sit as pellets
+inside the field; the options appear only while you are choosing.
 
-    <div class="row">
-        <div class="col-lg-8">
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-user-edit me-2"></i>Edit Profile Information
-                    </h3>
+**The underlying controls are plain checkbox lists**, rendered by Django and
+then hidden by the script below. With JavaScript switched off the page falls
+back to two ordinary lists of checkboxes - long, but complete and submittable.
+That is deliberate: this form is how a doctor becomes findable at all, and it
+must not depend on a script to work.
+
+Classes are `pe-` prefixed, and a test asserts every one is defined here.
+{% endcomment %}
+
+<div class="dashboard-content pe">
+
+    <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+
+        <div class="pe-head">
+            <div class="pe-id">
+                <p>What patients see when they search for a doctor.</p>
+            </div>
+            <a class="pe-btn ghost" href="{% url 'profile' %}">Cancel</a>
+            <button type="submit" class="pe-btn">Save changes</button>
+        </div>
+
+        {% if messages %}
+        <div class="pe-messages">
+            {% for message in messages %}
+            <div class="pe-message {{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if user_form.errors or profile_form.errors %}
+        <div class="pe-messages">
+            {% for field in user_form %}{% for error in field.errors %}
+            <div class="pe-message error">{{ field.label }}: {{ error }}</div>
+            {% endfor %}{% endfor %}
+            {% for field in profile_form %}{% for error in field.errors %}
+            <div class="pe-message error">{{ field.label }}: {{ error }}</div>
+            {% endfor %}{% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="pe-cols">
+            <div>
+                <p class="pe-group">Professional</p>
+
+                {% comment %}
+                Short list, short labels - a dropdown is enough, and a search
+                box over fourteen entries would be furniture.
+                {% endcomment %}
+                <div class="pe-field" data-picker="dropdown"
+                     data-empty="No qualifications chosen yet.">
+                    <label for="id_qualifications_0">Qualifications</label>
+                    <div class="pe-native">{{ profile_form.qualifications }}</div>
+                    <p class="pe-hint">AGKI keeps this list. Ask them to add anything missing
+                        rather than typing it in.</p>
                 </div>
-                <div class="card-body">
-                    <form method="POST" enctype="multipart/form-data" id="profileForm">
-                        {% csrf_token %}
 
-                        <!-- User Information Section -->
-                        <div class="mb-4">
-                            <h5 class="mb-3" style="color: var(--primary-green);">
-                                <i class="fas fa-user-circle me-2"></i>User Information
-                            </h5>
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label fw-bold">First Name</label>
-                                    <input type="text" 
-                                           class="form-control form-control-lg" 
-                                           name="first_name" 
-                                           value="{{ user_form.instance.first_name|default:'' }}"
-                                           placeholder="Enter first name">
-                                    <div class="form-text">Your legal first name</div>
-                                </div>
+                {% comment %}
+                Eighteen entries with names like "Obstetrics & Gynaecology" do
+                not fit a dropdown, so this one filters as you type. Chosen
+                entries stay in the results, marked - an option that vanishes
+                makes you wonder whether you imagined it.
+                {% endcomment %}
+                <div class="pe-field" data-picker="search"
+                     data-empty="No specialties chosen yet."
+                     data-placeholder="Search specialties…">
+                    <label for="id_specialties_0">Specialties</label>
+                    <div class="pe-native">{{ profile_form.specialties }}</div>
+                    <p class="pe-hint">Patients browse by specialty. Without one you do not appear
+                        in the search at all.</p>
+                </div>
 
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label fw-bold">Last Name</label>
-                                    <input type="text" 
-                                           class="form-control form-control-lg" 
-                                           name="last_name" 
-                                           value="{{ user_form.instance.last_name|default:'' }}"
-                                           placeholder="Enter last name">
-                                    <div class="form-text">Your legal last name</div>
-                                </div>
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">Email Address</label>
-                                <input type="email" 
-                                       class="form-control form-control-lg" 
-                                       name="email" 
-                                       value="{{ user_form.instance.email|default:'' }}"
-                                       placeholder="Enter email address">
-                                <div class="form-text">Your primary contact email</div>
-                            </div>
-                        </div>
-
-                        <!-- Profile Information Section -->
-                        <div class="mb-4">
-                            <h5 class="mb-3" style="color: var(--primary-green);">
-                                <i class="fas fa-id-card me-2"></i>Profile Information
-                            </h5>
-                            
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">Bio</label>
-                                <textarea class="form-control" 
-                                          name="bio" 
-                                          rows="4"
-                                          placeholder="Tell us about yourself, your experience, and your medical philosophy...">{{ profile_form.instance.bio|default:'' }}</textarea>
-                                <div class="form-text">Brief professional biography (max 500 characters)</div>
-                                <div class="text-end small" id="bioCounter">0/500</div>
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label fw-bold">Location</label>
-                                    <input type="text" 
-                                           class="form-control" 
-                                           name="location" 
-                                           value="{{ profile_form.instance.location|default:'' }}"
-                                           placeholder="City, Country">
-                                    <div class="form-text">Your current location</div>
-                                </div>
-
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label fw-bold">Birth Date</label>
-                                    <input type="date" 
-                                           class="form-control" 
-                                           name="birth_date" 
-                                           value="{{ profile_form.instance.birth_date|date:'Y-m-d'|default:'' }}">
-                                    <div class="form-text">Your date of birth</div>
-                                </div>
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label fw-bold">Phone Number</label>
-                                    <input type="tel" 
-                                           class="form-control" 
-                                           name="phone" 
-                                           value="{{ user_form.instance.phone|default:'' }}"
-                                           placeholder="+1234567890">
-                                    <div class="form-text">Your contact number</div>
-                                </div>
-
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label fw-bold">Address</label>
-                                    <input type="text" 
-                                           class="form-control" 
-                                           name="address" 
-                                           value="{{ profile_form.instance.address|default:'' }}"
-                                           placeholder="Street address">
-                                    <div class="form-text">Your complete address</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Professional Information Section -->
-                        <div class="mb-4">
-                            <h5 class="mb-3" style="color: var(--primary-green);">
-                                <i class="fas fa-briefcase-medical me-2"></i>Professional Information
-                            </h5>
-                            
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label fw-bold">Specialization</label>
-                                    <input type="text" 
-                                           class="form-control" 
-                                           name="expertise" 
-                                           value="{{ profile_form.instance.expertise|default:'' }}"
-                                           placeholder="e.g., Cardiology, Pediatrics">
-                                    <div class="form-text">Your medical specialization</div>
-                                </div>
-
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label fw-bold">Qualifications</label>
-                                    <input type="text"
-                                           class="form-control"
-                                           name="qualifications"
-                                           value="{{ user_form.instance.qualifications|default:'' }}"
-                                           placeholder="e.g., MD, MBBS, PhD">
-                                    <div class="form-text">Your medical qualifications</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Profile Image Section -->
-                        <div class="mb-4">
-                            <h5 class="mb-3" style="color: var(--primary-green);">
-                                <i class="fas fa-camera me-2"></i>Profile Image
-                            </h5>
-                            
-                            <div class="row align-items-center">
-                                <div class="col-md-4 mb-3">
-                                    <div class="text-center">
-                                        {% if user_form.instance.image %}
-                                        <img src="{{ user_form.instance.image.url }}" 
-                                             alt="Current Profile Image" 
-                                             class="img-fluid rounded-circle border border-3 border-primary mb-3"
-                                             style="width: 180px; height: 180px; object-fit: cover;"
-                                             id="profileImagePreview">
-                                        {% else %}
-                                        <div class="rounded-circle bg-light d-flex align-items-center justify-content-center mb-3"
-                                             style="width: 180px; height: 180px; border: 3px solid var(--primary-green);"
-                                             id="profileImagePreview">
-                                            <i class="fas fa-user-md text-muted" style="font-size: 4rem;"></i>
-                                        </div>
-                                        {% endif %}
-                                        
-                                        <label class="btn btn-outline-primary btn-sm">
-                                            <i class="fas fa-upload me-1"></i>Upload Image
-                                            <input type="file" 
-                                                   class="form-control d-none" 
-                                                   name="image" 
-                                                   accept="image/*"
-                                                   id="imageInput">
-                                        </label>
-                                    </div>
-                                </div>
-                                
-                                <div class="col-md-8 mb-3">
-                                    <div class="alert alert-info">
-                                        <h6 class="alert-heading"><i class="fas fa-info-circle me-2"></i>Image Guidelines</h6>
-                                        <ul class="mb-0 small">
-                                            <li>Upload a clear, professional headshot</li>
-                                            <li>Recommended size: 400x400 pixels</li>
-                                            <li>Accepted formats: JPG, PNG, GIF</li>
-                                            <li>Maximum file size: 5MB</li>
-                                            <li>Ensure good lighting and neutral background</li>
-                                        </ul>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Form Actions -->
-                        <div class="border-top pt-4">
-                            <div class="d-flex justify-content-between">
-                                <a href="{% url 'profile' %}" class="btn btn-outline-secondary px-4">
-                                    <i class="fas fa-times me-2"></i>Cancel
-                                </a>
-                                <div class="d-flex gap-3">
-                                    <button type="submit" class="btn btn-primary px-4" style="background: var(--gradient-green); border: none;">
-                                        <i class="fas fa-save me-2"></i>Save Changes
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </form>
+                <div class="pe-field">
+                    <label for="{{ profile_form.bio.id_for_label }}">About you</label>
+                    {{ profile_form.bio }}
+                    <p class="pe-hint">A sentence or two. It appears under your name on the
+                        booking page.</p>
                 </div>
             </div>
-        </div>
 
-        <!-- Sidebar Tips -->
-        <div class="col-lg-4">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-lightbulb me-2"></i>Profile Tips
-                    </h3>
+            <div>
+                <p class="pe-group">Where you practise</p>
+                <div class="pe-pair">
+                    <div class="pe-field">
+                        <label for="{{ profile_form.region.id_for_label }}">Region</label>
+                        {{ profile_form.region }}
+                    </div>
+                    <div class="pe-field">
+                        <label for="{{ profile_form.location.id_for_label }}">Location</label>
+                        {{ profile_form.location }}
+                    </div>
                 </div>
-                <div class="card-body">
-                    <div class="alert alert-success mb-3">
-                        <h6 class="alert-heading">
-                            <i class="fas fa-check-circle me-2"></i>Complete Your Profile
-                        </h6>
-                        <p class="small mb-0">Complete profiles receive 40% more patient inquiries.</p>
+                <div class="pe-field">
+                    <label for="{{ profile_form.languages_spoken.id_for_label }}">Languages spoken</label>
+                    {{ profile_form.languages_spoken }}
+                </div>
+
+                <p class="pe-group">You</p>
+                <div class="pe-pair">
+                    <div class="pe-field">
+                        <label for="{{ profile_form.years_of_experience.id_for_label }}">Years of experience</label>
+                        {{ profile_form.years_of_experience }}
                     </div>
-                    
-                    <div class="mb-3">
-                        <h6 class="fw-bold mb-2">Best Practices:</h6>
-                        <ul class="small text-muted">
-                            <li>Use your real, legal name</li>
-                            <li>Keep contact information up-to-date</li>
-                            <li>Write a professional, concise bio</li>
-                            <li>Use a recent, high-quality photo</li>
-                            <li>List all relevant qualifications</li>
-                        </ul>
+                    <div class="pe-field">
+                        <label for="{{ user_form.phone.id_for_label }}">Phone</label>
+                        {{ user_form.phone }}
                     </div>
-                    
-                    <div class="border-top pt-3">
-                        <h6 class="fw-bold mb-2">Profile Strength</h6>
-                        <div class="progress mb-2" style="height: 8px;">
-                            <div class="progress-bar" role="progressbar" 
-                                 style="width: {% firstof profile.complete_percentage '65' %}%; background: var(--gradient-green);">
-                            </div>
+                </div>
+                <div class="pe-pair">
+                    <div class="pe-field">
+                        <label for="{{ user_form.first_name.id_for_label }}">First name</label>
+                        {{ user_form.first_name }}
+                    </div>
+                    <div class="pe-field">
+                        <label for="{{ user_form.last_name.id_for_label }}">Last name</label>
+                        {{ user_form.last_name }}
+                    </div>
+                </div>
+                <div class="pe-field">
+                    <label for="{{ user_form.email.id_for_label }}">Email</label>
+                    {{ user_form.email }}
+                </div>
+                {% comment %}
+                These shared a row and the file input squeezed the date field
+                to nothing - a browser renders `<input type=file>` at the width
+                of its button plus the file name, which is long and not
+                something CSS can shorten. They are separate rows now, and the
+                file input is replaced by a thumbnail and a button (below).
+                {% endcomment %}
+                <div class="pe-field">
+                    <label>Photo</label>
+                    {% comment %}
+                    The two inputs are written out here rather than rendered by
+                    `{{ user_form.image }}`. An `ImageField` uses Django's
+                    `ClearableFileInput`, whose own markup is a "Currently:"
+                    label, a **link to the file**, a "Clear" checkbox and a
+                    "Change:" label - which is what AGKI saw on the page, and
+                    none of which can be styled or suppressed from CSS.
+
+                    Rendering the two controls directly is the alternative that
+                    does not require changing `FORM_RENDERER` and adding
+                    `django.forms` to `INSTALLED_APPS` just to override one
+                    widget template. `html_name` is used rather than a typed
+                    string, and `-clear` is `ClearableFileInput`'s own suffix,
+                    so what is posted is exactly what the widget parses.
+                    {% endcomment %}
+                    <div class="pe-photo" id="pe-photo">
+                        <span class="pe-thumb-wrap">
+                            {% if request.user.image %}
+                            <img class="pe-thumb" id="pe-thumb"
+                                 src="{{ request.user.image.url }}" alt="Your photo">
+                            {% else %}
+                            <span class="pe-thumb pe-thumb-empty" id="pe-thumb"
+                                  role="img" aria-label="No photo yet">
+                                <i class="fas fa-user-md"></i>
+                            </span>
+                            {% endif %}
+                        </span>
+
+                        <div class="pe-photo-actions">
+                            <label class="pe-file" for="id_{{ user_form.image.html_name }}">
+                                {% if request.user.image %}Change photo{% else %}Upload photo{% endif %}
+                            </label>
+                            {% if request.user.image %}
+                            <button type="button" class="pe-file danger" id="pe-clear-btn">Remove</button>
+                            {% endif %}
                         </div>
-                        <p class="small text-muted mb-0">
-                            <span class="fw-bold">{% firstof profile.complete_percentage '65' %}% Complete</span> 
-                            • Update all fields to reach 100%
+
+                        <p class="pe-cleared" id="pe-cleared" hidden>
+                            Photo will be removed when you save.
+                            <button type="button" class="pe-undo" id="pe-undo">Undo</button>
                         </p>
-                    </div>
-                </div>
-            </div>
 
-            <!-- Quick Links -->
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-link me-2"></i>Quick Links
-                    </h3>
-                </div>
-                <div class="card-body">
-                    <div class="list-group list-group-flush">
-                        <a href="{% url 'profile' %}" class="list-group-item list-group-item-action border-0 py-3">
-                            <i class="fas fa-user text-primary me-3"></i>
-                            <span>View My Profile</span>
-                            <i class="fas fa-chevron-right small ms-auto text-muted"></i>
-                        </a>
-                        <!-- <a href="#" class="list-group-item list-group-item-action border-0 py-3">
-                            <i class="fas fa-key text-primary me-3"></i>
-                            <span>Change Password</span>
-                            <i class="fas fa-chevron-right small ms-auto text-muted"></i>
-                        </a> -->
-                        <a href="{% url 'doctor_availability' %}" class="list-group-item list-group-item-action border-0 py-3">
-                            <i class="fas fa-calendar-alt text-primary me-3"></i>
-                            <span>Update Availability</span>
-                            <i class="fas fa-chevron-right small ms-auto text-muted"></i>
-                        </a>
+                        <input type="file" name="{{ user_form.image.html_name }}"
+                               id="id_{{ user_form.image.html_name }}"
+                               accept="image/*" class="pe-hidden-input">
+                        {% if request.user.image %}
+                        <input type="checkbox" name="{{ user_form.image.html_name }}-clear"
+                               id="id_{{ user_form.image.html_name }}-clear" class="pe-hidden-input">
+                        {% endif %}
                     </div>
+                </div>
+
+                <div class="pe-field">
+                    <label for="{{ profile_form.birth_date.id_for_label }}">Date of birth</label>
+                    {{ profile_form.birth_date }}
+                    <p class="pe-hint">Type it as YYYY-MM-DD, or use the picker.</p>
                 </div>
             </div>
         </div>
-    </div>
+    </form>
 </div>
 
-<!-- Custom JavaScript for Profile Edit -->
-<script>
-    // Image preview functionality
-    const imageInput = document.getElementById('imageInput');
-    const profileImagePreview = document.getElementById('profileImagePreview');
-
-    imageInput.addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                if (profileImagePreview.tagName === 'IMG') {
-                    profileImagePreview.src = e.target.result;
-                } else {
-                    // Replace div with image
-                    const img = document.createElement('img');
-                    img.src = e.target.result;
-                    img.alt = "Profile Preview";
-                    img.className = "img-fluid rounded-circle border border-3 border-primary mb-3";
-                    img.style.width = "180px";
-                    img.style.height = "180px";
-                    img.style.objectFit = "cover";
-                    img.id = "profileImagePreview";
-                    
-                    profileImagePreview.parentNode.replaceChild(img, profileImagePreview);
-                }
-            };
-            reader.readAsDataURL(file);
-        }
-    });
-
-    // Bio character counter
-    const bioTextarea = document.querySelector('textarea[name="bio"]');
-    const bioCounter = document.getElementById('bioCounter');
-
-    if (bioTextarea && bioCounter) {
-        function updateBioCounter() {
-            const length = bioTextarea.value.length;
-            bioCounter.textContent = `${length}/500`;
-            
-            if (length > 500) {
-                bioCounter.style.color = '#dc3545';
-            } else if (length > 400) {
-                bioCounter.style.color = '#ff9800';
-            } else {
-                bioCounter.style.color = '#666';
-            }
-        }
-        
-        bioTextarea.addEventListener('input', updateBioCounter);
-        updateBioCounter(); // Initial update
-    }
-
-    // Form validation
-    const profileForm = document.getElementById('profileForm');
-    
-    profileForm.addEventListener('submit', function(e) {
-        const firstName = document.querySelector('input[name="first_name"]');
-        const email = document.querySelector('input[name="email"]');
-        
-        let isValid = true;
-        
-        // Clear previous errors
-        document.querySelectorAll('.is-invalid').forEach(el => {
-            el.classList.remove('is-invalid');
-        });
-        
-        // Validate first name
-        if (!firstName.value.trim()) {
-            firstName.classList.add('is-invalid');
-            isValid = false;
-        }
-        
-        // Validate email
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email.value)) {
-            email.classList.add('is-invalid');
-            isValid = false;
-        }
-        
-        if (!isValid) {
-            e.preventDefault();
-            
-            // Show error message
-            if (!document.getElementById('formError')) {
-                const errorDiv = document.createElement('div');
-                errorDiv.id = 'formError';
-                errorDiv.className = 'alert alert-danger alert-dismissible fade show mt-3';
-                errorDiv.innerHTML = `
-                    <strong><i class="fas fa-exclamation-triangle me-2"></i>Please fix the following errors:</strong>
-                    <ul class="mb-0 mt-2">
-                        ${!firstName.value.trim() ? '<li>First name is required</li>' : ''}
-                        ${!emailRegex.test(email.value) ? '<li>Valid email address is required</li>' : ''}
-                    </ul>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                `;
-                profileForm.insertBefore(errorDiv, profileForm.firstChild);
-            }
-        }
-    });
-
-    // Preview button functionality
-    document.getElementById('previewBtn').addEventListener('click', function() {
-        // You can implement a preview modal here
-        alert('Preview functionality would show how your profile appears to patients. This feature will be implemented soon!');
-    });
-
-    // Initialize tooltips
-    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'));
-    tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl);
-    });
-
-    // Auto-save draft functionality (optional)
-    let saveTimeout;
-    profileForm.addEventListener('input', function() {
-        clearTimeout(saveTimeout);
-        saveTimeout = setTimeout(() => {
-            // You could implement auto-save to localStorage here
-            console.log('Auto-save triggered');
-        }, 2000);
-    });
-</script>
-
-<!-- Custom CSS for Edit Profile -->
 <style>
-    .form-control-lg {
-        border-radius: 8px;
-        border: 2px solid #e0e0e0;
-        padding: 0.75rem 1rem;
-        transition: all 0.3s;
-    }
-    
-    .form-control-lg:focus {
-        border-color: var(--primary-green);
-        box-shadow: 0 0 0 0.25rem rgba(45, 90, 45, 0.25);
-    }
-    
-    .form-control {
-        border-radius: 6px;
-        border: 1px solid #ddd;
-        padding: 0.5rem 0.75rem;
-    }
-    
-    .form-control:focus {
-        border-color: var(--primary-green);
-        box-shadow: 0 0 0 0.2rem rgba(45, 90, 45, 0.1);
-    }
-    
-    .form-label {
-        font-weight: 600;
-        color: var(--dark-text);
-        margin-bottom: 0.5rem;
-    }
-    
-    .form-text {
-        font-size: 0.85rem;
-        color: #666;
-        margin-top: 0.25rem;
-    }
-    
-    .is-invalid {
-        border-color: #dc3545 !important;
-    }
-    
-    .border-primary {
-        border-color: var(--primary-green) !important;
-    }
-    
-    .alert-info {
-        background-color: #f0f8f0;
-        border-color: #c3e6cb;
-        color: var(--primary-green);
-    }
-    
-    .list-group-item:hover {
-        background-color: #f8f9fa;
-        transform: translateX(5px);
-        transition: all 0.3s;
-    }
-    
-    .progress {
-        background-color: #e9ecef;
-        border-radius: 10px;
-        overflow: hidden;
-    }
-    
-    .btn-outline-primary {
-        border-color: var(--primary-green);
-        color: var(--primary-green);
-    }
-    
-    .btn-outline-primary:hover {
-        background-color: var(--primary-green);
-        border-color: var(--primary-green);
-    }
+.pe {
+    --pe-ink: #1c221e;
+    --pe-ink-2: #4a554d;
+    --pe-muted: #6b7770;
+    --pe-line: #dde5df;
+    --pe-line-2: #c3d0c6;
+    --pe-surface: #fff;
+    --pe-surface-2: #f2f6f2;
+    --pe-brand: var(--primary-green, #2d5a2d);
+    --pe-brand-wash: #e9f2ea;
+    --pe-info: #2b5f86;
+    --pe-info-wash: #e2eef7;
+    --pe-dim: #64706a;
+    --pe-bad: #a32020;
+    --pe-bad-wash: #fae8e8;
+}
+
+.pe-head {
+    display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
+    padding-bottom: .9rem; border-bottom: 1px solid var(--pe-line); margin-bottom: 1.1rem;
+}
+.pe-id { margin-right: auto; }
+.pe-id h2 { margin: 0; font-size: 1.3rem; letter-spacing: -.015em; color: var(--pe-ink); }
+.pe-id p { margin: .1rem 0 0; font-size: .85rem; color: var(--pe-muted); }
+
+.pe-btn {
+    font: inherit; font-size: .84rem; font-weight: 600; cursor: pointer; text-decoration: none;
+    display: inline-block; background: var(--pe-brand); color: #fff;
+    border: 1px solid var(--pe-brand); padding: .45rem .9rem; border-radius: 8px;
+}
+.pe-btn:hover { filter: brightness(1.12); color: #fff; }
+.pe-btn.ghost { background: #fff; color: var(--pe-ink-2); border-color: var(--pe-line-2); }
+.pe-btn.ghost:hover { background: var(--pe-surface-2); filter: none; color: var(--pe-ink-2); }
+
+.pe-messages { display: grid; gap: .5rem; margin-bottom: 1rem; }
+.pe-message {
+    padding: .7rem 1rem; border-radius: 8px; font-size: .9rem;
+    background: var(--pe-brand-wash); color: var(--pe-brand); border-left: 3px solid var(--pe-brand);
+}
+.pe-message.error { background: var(--pe-bad-wash); color: var(--pe-bad); border-left-color: var(--pe-bad); }
+
+.pe-cols { display: grid; grid-template-columns: 1.25fr 1fr; gap: 1.4rem; align-items: start; }
+.pe-group {
+    font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--pe-muted);
+    margin: 0 0 .6rem; padding-bottom: .35rem; border-bottom: 1px solid var(--pe-line);
+}
+.pe-group:not(:first-child) { margin-top: 1.2rem; }
+.pe-pair { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; }
+.pe-field { margin-bottom: .9rem; }
+.pe-field > label {
+    display: block; font-size: .66rem; letter-spacing: .09em; text-transform: uppercase;
+    color: var(--pe-muted); margin-bottom: .3rem;
+}
+.pe-field input[type="text"], .pe-field input[type="email"], .pe-field input[type="number"],
+.pe-field input[type="date"], .pe-field textarea, .pe-field select, .pe-search {
+    width: 100%; color: var(--pe-ink);
+    border: 1px solid var(--pe-line-2); border-radius: 7px; padding: .45rem .6rem; background: #fff;
+    /* Named rather than inherited. `font: inherit` is a shorthand that resets
+       weight along with everything else, so a value typed into a box came out
+       at the body's 400 and read as lighter than the label above it. A value
+       the doctor entered is the content of this page; 500 against the page's
+       400 says so without shouting. */
+    font-family: inherit;
+    font-size: .88rem;
+    font-weight: 500;
+}
+.pe-field input::placeholder, .pe-search::placeholder { font-weight: 400; color: var(--pe-muted); }
+.pe-field input:focus, .pe-field textarea:focus, .pe-field select:focus {
+    border-color: var(--pe-brand); outline: none;
+}
+.pe-field textarea { min-height: 76px; resize: vertical; }
+
+/* A date field the page owns. The browser's own control brings its own
+   typeface, its own spacing and, on some platforms, its own dark chrome - so
+   left alone it is the one input on the page that does not belong to it.
+   Typing stays possible: this styles the native control rather than replacing
+   it, so YYYY-MM-DD still works and so does the picker. */
+.pe-field input[type="date"] {
+    position: relative; font-variant-numeric: tabular-nums;
+    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7770' stroke-width='2' stroke-linecap='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M16 3v4M8 3v4M3 11h18'/%3E%3C/svg%3E") no-repeat right .6rem center;
+    padding-right: 2rem;
+}
+.pe-field input[type="date"]:focus { border-color: var(--pe-brand); outline: none; }
+.pe-field input[type="date"]::-webkit-calendar-picker-indicator {
+    opacity: 0; cursor: pointer; position: absolute; right: 0; width: 2.2rem; height: 100%;
+}
+
+/* The file input is hidden and driven by the label, which is the only way to
+   restyle one: `<input type=file>` renders its own button and file name, and
+   neither can be styled. `.pe-file` is a real `<label for=…>`, so it keeps
+   the keyboard and screen-reader behaviour the input had. */
+.pe-photo {
+    display: flex; align-items: center; gap: .9rem; flex-wrap: wrap;
+    border: 1px solid var(--pe-line); border-radius: 9px;
+    padding: .7rem .8rem; background: #fff;
+}
+.pe-thumb-wrap { flex: 0 0 auto; line-height: 0; }
+.pe-thumb {
+    width: 64px; height: 64px; border-radius: 50%; object-fit: cover;
+    border: 2px solid var(--pe-brand-wash); background: var(--pe-surface-2);
+}
+.pe-thumb-empty {
+    display: grid; place-items: center; color: var(--pe-muted); font-size: 1.4rem;
+    border-style: dashed; border-color: var(--pe-line-2);
+}
+.pe-photo-actions { display: flex; gap: .4rem; flex-wrap: wrap; }
+.pe-file {
+    display: inline-block; font: inherit; font-size: .82rem; font-weight: 600;
+    cursor: pointer; background: #fff; color: var(--pe-ink-2);
+    border: 1px solid var(--pe-line-2); border-radius: 7px; padding: .4rem .85rem;
+}
+.pe-file:hover { border-color: var(--pe-brand); color: var(--pe-brand); background: var(--pe-brand-wash); }
+.pe-file.danger { color: var(--pe-bad); }
+.pe-file.danger:hover { border-color: var(--pe-bad); color: var(--pe-bad); background: var(--pe-bad-wash); }
+.pe-cleared {
+    flex-basis: 100%; margin: 0; font-size: .78rem; color: var(--pe-bad);
+    display: flex; align-items: center; gap: .5rem;
+}
+.pe-undo {
+    font: inherit; font-size: .78rem; font-weight: 600; cursor: pointer;
+    background: none; border: 0; color: var(--pe-brand); text-decoration: underline; padding: 0;
+}
+.pe-photo.is-cleared .pe-thumb { opacity: .35; filter: grayscale(1); }
+
+/* Both real controls are hidden and driven by the buttons above. Hidden this
+   way rather than with `display: none`, which would take them out of the form
+   for some assistive technology and out of the tab order entirely. */
+.pe-hidden-input {
+    position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none;
+}
+.pe-hint { font-size: .75rem; color: var(--pe-muted); margin: .3rem 0 0; }
+
+/* --- the two pickers -------------------------------------------------- */
+.pe-tf {
+    border: 1px solid var(--pe-line-2); border-radius: 8px; background: #fff;
+    padding: .3rem .4rem; display: flex; gap: .3rem; flex-wrap: wrap; align-items: center;
+    min-height: 38px;
+}
+.pe-tf.open { border-radius: 8px 8px 0 0; border-bottom-color: var(--pe-brand); }
+
+/* The searchable picker is a **field, not a row of pellets with a box wedged
+   into it**. Chosen specialties sit above; the box below is the whole width,
+   so a long name does not shove the search into a corner and the two things
+   read as what they are - what you have picked, and how to pick more. */
+.pe-picked { display: flex; gap: .3rem; flex-wrap: wrap; margin-bottom: .35rem; }
+.pe-picked:empty { display: none; }
+.pe-tf.wide { display: block; padding: 0; }
+.pe-tf.wide .pe-search { width: 100%; padding: .5rem .7rem; }
+.pe-pellet {
+    display: inline-flex; align-items: center; gap: .3rem; font-size: .78rem; font-weight: 600;
+    border-radius: 999px; padding: .1rem .25rem .1rem .6rem;
+    background: var(--pe-brand-wash); color: var(--pe-brand);
+}
+.pe-pellet.q { background: var(--pe-info-wash); color: var(--pe-info); }
+.pe-pellet button {
+    background: none; border: 0; color: inherit; cursor: pointer; font-size: .95rem;
+    line-height: 1; padding: 0 .2rem; opacity: .65;
+}
+.pe-pellet button:hover { opacity: 1; }
+.pe-empty { font-size: .82rem; color: var(--pe-muted); padding: 0 .3rem; }
+.pe-add {
+    margin-left: auto; font: inherit; font-size: .78rem; color: var(--pe-muted); cursor: pointer;
+    border: 1px dashed var(--pe-line-2); border-radius: 6px; padding: .15rem .55rem; background: #fff;
+}
+.pe-add:hover { border-color: var(--pe-brand); color: var(--pe-brand); }
+.pe-search {
+    flex: 1; min-width: 110px; border: 0; outline: none; font: inherit; font-size: .84rem;
+    padding: .2rem; background: transparent; color: var(--pe-ink);
+}
+.pe-drop {
+    border: 1px solid var(--pe-brand); border-top: 0; border-radius: 0 0 8px 8px;
+    background: #fff; max-height: 168px; overflow-y: auto;
+}
+.pe-drop button {
+    display: block; width: 100%; text-align: left; font: inherit; font-size: .84rem;
+    background: none; border: 0; cursor: pointer; padding: .35rem .7rem; color: var(--pe-ink-2);
+}
+.pe-drop button:hover, .pe-drop button:focus-visible { background: var(--pe-brand-wash); color: var(--pe-brand); }
+.pe-drop button.taken { color: var(--pe-dim); }
+.pe-drop button.taken:after { content: " · added"; font-size: .72rem; }
+.pe-drop .pe-none { padding: .45rem .7rem; font-size: .82rem; color: var(--pe-muted); }
+
+/* The real controls. Hidden only once the script has replaced them, so the
+   page still works with JavaScript off. */
+.pe-native ul { list-style: none; margin: 0; padding: 0; display: grid; gap: .15rem; }
+.pe-native label { font-size: .85rem; color: var(--pe-ink-2); display: flex; gap: .4rem; align-items: center; }
+.pe-native.enhanced { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+@media (max-width: 860px) {
+    .pe-cols { grid-template-columns: 1fr; }
+}
 </style>
 
+<script>
+(function () {
+    "use strict";
+
+    // Each picker is built **around** the checkbox list Django rendered, never
+    // instead of it: the pellets and the search box drive those checkboxes, so
+    // what the form posts is exactly what a checkbox list would post. That is
+    // what lets the no-JavaScript fallback be the same control rather than a
+    // second implementation of it.
+    document.querySelectorAll(".pe-field[data-picker]").forEach(function (field) {
+        var native = field.querySelector(".pe-native");
+        var boxes = field.querySelectorAll('.pe-native input[type="checkbox"]');
+        if (!native || !boxes.length) { return; }
+
+        var searchable = field.dataset.picker === "search";
+        var options = Array.prototype.map.call(boxes, function (box) {
+            var label = box.closest("label") || box.parentElement;
+            return { box: box, text: (label ? label.textContent : "").trim() };
+        });
+
+        var picked = document.createElement("div");
+        picked.className = "pe-picked";
+        var tf = document.createElement("div");
+        tf.className = "pe-tf" + (searchable ? " wide" : "");
+        var drop = document.createElement("div");
+        drop.className = "pe-drop";
+        drop.hidden = true;
+
+        var search = document.createElement("input");
+        search.type = "text";
+        search.className = "pe-search";
+        search.setAttribute("aria-label", field.querySelector("label").textContent.trim());
+        search.placeholder = searchable ? (field.dataset.placeholder || "Search…") : "";
+
+        var add = document.createElement("button");
+        add.type = "button";
+        add.className = "pe-add";
+        add.textContent = "+ Add";
+
+        function chosen() {
+            return options.filter(function (o) { return o.box.checked; });
+        }
+
+        function closeDrop() {
+            drop.hidden = true;
+            tf.classList.remove("open");
+        }
+
+        function paintDrop() {
+            var term = search.value.trim().toLowerCase();
+            drop.innerHTML = "";
+            var shown = options.filter(function (o) {
+                return !term || o.text.toLowerCase().indexOf(term) !== -1;
+            });
+            if (!shown.length) {
+                var none = document.createElement("div");
+                none.className = "pe-none";
+                none.textContent = "Nothing matches that. AGKI keeps this list.";
+                drop.appendChild(none);
+                return;
+            }
+            shown.forEach(function (o) {
+                var item = document.createElement("button");
+                item.type = "button";
+                // A chosen option stays in the list, marked, rather than
+                // disappearing - an option that vanishes makes you wonder
+                // whether you imagined it.
+                item.className = o.box.checked ? "taken" : "";
+                item.textContent = o.text;
+                item.addEventListener("click", function () {
+                    o.box.checked = !o.box.checked;
+                    search.value = "";
+                    paint();
+                    search.focus();
+                });
+                drop.appendChild(item);
+            });
+        }
+
+        function pellet(o) {
+            var el = document.createElement("span");
+            el.className = "pe-pellet" + (searchable ? "" : " q");
+            el.appendChild(document.createTextNode(o.text));
+            var remove = document.createElement("button");
+            remove.type = "button";
+            remove.setAttribute("aria-label", "Remove " + o.text);
+            remove.textContent = "×";
+            remove.addEventListener("click", function () {
+                o.box.checked = false;
+                paint();
+            });
+            el.appendChild(remove);
+            return el;
+        }
+
+        function paint() {
+            var mine = chosen();
+            picked.innerHTML = "";
+            tf.innerHTML = "";
+
+            if (searchable) {
+                // Chosen specialties sit **above** the box rather than inside
+                // it, so the search stays full width whatever has been picked
+                // - a long name like "Obstetrics & Gynaecology" used to shove
+                // the box into whatever was left of the row.
+                mine.forEach(function (o) { picked.appendChild(pellet(o)); });
+                tf.appendChild(search);
+            } else {
+                if (!mine.length) {
+                    var empty = document.createElement("span");
+                    empty.className = "pe-empty";
+                    empty.textContent = field.dataset.empty || "Nothing chosen yet.";
+                    tf.appendChild(empty);
+                }
+                mine.forEach(function (o) { tf.appendChild(pellet(o)); });
+                tf.appendChild(add);
+            }
+            if (!drop.hidden) { paintDrop(); }
+        }
+
+        search.addEventListener("input", function () {
+            drop.hidden = false;
+            tf.classList.add("open");
+            paintDrop();
+        });
+        search.addEventListener("focus", function () {
+            drop.hidden = false;
+            tf.classList.add("open");
+            paintDrop();
+        });
+        add.addEventListener("click", function () {
+            if (drop.hidden) {
+                drop.hidden = false;
+                tf.classList.add("open");
+                paintDrop();
+            } else {
+                closeDrop();
+            }
+        });
+        document.addEventListener("click", function (event) {
+            if (!field.contains(event.target)) { closeDrop(); }
+        });
+        field.addEventListener("keydown", function (event) {
+            if (event.key === "Escape") { closeDrop(); }
+        });
+
+        native.classList.add("enhanced");
+        native.parentNode.insertBefore(picked, native);
+        native.parentNode.insertBefore(tf, native);
+        native.parentNode.insertBefore(drop, native);
+        paint();
+    });
+
+    // ---- the photo control ----------------------------------------------
+    // Two hidden inputs, three visible controls. The file name is deliberately
+    // **not** shown: AGKI asked for it gone, and it earns nothing - the
+    // thumbnail already answers "which photo is this", and it answers it in the
+    // one form that matters here.
+    (function () {
+        var wrap = document.getElementById("pe-photo");
+        if (!wrap) { return; }
+
+        var file = wrap.querySelector('input[type="file"]');
+        var clear = wrap.querySelector('input[type="checkbox"]');
+        var thumb = document.getElementById("pe-thumb");
+        var clearBtn = document.getElementById("pe-clear-btn");
+        var undoBtn = document.getElementById("pe-undo");
+        var notice = document.getElementById("pe-cleared");
+
+        function setCleared(on) {
+            if (!clear) { return; }
+            clear.checked = on;
+            wrap.classList.toggle("is-cleared", on);
+            if (notice) { notice.hidden = !on; }
+            if (clearBtn) { clearBtn.hidden = on; }
+        }
+
+        if (clearBtn) { clearBtn.addEventListener("click", function () { setCleared(true); }); }
+        if (undoBtn) { undoBtn.addEventListener("click", function () { setCleared(false); }); }
+
+        if (file) {
+            file.addEventListener("change", function () {
+                if (!file.files || !file.files.length) { return; }
+                // Choosing a new photo cancels a pending removal: asking the
+                // server to both delete and replace is a contradiction, and the
+                // one the person plainly meant is the replacement.
+                setCleared(false);
+                if (thumb && thumb.tagName === "IMG" && window.FileReader) {
+                    var reader = new FileReader();
+                    reader.onload = function (event) { thumb.src = event.target.result; };
+                    reader.readAsDataURL(file.files[0]);
+                }
+            });
+        }
+    }());
+}());
+</script>
 {% endblock %}
