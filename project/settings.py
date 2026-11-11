@@ -103,6 +103,7 @@ INSTALLED_APPS = [
     'doctorDashboard',
     'ecommerce',
     'cms',
+    'afya',  # Afya Mfukoni: AI health guide, SMS/USSD/WhatsApp, payments
     'django_ckeditor_5',
     'adminsortable2',
     # google login
@@ -426,6 +427,25 @@ BEEM_SECRET_KEY = os.getenv("BEEM_SECRET_KEY", "")
 BEEM_SENDER_ID = os.getenv("BEEM_SENDER_ID", "")
 BEEM_BASE_URL = os.getenv("BEEM_BASE_URL", "https://apisms.beem.africa")
 BEEM_TIMEOUT = int(os.getenv("BEEM_TIMEOUT", "15"))
+
+# --- Afya Mfukoni ------------------------------------------------------------
+#
+# Shared secret every gateway webhook (SMS, USSD, payments) must send as
+# ?token=... or an X-Afya-Token header. Empty means webhooks only work with
+# DEBUG on.
+AFYA_WEBHOOK_TOKEN = os.getenv("AFYA_WEBHOOK_TOKEN", "")
+# Tanzania's national emergency number. Confirm before launch.
+AFYA_EMERGENCY_NUMBER = os.getenv("AFYA_EMERGENCY_NUMBER", "112")
+# Commission on each mobile-money visit: 5%, capped at TSh 2,000.
+AFYA_COMMISSION_RATE = os.getenv("AFYA_COMMISSION_RATE", "0.05")
+AFYA_COMMISSION_CAP_TSH = int(os.getenv("AFYA_COMMISSION_CAP_TSH", "2000"))
+# Mobile-money gateway class. The sandbox moves no money.
+AFYA_PAYMENT_GATEWAY = os.getenv("AFYA_PAYMENT_GATEWAY", "afya.payments.SandboxGateway")
+# WhatsApp Cloud API (Meta). Leave empty to disable sending.
+AFYA_WHATSAPP_TOKEN = os.getenv("AFYA_WHATSAPP_TOKEN", "")
+AFYA_WHATSAPP_PHONE_ID = os.getenv("AFYA_WHATSAPP_PHONE_ID", "")
+AFYA_WHATSAPP_VERIFY_TOKEN = os.getenv("AFYA_WHATSAPP_VERIFY_TOKEN", "")
+AFYA_WHATSAPP_APP_SECRET = os.getenv("AFYA_WHATSAPP_APP_SECRET", "")
 
 # The suite must not behave differently on a machine that happens to have
 # gateway credentials in its `.env` - see the runner's own docstring.

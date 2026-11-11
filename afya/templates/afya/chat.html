@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="sw">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Afya Mfukoni</title>
+<style>
+  :root { --brand:#0f766e; --bg:#f6f7f6; --card:#fff; --ink:#1c2321; --muted:#5f6b67; --me:#e6f4f1; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background:var(--bg); color:var(--ink); }
+  header { background:var(--brand); color:#fff; padding:14px 16px; }
+  header h1 { margin:0; font-size:1.15rem; }
+  header p { margin:2px 0 0; font-size:.85rem; opacity:.9; }
+  main { max-width:640px; margin:0 auto; padding:16px; display:flex; flex-direction:column; height:calc(100vh - 64px); }
+  #log { flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding-bottom:12px; }
+  .msg { max-width:85%; padding:10px 12px; border-radius:12px; white-space:pre-wrap; background:var(--card); box-shadow:0 1px 2px rgba(0,0,0,.06); }
+  .msg.me { align-self:flex-end; background:var(--me); }
+  form { display:flex; gap:8px; }
+  input { flex:1; padding:12px; border:1px solid #cfd8d5; border-radius:10px; font:inherit; }
+  button:disabled { opacity:.6; }
+  button { padding:12px 16px; border:0; border-radius:10px; background:var(--brand); color:#fff; font:inherit; cursor:pointer; }
+  .note { font-size:.8rem; color:var(--muted); margin-top:8px; text-align:center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Afya Mfukoni</h1>
+  <p>Afya mfukoni mwako · Health in your pocket</p>
+</header>
+<main>
+  <div id="log" aria-live="polite">
+    <div class="msg">Habari! Eleza unachohitaji kwa maneno yako. · Hi! Tell us what you need in your own words.</div>
+  </div>
+  <form id="form">
+    {% csrf_token %}
+    <input id="text" autocomplete="off" maxlength="500" placeholder="Andika hapa / Type here" aria-label="Message">
+    <button>Tuma</button>
+  </form>
+  <p class="note">Hatuchunguzi ugonjwa. Dharura? Nenda hospitali au piga {{ emergency_number }}. · We do not diagnose. Emergency? Go to hospital or call {{ emergency_number }}.</p>
+</main>
+<script>
+  const log = document.getElementById('log');
+  const input = document.getElementById('text');
+  const button = document.querySelector('#form button');
+  const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+  function add(text, me) {
+    const div = document.createElement('div');
+    div.className = 'msg' + (me ? ' me' : '');
+    div.textContent = text;
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+  }
+  document.getElementById('form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const message = input.value.trim();
+    if (!message || button.disabled) return;
+    button.disabled = true;
+    add(message, true);
+    input.value = '';
+    try {
+      const response = await fetch('{% url "afya:chat_api" %}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
+        body: JSON.stringify({message}),
+      });
+      const data = await response.json().catch(() => ({}));
+      add(data.reply || 'Samahani, jaribu tena. · Sorry, please try again.');
+    } catch (e) {
+      add('Mtandao umekatika. Jaribu tena. · Connection lost. Please try again.');
+    } finally {
+      button.disabled = false;
+      input.focus();
+    }
+  });
+</script>
+</body>
+</html>

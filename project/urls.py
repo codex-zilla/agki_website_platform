@@ -33,6 +33,7 @@ urlpatterns = [
     path('useraccount/', include('useraccount.urls')),
     path('doctorDashboard/', include('doctorDashboard.urls')),
     path('ecommerce/', include('ecommerce.urls')),
+    path('afya/', include('afya.urls')),  # Afya Mfukoni
     path('accounts/', include('allauth.urls')),  # google login ===============
     path('ckeditor5/', include('django_ckeditor_5.urls')),
 ]

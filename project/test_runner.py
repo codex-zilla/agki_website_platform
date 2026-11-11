@@ -27,7 +27,8 @@ class HermeticTestRunner(DiscoverRunner):
     #: setting starts deciding *behaviour* from the environment rather than
     #: only *destinations* - an SMTP host that is wrong is a failed send, but a
     #: gateway that is present changes which messages exist at all.
-    NEUTRALISED = ("BEEM_API_KEY", "BEEM_SECRET_KEY", "BEEM_SENDER_ID")
+    NEUTRALISED = ("BEEM_API_KEY", "BEEM_SECRET_KEY", "BEEM_SENDER_ID",
+                   "AFYA_WHATSAPP_TOKEN", "AFYA_WHATSAPP_PHONE_ID")
 
     def setup_test_environment(self, **kwargs):
         from django.conf import settings
